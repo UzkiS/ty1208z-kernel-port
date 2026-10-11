@@ -1,0 +1,79 @@
+[    0.000000] Booting Linux on physical CPU 0x0
+[    0.000000] Linux version 6.12.112-ty1208z-diag1 (ty1208z@offline) (arm-linux-gnueabihf-gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, GNU ld (GNU Binutils for Ubuntu) 2.42) #1 2026-10-11 00:00:00 UTC
+[    0.000000] CPU: ARMv7 Processor [410fc075] revision 5 (ARMv7), cr=50c53c7d
+[    0.000000] CPU: div instructions available: patching division code
+[    0.000000] CPU: PIPT / VIPT nonaliasing data cache, VIPT aliasing instruction cache
+[    0.000000] OF: fdt: Machine model: linux,dummy-virt
+[    0.000000] random: crng init done
+[    0.000000] Memory policy: Data cache writeback
+[    0.000000] Zone ranges:
+[    0.000000]   Normal   [mem 0x0000000040000000-0x000000004fffffff]
+[    0.000000] Movable zone start for each node
+[    0.000000] Early memory node ranges
+[    0.000000]   node   0: [mem 0x0000000040000000-0x000000004fffffff]
+[    0.000000] Initmem setup node 0 [mem 0x0000000040000000-0x000000004fffffff]
+[    0.000000] OF: reserved mem: Reserved memory: No reserved-memory node in the DT
+[    0.000000] psci: probing for conduit method from DT.
+[    0.000000] psci: PSCIv1.1 detected in firmware.
+[    0.000000] psci: Using standard PSCI v0.2 function IDs
+[    0.000000] psci: Trusted OS migration not required
+[    0.000000] psci: SMC Calling Convention v1.0
+[    0.000000] CPU: All CPU(s) started in SVC mode.
+[    0.000000] Kernel command line: console=ttyAMA0 rdinit=/init ty1208z.qemu_selftest=1
+[    0.000000] Dentry cache hash table entries: 32768 (order: 5, 131072 bytes, linear)
+[    0.000000] Inode-cache hash table entries: 16384 (order: 4, 65536 bytes, linear)
+[    0.000000] Built 1 zonelists, mobility grouping on.  Total pages: 65536
+[    0.000000] mem auto-init: stack:all(zero), heap alloc:off, heap free:off
+[    0.000000] SLUB: HWalign=64, Order=0-3, MinObjects=0, CPUs=1, Nodes=1
+[    0.000000] NR_IRQS: 16, nr_irqs: 16, preallocated irqs: 16
+[    0.000000] clocksource: jiffies: mask: 0xffffffff max_cycles: 0xffffffff, max_idle_ns: 19112604462750000 ns
+[    0.000000] arch_timer: cp15 timer(s) running at 62.50MHz (virt).
+[    0.000000] clocksource: arch_sys_counter: mask: 0x1ffffffffffffff max_cycles: 0x1cd42e208c, max_idle_ns: 881590405314 ns
+[    0.000092] sched_clock: 57 bits at 63MHz, resolution 16ns, wraps every 4398046511096ns
+[    0.000197] Switching to timer-based delay loop, resolution 16ns
+[    0.001638] Console: colour dummy device 80x30
+[    0.002310] Calibrating delay loop (skipped), value calculated using timer frequency.. 125.00 BogoMIPS (lpj=625000)
+[    0.002371] CPU: Testing write buffer coherency: ok
+[    0.003152] pid_max: default: 32768 minimum: 301
+[    0.003669] Mount-cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+[    0.003687] Mountpoint-cache hash table entries: 1024 (order: 0, 4096 bytes, linear)
+[    0.017474] Setting up static identity map for 0x40100000 - 0x40100054
+[    0.018278] Memory: 253476K/262144K available (2048K kernel code, 485K rwdata, 480K rodata, 1024K init, 210K bss, 8152K reserved, 0K cma-reserved)
+[    0.021773] devtmpfs: initialized
+[    0.026610] VFP support v0.3: implementor 41 architecture 2 part 30 variant 7 rev 5
+[    0.031540] futex hash table entries: 256 (order: 0, 3072 bytes, linear)
+[    0.041092] DMA: preallocated 256 KiB pool for atomic coherent allocations
+[    0.043814] Serial: AMBA PL011 UART driver
+[    0.059091] 9000000.pl011: ttyAMA0 at MMIO 0x9000000 (irq = 20, base_baud = 0) is a PL011 rev1
+[    0.059971] printk: legacy console [ttyAMA0] enabled
+[    0.078053] clocksource: Switched to clocksource arch_sys_counter
+[    0.091689] workingset: timestamp_bits=30 max_order=16 bucket_order=0
+[    0.111196] clk: Disabling unused clocks
+[    0.148060] Freeing unused kernel image (initmem) memory: 1024K
+[    0.148842] Run /init as init process
+
+TY1208Z diag1: Linux 6.12 offline candidate; hardware not validated.
+Single core; storage and network drivers disabled; root is RAM only.
+Linux (none) 6.12.112-ty1208z-diag1 #1 2026-10-11 00:00:00 UTC armv7l
+console=ttyAMA0 rdinit=/init ty1208z.qemu_selftest=1
+MemTotal:         255016 kB
+MemFree:          249396 kB
+MemAvailable:     246424 kB
+Buffers:               0 kB
+Cached:             1260 kB
+arch_sys_counter
+TIME64_PASS sizeof(time_t)=8 realtime=0 file=2208988800 converted=2040-01-01T00:00:00Z monotonic_ns=50929584
+Run diag to capture IRQ/timer/memory information.
+TIME64_PASS sizeof(time_t)=8 realtime=2208988800 file=2208988800 converted=2040-01-01T00:00:00Z monotonic_ns=50559104
+BusyBox future-date readback: year=2040 file_epoch=2208988800
+QEMU_ARM_SHELL_PASS
+Sun Jan  1 00:00:00 UTC 2040
+  File: /tmp/busybox-2040
+  Size: 0         	Blocks: 0          IO Block: 4096   regular empty file
+Device: eh/14d	Inode: 4           Links: 1
+Access: (0644/-rw-r--r--)  Uid: (    0/ UNKNOWN)   Gid: (    0/ UNKNOWN)
+Access: 2040-01-01 00:00:00.050000000 +0000
+Modify: 2040-01-01 00:00:00.050000000 +0000
+Change: 2040-01-01 00:00:00.050000000 +0000
+QEMU_INITRAMFS_TIME64_PASS
+[    0.430590] reboot: Power down

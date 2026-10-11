@@ -1,0 +1,57 @@
+{
+  "status": "offline structural checks only; hardware untested",
+  "files": {
+    "0001-hi3798mv100-diagnostic.patch": {
+      "bytes": 9021,
+      "sha256": "8bb1d7ce71eb55e050ec39ee31d0f9ab68be9778ffb51f7e276f37686048691b"
+    },
+    "0002-busybox-stat-time64.patch": {
+      "bytes": 2160,
+      "sha256": "5e3042d809de0606d009f105157ed9bf076d91a1059bb47ef23f461ad9772911"
+    },
+    "STATUS.md": {
+      "bytes": 2381,
+      "sha256": "f4850e4a1a73f27a3fe99ec5e7b42cbeed676043652fc46c412fdffd4f4772a2"
+    },
+    "busybox.armhf": {
+      "bytes": 751048,
+      "sha256": "4fc23ece22bca82e77ea17ac7c00f85d584dbf453055bffe147af81ab0b04ab2"
+    },
+    "busybox.config": {
+      "bytes": 38135,
+      "sha256": "c57d6f239e9857116bab0b3e70b27acc9af089b2b134a6f656eae9b3892656fd"
+    },
+    "initramfs.cpio": {
+      "bytes": 1280512,
+      "sha256": "f2b7a36b40d078f0973ae56fe04423b41b1e401ba75ea50c52c8ab4dd6183e06"
+    },
+    "linux.config": {
+      "bytes": 38746,
+      "sha256": "c0ef64795c1dc264fdf7c26b00bcf50a418f2830c97d122ebbd73b12c232a273"
+    },
+    "sources.lock.json": {
+      "bytes": 1186,
+      "sha256": "51c11a68c0422c7845fb09b2d31ee6f4bdc070ae1887c137474cd8bd10d846f8"
+    },
+    "time64-probe.armhf": {
+      "bytes": 525016,
+      "sha256": "3cab4198127a09c94e3c05013f1338e9f4f717a869ff7599f3238011782b7614"
+    },
+    "ty1208z-diagnostic.dtb": {
+      "bytes": 1663,
+      "sha256": "111a12e92fae56c419d5bd81aba290bdca873fa3ab5b4e57f542e054e794d928"
+    },
+    "uImage-UNTESTED.bin": {
+      "bytes": 2226231,
+      "sha256": "0773da0182ef3cf2b8e3de8eae9ed59b2566bec1407c346bdaae444c4b859dcb"
+    },
+    "zImage": {
+      "bytes": 2224504,
+      "sha256": "d48ade72e1f5ee178a3cec9c219247a0c22fd36c2a574288938189301ba172ea"
+    },
+    "zImage-appended-dtb": {
+      "bytes": 2226167,
+      "sha256": "280e45f2276e243e3f744b1aa4009839033a8933beb913c98fd0d2fe0014efe1"
+    }
+  }
+}

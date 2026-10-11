@@ -1,0 +1,24 @@
+# Local downloads, build trees and unsigned diagnostic binaries
+/.work/
+/artifacts/
+/build/
+/downloads/
+/src/
+/logs/
+/reference/sdk/
+/reference/sdk-patch-tree.json
+/evidence/
+__pycache__/
+*.py[cod]
+.ruff_cache/
+*.orig
+*.rej
+*.img
+*.bin
+*.dtb
+*.cpio
+*.armhf
+.env
+.env.*
+*.key
+*.pem

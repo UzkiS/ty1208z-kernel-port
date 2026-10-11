@@ -1,0 +1,58 @@
+name: Diagnostic build and time64 regression
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: diagnostic-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  diagnostic:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      JOBS: "2"
+      PYTHONUNBUFFERED: "1"
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install build and lint dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential gcc-arm-linux-gnueabihf \
+            binutils-arm-linux-gnueabihf libc6-dev-armhf-cross bc bison flex \
+            libssl-dev libelf-dev libncurses-dev device-tree-compiler \
+            u-boot-tools cpio xz-utils pkg-config qemu-user qemu-system-arm \
+            shellcheck python3-venv
+          python3 -m venv .work/lint-venv
+          .work/lint-venv/bin/pip install ruff==0.11.13
+          echo "$PWD/.work/lint-venv/bin" >> "$GITHUB_PATH"
+      - name: Repository and script checks
+        run: make lint
+      - name: Build pinned Linux and BusyBox candidate
+        run: |
+          mkdir -p logs
+          make build > logs/build.log 2>&1 || { tail -n 100 logs/build.log; exit 1; }
+          tail -n 20 logs/build.log
+          git diff --exit-code -- patches
+      - name: ARM and 2040 timestamp regression on QEMU virt
+        run: make test
+      - name: Upload UNTESTED diagnostics and logs
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ty1208z-diag1-HARDWARE-UNTESTED-${{ github.sha }}
+          path: |
+            artifacts/diag1/
+            logs/
+          retention-days: 14
+          if-no-files-found: warn

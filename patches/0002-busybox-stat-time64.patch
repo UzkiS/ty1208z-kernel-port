@@ -1,0 +1,52 @@
+--- a/coreutils/stat.c
++++ b/coreutils/stat.c
+@@ -382,20 +382,19 @@
+ 	} else if (m == 'x') {
+ 		printfs(pformat, human_time(&statbuf->st_atim));
+ 	} else if (m == 'X') {
+-		strcat(pformat, TYPE_SIGNED(time_t) ? "ld" : "lu");
+-		/* note: (unsigned long) would be wrong:
+-		 * imagine (unsigned long64)int32 */
+-		printf(pformat, (long) statbuf->st_atime);
++		strcat(pformat, TYPE_SIGNED(time_t) ? "lld" : "llu");
++		/* time_t may be 64-bit even when long is only 32-bit. */
++		printf(pformat, (long long) statbuf->st_atime);
+ 	} else if (m == 'y') {
+ 		printfs(pformat, human_time(&statbuf->st_mtim));
+ 	} else if (m == 'Y') {
+-		strcat(pformat, TYPE_SIGNED(time_t) ? "ld" : "lu");
+-		printf(pformat, (long) statbuf->st_mtime);
++		strcat(pformat, TYPE_SIGNED(time_t) ? "lld" : "llu");
++		printf(pformat, (long long) statbuf->st_mtime);
+ 	} else if (m == 'z') {
+ 		printfs(pformat, human_time(&statbuf->st_ctim));
+ 	} else if (m == 'Z') {
+-		strcat(pformat, TYPE_SIGNED(time_t) ? "ld" : "lu");
+-		printf(pformat, (long) statbuf->st_ctime);
++		strcat(pformat, TYPE_SIGNED(time_t) ? "lld" : "llu");
++		printf(pformat, (long long) statbuf->st_ctime);
+ # if ENABLE_SELINUX
+ 	} else if (m == 'C' && (option_mask32 & OPT_SELINUX)) {
+ 		printfs(pformat, scontext);
+@@ -678,7 +677,7 @@
+ 	print_it(format, filename, print_stat, &statbuf IF_SELINUX(, scontext));
+ #else	/* FEATURE_STAT_FORMAT */
+ 	if (option_mask32 & OPT_TERSE) {
+-		printf("%s %llu %llu %lx %lu %lu %llx %llu %lu %lx %lx %lu %lu %lu %lu"
++		printf("%s %llu %llu %lx %lu %lu %llx %llu %lu %lx %lx %lld %lld %lld %lu"
+ 		       IF_NOT_SELINUX("\n"),
+ 		       filename,
+ 		       (unsigned long long) statbuf.st_size,
+@@ -691,9 +690,9 @@
+ 		       (unsigned long) statbuf.st_nlink,
+ 		       (unsigned long) major(statbuf.st_rdev),
+ 		       (unsigned long) minor(statbuf.st_rdev),
+-		       (unsigned long) statbuf.st_atime,
+-		       (unsigned long) statbuf.st_mtime,
+-		       (unsigned long) statbuf.st_ctime,
++		       (long long) statbuf.st_atime,
++		       (long long) statbuf.st_mtime,
++		       (long long) statbuf.st_ctime,
+ 		       (unsigned long) statbuf.st_blksize
+ 		);
+ # if ENABLE_SELINUX

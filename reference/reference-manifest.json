@@ -1,0 +1,399 @@
+{
+  "repository": "07bug/HiSTBLinuxV100R005C00SPC060",
+  "commit": "a9f05973129d738e175416dd4a91b2c264ffcdd4",
+  "patch_tree": "e2ee0d23fdf0a1d921d56e55c9450415c0dbbcc0",
+  "files": [
+    {
+      "path": "Makefile",
+      "bytes": 55417,
+      "git_blob_sha1": "ff936c8867bd5d35bde6550cebb7cb77407fe127",
+      "sha256": "f991e475da8f5e4c71907de912969e33a32e304e7d62b8605d67da559ca7bbe6",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/Makefile"
+    },
+    {
+      "path": "arch/arm/boot/dts/hi3798mv100.dts",
+      "bytes": 12848,
+      "git_blob_sha1": "7dd3b897bd89e3a53a597ac2a5aa91220d741e99",
+      "sha256": "22ae6a515650b7bd9f54f543bfa42f132085b4fda0ad03881a0f075a343c3f6f",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/boot/dts/hi3798mv100.dts"
+    },
+    {
+      "path": "arch/arm/configs/hi3798mv100_defconfig",
+      "bytes": 87027,
+      "git_blob_sha1": "4b523bf20abac0a0d3a008692e7dd8a901e37819",
+      "sha256": "4d1dde91300934ee699442bf875cd46fd9a72aff8c1c72d1324cccc55a0cf39a",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/configs/hi3798mv100_defconfig"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/Kconfig",
+      "bytes": 680,
+      "git_blob_sha1": "d02d63fb3eb55d83f49e412b40fb6864cc322188",
+      "sha256": "55c521a23dc0fa7ba7e55479bb1fc3d355379c236f98efa6fefe280288b81175",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/Kconfig"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/Makefile",
+      "bytes": 280,
+      "git_blob_sha1": "fdab154774670f63e7781906cfb45831ac0531cb",
+      "sha256": "bc583ab8e747ab04c26edce7947c10548231f051d153b4b20293fa51520eb186",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/Makefile"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/Makefile.boot",
+      "bytes": 104,
+      "git_blob_sha1": "aa739ea102d5cd864b5cb3ba58ae94dd7248c106",
+      "sha256": "8d8d7d6f98459b85e7c00b923fd3cb412da070d6fba3e5a6529f0f567639eac2",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/Makefile.boot"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/core.c",
+      "bytes": 4298,
+      "git_blob_sha1": "bde3389f8b00d6df2b492e56cfdd9c96fbc0c0ce",
+      "sha256": "0772a0455e4ca377638195107e768c7909b6e5fb672cd7f5625494bfceba83a8",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/core.c"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/headsmp.S",
+      "bytes": 2632,
+      "git_blob_sha1": "8d2bff41f40a8198a37ad1e0f6c5f85e02d34df0",
+      "sha256": "f7fb16078bfec26b3fe368e1cea7d57858852bdb99a42d85baa6f7c8bf320b4f",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/headsmp.S"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/hotplug.c",
+      "bytes": 4212,
+      "git_blob_sha1": "e5d264f0179b285a1b9b966317238c9d7ecd9bf3",
+      "sha256": "93388c315851bb528d90e516f28aa137261c3d8b0dcbcc89917b62e4cedc3165",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/hotplug.c"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/hotplug.h",
+      "bytes": 1146,
+      "git_blob_sha1": "c7eb9e13f7b2e9ccabd5a60b66081ed265b8140c",
+      "sha256": "5e3283906e401741f9046ef6d5f4f59e3cd6272731f6dcf2f12b958dd4be60f8",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/hotplug.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/debug-macro.S",
+      "bytes": 249,
+      "git_blob_sha1": "40b0c8df0c4eb2890704cc0a5c0d9466a826ffde",
+      "sha256": "6b1040e44752917d3ee1c25373eb81a2a909c8b9a8a09b9852a876a470a2b9de",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/debug-macro.S"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/early-debug.h",
+      "bytes": 661,
+      "git_blob_sha1": "fd2f28420b6b9b7bc94e38f164eb57a921c3d2e7",
+      "sha256": "86064a8346bbb357912617d733ebcab8ed27260301e040e3fa07de5f80d739e9",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/early-debug.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/entry-macro.S",
+      "bytes": 1878,
+      "git_blob_sha1": "5d6bc5b927caa33803e1dc791eb973b967160c19",
+      "sha256": "0b63509841e9a9f9084d487949ebd88995e37653a23f82371481837168bb9c9e",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/entry-macro.S"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/hardware.h",
+      "bytes": 216,
+      "git_blob_sha1": "961f5dbf9be7b4c73a2566940838ae0307a65ed0",
+      "sha256": "e8f2e14f3854c77c93eef39fd4df854ec5da9ec26d5554705927f77754326167",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/hardware.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/io.h",
+      "bytes": 807,
+      "git_blob_sha1": "ed3a53a17016b4f4e1df37b12f03aa154403da57",
+      "sha256": "c89566a75ec0474b12afaef03a71fb4df6cb8c76e76bc919383a057d5943b9ef",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/io.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/irqs.h",
+      "bytes": 2551,
+      "git_blob_sha1": "abedb1abb0908a8f50f325faaecdba68e6176614",
+      "sha256": "b764626ced7cb834635f4bec9903570e58331dd1201baf09a4aa825faa01e8d1",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/irqs.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/memory.h",
+      "bytes": 692,
+      "git_blob_sha1": "fc2ab58aa3988853fccc03f3dddb75a192df96b6",
+      "sha256": "9a02e35c4e176b4a50a47d485268e42012e09f777c8b8ddac90afe8533ae5ab7",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/memory.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/platform.h",
+      "bytes": 8162,
+      "git_blob_sha1": "376f208324582fa31c6c50b0bc837eee0bdfdddd",
+      "sha256": "5e75363cd3b02df7eac7e80f3f886644d78d4888b359f61d42ef13e9c7e9cf30",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/platform.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/timex.h",
+      "bytes": 88,
+      "git_blob_sha1": "5c9ae566c7a33a1539b53ba6e7eb0c0fb93f4d0c",
+      "sha256": "a6edfef4140bfb06a7126903dda65948e6014e0c39cbac00c5eac772b016063e",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/timex.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/include/mach/uncompress.h",
+      "bytes": 798,
+      "git_blob_sha1": "1fbad984eacff485115d7a9d6901d01ee3d994d9",
+      "sha256": "1a44d93a1a93715a9ce13ad4cc1d7a583ad219465ddf33a6cc6d1533876e756a",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/include/mach/uncompress.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/platsmp.c",
+      "bytes": 6541,
+      "git_blob_sha1": "fcf7be9d5725ef63deb5635bc46adad5b395169c",
+      "sha256": "7ff5db669ef13643ec19bc798e10c3dfc1e1a8fbe3d6f1aaf27db04e27695611",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/platsmp.c"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/platsmp.h",
+      "bytes": 990,
+      "git_blob_sha1": "626c96bf8dcf4cc15f215d5f763f5a55875bfc45",
+      "sha256": "8ad7885d458f8fc46915095f51062e8a5b4c0348e91d33b751a715e12927af62",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/platsmp.h"
+    },
+    {
+      "path": "arch/arm/mach-hi3798mx/pmu.c",
+      "bytes": 623,
+      "git_blob_sha1": "6e1d908fbac2c85c47c38c933ade1c8ad3e5b1e2",
+      "sha256": "b145659b1f7a67020af5c59f3a20ba75d5b0b00645c97ee7303773cdf817c86e",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/arch/arm/mach-hi3798mx/pmu.c"
+    },
+    {
+      "path": "drivers/hisilicon/clk/clk-hisi.c",
+      "bytes": 8128,
+      "git_blob_sha1": "37c5362da7be2f143597b5104a04d6d851c5b1e7",
+      "sha256": "9a106e597a52e80fe75d76988deb56687b151330bfb9189f4ddd1cfcc5adee42",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/clk/clk-hisi.c"
+    },
+    {
+      "path": "drivers/hisilicon/clk/clk-hisi.h",
+      "bytes": 1971,
+      "git_blob_sha1": "37f6baa85b73423d8262b4e1659ab9f5406b2bd2",
+      "sha256": "c91fd314dda041d4806b4e63fbc3d3b470b7dc42cb0d8f897b44664095a2f5ff",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/clk/clk-hisi.h"
+    },
+    {
+      "path": "drivers/hisilicon/clk/hi3798mx/Makefile",
+      "bytes": 133,
+      "git_blob_sha1": "ac1601ea86464dbf0c8aed106c54dfc0c5a886e3",
+      "sha256": "0d2c69e8390228b65a91983d5fa83aa1ab38cf90dbf6b33e1288615ca6469254",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/clk/hi3798mx/Makefile"
+    },
+    {
+      "path": "drivers/hisilicon/clk/hi3798mx/clk-hi3798mv100.c",
+      "bytes": 4347,
+      "git_blob_sha1": "9e586286c203350568751e88b758692f7922f55b",
+      "sha256": "0a7d847cb6b41675b7bb2eb1260fb6f623ec2abc399aa177bfb1ab587f10ccf8",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/clk/hi3798mx/clk-hi3798mv100.c"
+    },
+    {
+      "path": "drivers/hisilicon/clk/hi3798mx/clk-hiir.c",
+      "bytes": 909,
+      "git_blob_sha1": "fda690aebbcdde904ebbc8e751fb9d2eaf55762f",
+      "sha256": "f0c721caafb0f98b8cfb31341b44a7aec9b2478e359f33a15b2537f8e24cfcd4",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/clk/hi3798mx/clk-hiir.c"
+    },
+    {
+      "path": "drivers/hisilicon/clk/hi3798mx/clk-hiusb2.c",
+      "bytes": 14084,
+      "git_blob_sha1": "a8de15480220088022e66e97d9422ecc422f3a6e",
+      "sha256": "8535bdb3f7d8567e862c87f25a6c8c4a363125e9b4ec40695724c6d6d5002e40",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/clk/hi3798mx/clk-hiusb2.c"
+    },
+    {
+      "path": "drivers/hisilicon/clk/hi3798mx/clk-hiusb3.c",
+      "bytes": 4407,
+      "git_blob_sha1": "ed700ad80df0a2799173b8c256a951817a77ce3c",
+      "sha256": "37661cf0107b61ec107d471f1da76fbd1a377319291ca4c137d33ec1e2e147a1",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/clk/hi3798mx/clk-hiusb3.c"
+    },
+    {
+      "path": "drivers/hisilicon/clk/reset-hisilicon.c",
+      "bytes": 5964,
+      "git_blob_sha1": "348d8b9cf28a0fff68cf9aaa10a14cb74cae1ef1",
+      "sha256": "991283f4451638de26f235b862593b640fea9c022eeb83a9e7ffac67e6282174",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/clk/reset-hisilicon.c"
+    },
+    {
+      "path": "drivers/hisilicon/misc/hisp804-timer.c",
+      "bytes": 10359,
+      "git_blob_sha1": "6912828efeafb11725a93e4eea382133129c7df7",
+      "sha256": "6d164b2874153bfa9057dc3f2c38542edbc9dbc4b90d2ca056228611aca258b5",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/misc/hisp804-timer.c"
+    },
+    {
+      "path": "drivers/mmc/host/himciv200/Kconfig",
+      "bytes": 374,
+      "git_blob_sha1": "0dbaf18c8d37d36a895b5fbc529e5145c866e338",
+      "sha256": "39a3a7aaa2ba6ba93626b05652df1ef9900f88faf4e07d229bc16130a2137df3",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/mmc/host/himciv200/Kconfig"
+    },
+    {
+      "path": "drivers/mmc/host/himciv200/Makefile",
+      "bytes": 70,
+      "git_blob_sha1": "d3c69c73ac35a38a125001312b16fff788ca237d",
+      "sha256": "41df544c46c4c3b7d97307d136b95dda9cde3d51d636014ca48323ca9476ce0f",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/mmc/host/himciv200/Makefile"
+    },
+    {
+      "path": "drivers/mmc/host/himciv200/himci_hi3798cv2x.c",
+      "bytes": 10301,
+      "git_blob_sha1": "46ba6e5886c6406c299871ac25bf58b060a424a2",
+      "sha256": "39caec644aa534bc8a93d4c061cb26cdd26ae890cc8befafbda65f59449fa456",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/mmc/host/himciv200/himci_hi3798cv2x.c"
+    },
+    {
+      "path": "drivers/mmc/host/himciv200/himciv200.c",
+      "bytes": 40334,
+      "git_blob_sha1": "504d50193f22e9100bf4ecaa015b0da244e83b89",
+      "sha256": "4c6b762fc3f5db182c3d8113fc1a49583a852d49c22979428f20b918295202cb",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/mmc/host/himciv200/himciv200.c"
+    },
+    {
+      "path": "drivers/mmc/host/himciv200/himciv200.h",
+      "bytes": 2001,
+      "git_blob_sha1": "e2571325e88bd2780d3228624afeeec0ed1fbfc6",
+      "sha256": "f17bf40d1bf560d82be170fb941c9c5380429ff4b4a63df287116801d28c6421",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/mmc/host/himciv200/himciv200.h"
+    },
+    {
+      "path": "drivers/mmc/host/himciv200/himciv200_dbg.c",
+      "bytes": 14996,
+      "git_blob_sha1": "7cf4c53a0e7144b99dc2944192abbcce7102a429",
+      "sha256": "8895da42b1ebece4450d48ec664e0aba42e86a75780558607e68accf29e4b2d8",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/mmc/host/himciv200/himciv200_dbg.c"
+    },
+    {
+      "path": "drivers/mmc/host/himciv200/himciv200_dbg.h",
+      "bytes": 957,
+      "git_blob_sha1": "f9b46f8f5cdbdcc551f7c048d0f615d85ea913a3",
+      "sha256": "c833560734e41289b67fa67edde1f50a8c86eba1f8a2c0752e715509f77204b4",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/mmc/host/himciv200/himciv200_dbg.h"
+    },
+    {
+      "path": "drivers/mmc/host/himciv200/himciv200_def.h",
+      "bytes": 7007,
+      "git_blob_sha1": "13bb26f7b704855e9957dbbc1a8b8f2c589e8819",
+      "sha256": "43ca52aa93c2aaf80e9807b1fd8ec5c78933703be447aec4191dabd68fcda56a",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/mmc/host/himciv200/himciv200_def.h"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/Kconfig",
+      "bytes": 540,
+      "git_blob_sha1": "46aae716e0aa41e1c08f4de51a09ca9cdad4c37e",
+      "sha256": "52c74e10a5649f04915f8fd68d6bfc7be117e4567fa1545430d4d6fe4c75c427",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/Kconfig"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/Makefile",
+      "bytes": 161,
+      "git_blob_sha1": "3a7a17f33498b5083349f6dce387d54842e6fa69",
+      "sha256": "5a4972b6b95893f117562975f6a3b3d75f95676e8bcfe6183f718c9badf3bc78",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/Makefile"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/autoeee.c",
+      "bytes": 5805,
+      "git_blob_sha1": "e9714e1125614c3cada4aa377896bbc51b5e8928",
+      "sha256": "931d4a618b696764ed2f9ada5a9f14bb0e9ba863664de18110d25990521df921",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/autoeee.c"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/festa_s28v112.h",
+      "bytes": 27520,
+      "git_blob_sha1": "eb097ea88f4ec36491388d09a7cf73d5980e453f",
+      "sha256": "1098627e6f461600406ca9a39f36377aa387c1d74cb02806a6743f1f1b5eaa73",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/festa_s28v112.h"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/festa_v212.h",
+      "bytes": 12038,
+      "git_blob_sha1": "42da076b4cd222a60bf467cadd893f79c6ad154b",
+      "sha256": "3c6ffa14dbd0be8470f9bed6e6ac59b51e173a99a69482d9d03eb9416cceb5e6",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/festa_v212.h"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/festa_v220.h",
+      "bytes": 18172,
+      "git_blob_sha1": "ffababd7b9c3140148c3ce930f09c7edc2ca5c53",
+      "sha256": "f916fa05fd7a559c589fa702e85cf72332af054ce8a496a1a445d2d2661cfb56",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/festa_v220.h"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/festa_v330.h",
+      "bytes": 557,
+      "git_blob_sha1": "169f7411f5f0112f15433d2d6b78e650eae96ac8",
+      "sha256": "597c0bf5d486b3d866b3a17d885d891305012e0a1ccc54bbd03e6d48be5d8866",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/festa_v330.h"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/hieth.c",
+      "bytes": 43188,
+      "git_blob_sha1": "fc191d62794833efcd0e0b760ff69b091190bd7a",
+      "sha256": "ae55a55be4f8eb658f31e2c872f3990cae2f4464d4b8a17bc8b7f5096369aaa5",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/hieth.c"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/hieth.h",
+      "bytes": 13200,
+      "git_blob_sha1": "b9c25e06e33543057ad8224bb77751e150eb829a",
+      "sha256": "efebfabfbeacca9898be0fe92aab5544d813e9d55686a3a3d7025ed28f608b06",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/hieth.h"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/hieth_dbg.c",
+      "bytes": 10960,
+      "git_blob_sha1": "fb9ac41bf0ac8b555106d1e78c82e87ed8029d8e",
+      "sha256": "91aa8d33dde55c009af22570048434343ae132e5aa2a74c6b63553d8d3147432",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/hieth_dbg.c"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/hieth_dbg.h",
+      "bytes": 616,
+      "git_blob_sha1": "8f4c5de9667fb233652522b58866c276d9c1ee5e",
+      "sha256": "9dd12d28c22638e4a4b17528778a229f1f0b99aa2e1842fedb479335e55d92fd",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/hieth_dbg.h"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/mdio.c",
+      "bytes": 4473,
+      "git_blob_sha1": "276dc2649ae841d50df8dd4da6fc7deaa6ed2972",
+      "sha256": "03d70b30f89562fae4ceab04ef43aaecfddae224847f586d92d89de6412bb23e",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/mdio.c"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/mdio.h",
+      "bytes": 2492,
+      "git_blob_sha1": "429fba5ca148ab2bb55e2b4878ede4af3ff243ed",
+      "sha256": "789d97227b6d3c50da8f99b1a4a2132979873b8442b3e86b309a42edb0b9aeaf",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/mdio.h"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/phy.c",
+      "bytes": 13704,
+      "git_blob_sha1": "65e7eadbafb70e678499990f903c3b88eceb7e0c",
+      "sha256": "80955d79de6481c67319e9ab999f17387a6ada52d51d5c9f4f61d384a85afebb",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/phy.c"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/phy.h",
+      "bytes": 899,
+      "git_blob_sha1": "da5e1dc5e4cc23bd32f024b1fad5c805b510683c",
+      "sha256": "4cde5cdfe09aa09a833b5a1561e0154c4e8cc570f7a8126cd96c302db72fbd8a",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/phy.h"
+    },
+    {
+      "path": "drivers/net/ethernet/hieth/pm.c",
+      "bytes": 7816,
+      "git_blob_sha1": "fa6c07fe6fc82cd0f10c5a8d7882f48104cd068c",
+      "sha256": "ec316064757fe5f515dc6bb4d95bb77b8771322700e4e9dd43f03d0614247cba",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/pm.c"
+    }
+  ]
+}

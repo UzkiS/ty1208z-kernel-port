@@ -1,0 +1,56 @@
+#!/bin/sh
+export PATH=/bin:/sbin
+/bin/busybox --install -s /bin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+mkdir -p /dev/pts /tmp
+mount -t devpts devpts /dev/pts
+mount -t tmpfs tmpfs /tmp
+echo
+echo 'TY1208Z diag1: Linux 6.12 offline candidate; hardware not validated.'
+echo 'Single core; storage and network drivers disabled; root is RAM only.'
+uname -a
+cat /proc/cmdline
+head -n 5 /proc/meminfo
+cat /sys/devices/system/clocksource/clocksource0/current_clocksource
+/bin/time64-probe
+echo 'Run diag to capture IRQ/timer/memory information.'
+
+# Only QEMU virt regression runs use this exact command-line token.
+# Board DTB does not include it. Future-date test never runs by default.
+# Kernel command line is intentionally scanned as words, not input lines.
+# shellcheck disable=SC2013
+for arg in $(cat /proc/cmdline); do
+    if [ "$arg" = 'ty1208z.qemu_selftest=1' ]; then
+        if ! grep -q 'linux,dummy-virt' /sys/firmware/devicetree/base/compatible; then
+            echo 'QEMU_SELFTEST_REFUSED: board is not the virt machine'
+            break
+        fi
+        clock_ok=0
+        /bin/time64-probe --set-clock-2040 && clock_ok=1
+        year=$(date -u +%Y)
+        touch /tmp/busybox-2040
+        file_epoch=$(stat -c %Y /tmp/busybox-2040)
+        echo "BusyBox future-date readback: year=$year file_epoch=$file_epoch"
+        if [ "$clock_ok" = 1 ] && [ "$year" = 2040 ] &&
+           [ "$file_epoch" -gt 2147483647 ] &&
+           [ "$(stat -c %X /tmp/busybox-2040)" -gt 2147483647 ] &&
+           [ "$(stat -c %Z /tmp/busybox-2040)" -gt 2147483647 ]; then
+            /bin/sh -c 'echo QEMU_ARM_SHELL_PASS'
+            date -u
+            stat /tmp/busybox-2040
+            echo 'QEMU_INITRAMFS_TIME64_PASS'
+        else
+            echo 'QEMU_INITRAMFS_TIME64_FAIL'
+        fi
+        sync
+        poweroff -f
+    fi
+done
+
+while :; do
+    setsid cttyhack /bin/sh
+    echo 'Diagnostic shell exited; restarting it.'
+    sleep 1
+done

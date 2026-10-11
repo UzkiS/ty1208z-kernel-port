@@ -1,0 +1,313 @@
+--- a/arch/arm/mach-hisi/Kconfig
++++ b/arch/arm/mach-hisi/Kconfig
+@@ -12,6 +12,14 @@
+ if ARCH_HISI
+ 
+ menu "Hisilicon platform type"
++
++config ARCH_HI3798MV100
++	bool "Hi3798MV100 single-core diagnostic support"
++	depends on ARCH_MULTI_V7 && !SMP
++	select HI3798MV100_TIMER
++	help
++	  Experimental RAM-only diagnostic candidate for TY1208Z CA.
++	  Hardware boot and secure-boot acceptance remain unverified.
+ 
+ config ARCH_HI3xxx
+ 	bool "Hisilicon Hi36xx family"
+--- a/arch/arm/mach-hisi/Makefile
++++ b/arch/arm/mach-hisi/Makefile
+@@ -6,5 +6,6 @@
+ CFLAGS_platmcpm.o	:= -march=armv7-a
+ 
+ obj-y	+= hisilicon.o
++obj-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100.o
+ obj-$(CONFIG_MCPM)		+= platmcpm.o
+ obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
+--- a/arch/arm/boot/dts/hisilicon/Makefile
++++ b/arch/arm/boot/dts/hisilicon/Makefile
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
++dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
+ dtb-$(CONFIG_ARCH_HI3xxx) += \
+ 	hi3620-hi4511.dtb
+ dtb-$(CONFIG_ARCH_HIP01) += \
+--- a/drivers/clocksource/Kconfig
++++ b/drivers/clocksource/Kconfig
+@@ -400,6 +400,12 @@
+ 	  increase wrt the initial clock value.
+ 	  This affects CPU_FREQ max delta from the initial frequency.
+ 
++config HI3798MV100_TIMER
++	bool
++	depends on ARM && OF
++	select CLKSRC_MMIO
++	select TIMER_OF
++
+ config ARM_TIMER_SP804
+ 	bool "Support for Dual Timer SP804 module"
+ 	depends on ARM || ARM64 || COMPILE_TEST
+--- a/drivers/clocksource/Makefile
++++ b/drivers/clocksource/Makefile
+@@ -65,6 +65,7 @@
+ obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
+ obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
+ obj-$(CONFIG_ARMV7M_SYSTICK)		+= armv7m_systick.o
++obj-$(CONFIG_HI3798MV100_TIMER) += timer-hi3798mv100.o
+ obj-$(CONFIG_ARM_TIMER_SP804)		+= timer-sp804.o
+ obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
+ obj-$(CONFIG_KEYSTONE_TIMER)		+= timer-keystone.o
+--- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-diagnostic.dts
+@@ -0,0 +1,84 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/dts-v1/;
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++
++/*
++ * OFFLINE CANDIDATE, NOT A VERIFIED BOARD DESCRIPTION.
++ * Register addresses, IRQs and fixed clocks follow the local Hinas DTB and
++ * pinned vendor reference. RAM size and secure reservations must be checked
++ * against the actual machine BEFORE any RAM boot is attempted.
++ */
++/ {
++	model = "TY1208Z CA offline diagnostic candidate";
++	compatible = "tianyi,ty1208z-ca-diagnostic", "hi3798mv100-series";
++	#address-cells = <1>;
++	#size-cells = <1>;
++	interrupt-parent = <&gic>;
++
++	aliases { serial0 = &uart0; };
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++		bootargs = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=8 ignore_loglevel keep_bootcon panic=0";
++	};
++
++	/* PLACEHOLDER: 256 MiB, not an assertion of safe available RAM. */
++	memory@0 {
++		device_type = "memory";
++		reg = <0x00000000 0x10000000>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu@0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0>;
++		};
++	};
++
++	xtal: clock-24m {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24000000>;
++	};
++	uartclk: clock-83m3 {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <83300000>;
++	};
++
++	gic: interrupt-controller@f8a01000 {
++		compatible = "arm,cortex-a7-gic";
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++		interrupt-controller;
++		reg = <0xf8a01000 0x1000>, <0xf8a02000 0x100>;
++	};
++
++	soc {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		/* Original clocksource and CPU0 event counters, not CPU1's counter. */
++		timer@f8a29000 {
++			compatible = "hisilicon,hi3798mv100-timer";
++			reg = <0xf8a29000 0x20>, <0xf8a2a000 0x20>;
++			reg-names = "clocksource", "clockevent";
++			interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&xtal>;
++		};
++
++		uart0: serial@f8b00000 {
++			compatible = "arm,pl011", "arm,primecell";
++			arm,primecell-periphid = <0x001fe011>;
++			reg = <0xf8b00000 0x1000>;
++			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&uartclk>, <&uartclk>;
++			clock-names = "uartclk", "apb_pclk";
++		};
++	};
++};
+--- /dev/null
++++ b/arch/arm/mach-hisi/hi3798mv100.c
+@@ -0,0 +1,16 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Minimal UP diagnostic support; no vendor SMP, storage or security writes. */
++#include <asm/mach/arch.h>
++#include <asm/mach/map.h>
++
++static const char *const hi3798mv100_compat[] __initconst = {
++	"tianyi,ty1208z-ca-diagnostic",
++	"hi3798mv100-series",
++	NULL,
++};
++
++DT_MACHINE_START(HI3798MV100, "HiSilicon Hi3798MV100 diagnostic candidate")
++	.atag_offset = 0x100,
++	.map_io = debug_ll_io_init,
++	.dt_compat = hi3798mv100_compat,
++MACHINE_END
+--- /dev/null
++++ b/drivers/clocksource/timer-hi3798mv100.c
+@@ -0,0 +1,145 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Single-core diagnostic timer for Hi3798MV100.
++ * Register facts and the repeated event LOAD write follow the pinned vendor
++ * hisp804 reference. This driver intentionally does not enable other CPUs or
++ * touch clock gates, secure registers, OTP, storage or bootloader state.
++ * The upstream "hisilicon,sp804" binding describes a different 64-bit layout.
++ */
++#define pr_fmt(fmt) "hi3798mv100-timer: " fmt
++
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/clocksource.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/of_address.h>
++#include <linux/of_clk.h>
++#include <linux/of_irq.h>
++#include <linux/sched_clock.h>
++
++#include "timer-sp.h"
++
++static void __iomem *mv100_source;
++static void __iomem *mv100_event;
++static unsigned long mv100_reload;
++
++static u64 notrace mv100_sched_read(void)
++{
++	return (u32)~readl_relaxed(mv100_source + TIMER_VALUE);
++}
++
++static int mv100_shutdown(struct clock_event_device *evt)
++{
++	writel(0, mv100_event + TIMER_CTRL);
++	return 0;
++}
++
++static void mv100_program(unsigned long count, unsigned long mode)
++{
++	writel(TIMER_CTRL_32BIT, mv100_event + TIMER_CTRL);
++	/* Preserve the vendor hardware workaround until physical validation. */
++	writel(count, mv100_event + TIMER_LOAD);
++	writel(count, mv100_event + TIMER_LOAD);
++	writel(TIMER_CTRL_32BIT | TIMER_CTRL_IE | TIMER_CTRL_ENABLE | mode,
++	       mv100_event + TIMER_CTRL);
++}
++
++static int mv100_periodic(struct clock_event_device *evt)
++{
++	mv100_program(mv100_reload, TIMER_CTRL_PERIODIC);
++	return 0;
++}
++
++static int mv100_next_event(unsigned long next, struct clock_event_device *evt)
++{
++	mv100_program(next, TIMER_CTRL_ONESHOT);
++	return 0;
++}
++
++static struct clock_event_device mv100_clkevt = {
++	.name = "hi3798mv100-cpu0",
++	.rating = 400,
++	.features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT,
++	.set_state_shutdown = mv100_shutdown,
++	.set_state_oneshot = mv100_shutdown,
++	.set_state_periodic = mv100_periodic,
++	.tick_resume = mv100_shutdown,
++	.set_next_event = mv100_next_event,
++};
++
++static irqreturn_t mv100_interrupt(int irq, void *dev_id)
++{
++	struct clock_event_device *evt = dev_id;
++
++	writel(1, mv100_event + TIMER_INTCLR);
++	evt->event_handler(evt);
++	return IRQ_HANDLED;
++}
++
++static int __init mv100_timer_init(struct device_node *node)
++{
++	struct clk *clk;
++	unsigned long rate;
++	int ret, irq;
++
++	clk = of_clk_get(node, 0);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		goto put_clk;
++	rate = clk_get_rate(clk);
++	if (!rate) {
++		ret = -EINVAL;
++		goto disable_clk;
++	}
++	mv100_source = of_iomap(node, 0);
++	mv100_event = of_iomap(node, 1);
++	if (!mv100_source || !mv100_event) {
++		ret = -ENXIO;
++		goto unmap;
++	}
++	irq = irq_of_parse_and_map(node, 0);
++	if (irq <= 0) {
++		ret = -EINVAL;
++		goto unmap;
++	}
++	writel(0, mv100_source + TIMER_CTRL);
++	writel(0, mv100_event + TIMER_CTRL);
++	writel(1, mv100_event + TIMER_INTCLR);
++	ret = request_irq(irq, mv100_interrupt, IRQF_TIMER,
++			  mv100_clkevt.name, &mv100_clkevt);
++	if (ret)
++		goto unmap;
++
++	writel(0xffffffff, mv100_source + TIMER_LOAD);
++	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
++	       mv100_source + TIMER_CTRL);
++	ret = clocksource_mmio_init(mv100_source + TIMER_VALUE,
++			"hi3798mv100", rate, 499, 32, clocksource_mmio_readl_down);
++	if (ret) {
++		writel(0, mv100_source + TIMER_CTRL);
++		free_irq(irq, &mv100_clkevt);
++		goto unmap;
++	}
++	sched_clock_register(mv100_sched_read, 32, rate);
++	mv100_clkevt.irq = irq;
++	mv100_clkevt.cpumask = cpumask_of(0);
++	mv100_reload = DIV_ROUND_CLOSEST(rate, HZ);
++	clockevents_config_and_register(&mv100_clkevt, rate, 0xf, 0x7fffffff);
++	pr_info("single CPU, %lu Hz, source/event mapped, IRQ %d\n", rate, irq);
++	return 0;
++
++unmap:
++	if (mv100_event)
++		iounmap(mv100_event);
++	if (mv100_source)
++		iounmap(mv100_source);
++disable_clk:
++	clk_disable_unprepare(clk);
++put_clk:
++	clk_put(clk);
++	return ret;
++}
++TIMER_OF_DECLARE(hi3798mv100, "hisilicon,hi3798mv100-timer", mv100_timer_init);

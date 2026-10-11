@@ -1,0 +1,30 @@
+{
+  "linux": {
+    "version": "6.12.112",
+    "commit": "7aba70ab2e8d8ab3cd45abcaa15e1119a00dc42a",
+    "url": "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.12.112.tar.xz",
+    "sha256": "164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03",
+    "hash_verification": "Matched downloaded kernel.org sha256sums.asc line; PGP signature not verified"
+  },
+  "busybox": {
+    "version": "1.37.0",
+    "url": "https://busybox.net/downloads/busybox-1.37.0.tar.bz2",
+    "sha256": "3311dff32e746499f4df0d5df04d7eb396382d7e108bb9250e7b519b837043a4"
+  },
+  "vendor_reference": {
+    "repository": "https://github.com/07bug/HiSTBLinuxV100R005C00SPC060",
+    "commit": "a9f05973129d738e175416dd4a91b2c264ffcdd4",
+    "patch_tree": "e2ee0d23fdf0a1d921d56e55c9450415c0dbbcc0",
+    "file_manifest": "reference/reference-manifest.json",
+    "role": "Source audit only; not the exact ecoo Hinas kernel source"
+  },
+  "observed_toolchain": {
+    "host": "WSL Ubuntu 24.04.4 amd64",
+    "cross_prefix": "arm-linux-gnueabihf-",
+    "gcc": "13.3.0 (Ubuntu 13.3.0-6ubuntu2~24.04.1)",
+    "binutils": "2.42",
+    "cross_glibc": "2.39",
+    "qemu": "8.2.2",
+    "mkimage": "2025.10"
+  }
+}

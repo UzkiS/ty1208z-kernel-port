@@ -1,0 +1,44 @@
+schema: 1
+board: TY1208Z-CA
+status: diagnostic-built-hardware-unverified
+source_firmware:
+  bootloader_sha256: f891870ec98b4df48de879afc1e1973cf14cc9057eb18a5a41d974fab3e935bc
+  kernel_sha256: baaa86b45dc9f10ac9611695c1f37311ac6eda6315fd03e5fb2c8cf7f92afaf5
+  kernel_version: 4.4.35_ecoo_81082668
+  uimage_load: 0x02000000
+  uimage_entry: 0x02000000
+  dtb_file_offset: 10853712
+  dtb_bytes: 8935
+reference_soc:
+  compatible: hi3798mv100-series
+  cpu: arm,cortex-a7
+  cores: 4
+  uart0: 0xf8b00000
+  gic_distributor: 0xf8a01000
+  gic_cpu_interface: 0xf8a02000
+  emmc: 0xf9830000
+  ethernet: 0xf9840000
+  phy_address: 2
+  crg: 0xf8a22000
+  timer23: 0xf8a29000
+  timer45: 0xf8a2a000
+  physical_ram_base: 0x00000000
+  ram_size: unverified
+reference_partition_layout:
+  kernel_start_mib: 14
+  kernel_size_mib: 20
+  rootfs_start_mib: 610
+  rootfs_device: /dev/mmcblk0p9
+unverified:
+  - Actual board RAM size and reserved/secure regions
+  - Current bootloader identity and runtime commands
+  - Candidate image authentication/encoding requirements
+  - Recovery backups belong to this physical board
+  - Exact timer and UART clocks in hardware
+  - Safe temporary image/DTB placement in RAM
+  - Physical Wi-Fi USB/SDIO identity, power/reset and station/AP capabilities
+policy:
+  keep_known_successful_bootloader: true
+  candidate_stage: RAM-initramfs-only
+  persistent_device_writes: false
+  otp_efuse_writes: false
