@@ -1,5 +1,7 @@
 # TY1208Z CA kernel port
 
+[![Diagnostic CI](https://github.com/UzkiS/ty1208z-kernel-port/actions/workflows/diagnostic.yml/badge.svg)](https://github.com/UzkiS/ty1208z-kernel-port/actions/workflows/diagnostic.yml)
+
 为天邑 TY1208Z 高安版 / Hi3798MV100 准备现代 Linux 板级适配，后续目标是
 原生 OpenWrt/Kwrt、Passwall、板载 Wi-Fi，以及可验证的 64 位时间支持。
 

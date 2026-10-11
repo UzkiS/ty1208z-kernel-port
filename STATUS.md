@@ -13,7 +13,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Linux 6.12.112 candidate | Cross-compiled; board descriptor, UART/GIC DTB, single-core timer and embedded initramfs |
 | Structural checks | Passed: CRC, ARM uImage/zImage, appended DTB, static ARM ELF, required/disabled config |
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
-| GitHub CI | Workflow prepared; published run result is available in GitHub Actions |
+| GitHub CI | Passed for code commit `7b99fe6`; [run 38141542884](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38141542884) |
 | Physical TY1208Z boot | Not attempted |
 | CA authentication / RAM placement | Unverified; DT memory range and load address require hardware confirmation |
 | Hinas startup under new kernel | Not tested; eMMC driver and legacy modules need separate work |

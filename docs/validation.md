@@ -3,6 +3,10 @@
 日期：2026-10-11。主机 WSL Ubuntu 24.04.4，ARM GCC 13.3、binutils 2.42，
 交叉 glibc 2.39，QEMU 8.2.2。实际构建配置和哈希随产物保存。
 
+云端干净环境的完整构建和回归也已通过：代码提交 `7b99fe6`，
+[Actions run 38141542884](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38141542884)。
+首轮发现产物检查目录未提前创建，修复后重跑通过。此后状态文档的修改不改变二进制。
+
 ## 已通过
 
 - 固定 Linux 6.12.112 与 BusyBox 1.37.0 的压缩包 SHA-256。
