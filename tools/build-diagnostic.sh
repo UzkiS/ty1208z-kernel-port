@@ -17,7 +17,7 @@ kout="$taskbase/build/linux-diagnostic"
 bout="$taskbase/build/busybox-diagnostic"
 rootfs="$taskbase/build/initramfs-root"
 artifacts="$project/artifacts/diag1"
-mkdir -p "$kout" "$bout" "$rootfs" "$artifacts"
+mkdir -p "$kout" "$bout" "$rootfs" "$artifacts/checks"
 
 python3 - "$project" "$taskbase" <<'PY'
 import hashlib, json, sys, urllib.request
