@@ -72,7 +72,12 @@ copies pass actual-pair/resource/provenance checks; PTY cases run on Linux.
 `make lint`, the ordinary diagnostic `make build` and `make test` also pass.
 
 The application workflow includes this fixture in both matrix jobs and memory
-trials. A completed CI acceptance for the NTP addition is still pending.
+trials. Complete remote acceptance now passed on `c25f83d`,
+[run 38298432025](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38298432025).
+Both actual jobs/all steps, uploaded image/provenance/console hashes, the
+four corrected epochs/reply counts in all four trials and test-source hashes
+against that commit were inspected. Remote identities are recorded separately
+in [the CI report](openwrt-applications-ci-20261013.md).
 
 These results establish the installed client's one-shot protocol/clock handling
 in those scenarios. Physical clock accuracy, real network NTP servers, normal

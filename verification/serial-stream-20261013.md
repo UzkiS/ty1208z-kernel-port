@@ -60,6 +60,13 @@ character submission is not proof that the board received it; the cause
 remains unestablished. The guarded listener was restored without boot, reset
 or storage commands. No fresh board startup has yet been observed.
 
+After the next user completion reply, that same live COM9 listener still had
+zero received bytes. Windows reported the adapter OK, and two further pings
+received replies at 4 and 15 ms. This is not evidence of a captured power
+cycle or recovered UART. A question about the actual box power/LED transition
+was left pending; the listener was kept armed rather than repeatedly reopening
+the port or sending boot commands.
+
 ## Local evidence identities
 
 Raw logs and experimental runners remain in ignored local storage.

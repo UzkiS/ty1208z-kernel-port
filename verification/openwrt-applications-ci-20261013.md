@@ -52,4 +52,50 @@ to the board.
 The guests used QEMU virt/Cortex-A7/single-core, no host-network access and no
 disks. This does not verify MV100 peripherals, CA RAM boot, sustained physical
 traffic, physical routing/TPROXY, NTP service, Wi-Fi or installation. Later
-UDP/NTP regression remains locally accepted and awaits its own remote CI.
+UDP/NTP remote acceptance is recorded separately below.
+
+## UDP and NTP matrix accepted remotely
+
+The later [run 38298432025](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38298432025)
+completed successfully on `c25f83d788169610045eef96788cc23f95f04fba`.
+Both matrix jobs and every step were inspected. The plain job ran from
+19:57:47 to 21:41:42 UTC and the integrated job from 19:57:47 to 21:52:57 UTC
+on 2026-10-12. Fresh pinned native toolchains, full applications, 512/240-MiB
+QEMU trials and separate external-initrd packaging all succeeded.
+
+All four uploaded artifacts were downloaded. Each RAM manifest's actual
+file lengths/hashes, uImage header/data CRC, appended DTB, initrd gzip length
+and load addresses were checked. QEMU kernel/rootfs/config/package identities
+match the packaged files. Every console's byte length/hash and exact required
+marker set were verified. Test-source hashes also match the files in the
+actual `c25f83d` commit; fixture source/binary provenance remains separate
+from the delivered rootfs.
+
+All four consoles contain the four distinct installed-NTP-client cases with
+the expected seed/target pairs. Actual corrected times were at most three
+seconds after the target; every server reported positive replies and zero
+rejected requests. Both integrated trials contain actual UDP TPROXY packet
+counters and the TCP/UDP success markers. The executed router fixture requires
+forward and reverse UDP delivery, and direct traffic failure before/after
+Passwall, not merely construction of firewall rules. Emulated transfers
+establish delivery, not board throughput.
+
+| Variant | Usable memory | Console SHA-256 |
+|---|---|---|
+| Plain applications | 512 MiB | `1c743a9ab6cd5fde135eace236a2ba4243e17cbffd2017b2f3e0b05acb337c17` |
+| Plain applications | 240 MiB | `79d24d90fab62f360877dd3a9e5cfa696d433054532ef1161c4c15e9ec464a39` |
+| Ethernet/applications | 512 MiB | `72decfa23e7842adbe758e4614b95e3bf6894b9e77d5cc004b8741f0204dbcfb` |
+| Ethernet/applications | 240 MiB | `e8edfcf0b3abf4d144c5506fd24d4756e4bada58b167852b476354d886f6fa0c` |
+
+| Remote `c25f83d` RAM file | Bytes | SHA-256 |
+|---|---:|---|
+| Plain uImage | 3391804 | `61fcbdb8e2407f82da06ff83f6b0c7a42ac85bb8fd0134707a2a19b79cc67c58` |
+| Plain external rootfs | 20923232 | `0ead3f0df5235c35d218512de1da07e3a73f670836861c9c01f617c2c8cc7191` |
+| Integrated uImage | 3436584 | `ca79ad16f31a4288e6b52fc241775a8d731261ed1c29b171767d7699120d5dcc` |
+| Integrated external rootfs | 21043524 | `87661537e019392aed403f7a1690d7befd0697d939a8fd1db5112f9673f20769` |
+
+The static remote NTP fixture binary is 42096 bytes, SHA-256
+`ed944c93286928df9588e41eaf1a02f3cc941afd87fcb41fc42e7aec02485e15`.
+These remote artifacts have not replaced the local physical-test candidates.
+No physical peripherals, NTP service, routing/proxy performance, Wi-Fi,
+persistent storage or complete system Y2038 acceptance is implied.

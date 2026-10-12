@@ -89,8 +89,13 @@ Downloaded image/provenance/console hashes and markers were checked; the
 [remote report](openwrt-applications-ci-20261013.md) records those separate
 artifact identities. Native core/Ethernet CI also passed on `62db42b` in
 [run 38287462054](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38287462054).
-The completed application run predates the later UDP/NTP fixtures; their
-local acceptance is not replaced by this older CI result.
+The later `c25f83d` application matrix also completed successfully in
+[run 38298432025](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38298432025),
+including actual bidirectional UDP TPROXY and all four installed NTP-client
+era/time64 cases at both memory budgets. All four artifacts were downloaded;
+file/console hashes, exact source identities, clock targets and UDP counters
+were independently verified in the linked remote report. Physical acceptance
+remains separate.
 
 ## Remaining acceptance
 
