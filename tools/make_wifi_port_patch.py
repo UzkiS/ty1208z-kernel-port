@@ -171,6 +171,10 @@ def transform(files):
 \tif (drvr->bus_if->state''')
     for name in ("wland_pull_wid", "wland_wid_hdrpull", "wland_proto_cdc_cmplt"):
         text = replace_definition(text, name)
+    for name in ("wland_fil_iovar_data_set", "wland_fil_iovar_data_get"):
+        text = body(text, name, '''\t/* The locked source has no transport for named iovars. */
+\treturn -EOPNOTSUPP;
+''')
     result["rdawlan/wland_cmds.c"] = text
     text = files["rdawlan/wland_trap.c"]
     text = replace(text, '''\trdlen = kernel_read(fp, fp->f_pos, buf, len);
@@ -347,6 +351,29 @@ def transform(files):
 \t\tap_gtk_len = params->key_len + 2;
 #endif
 \tWLAND_DBG(CFG80211, TRACE, "Done.\\n");''')
+    text = text[:start] + operation + text[end:]
+    for name in ("wland_cfg80211_del_key", "wland_cfg80211_get_key",
+                 "wland_cfg80211_config_default_key", "wland_cfg80211_stop_ap"):
+        text = replace_definition(text, name)
+    text = replace(text, '''\tWLAN_CIPHER_SUITE_CCMP,
+\tWLAN_CIPHER_SUITE_AES_CMAC,
+#ifdef WLAND_WAPI_SUPPORT
+\tWLAN_CIPHER_SUITE_SMS4
+#endif /*WLAND_WAPI_SUPPORT */''', '''\tWLAN_CIPHER_SUITE_CCMP,
+\t/* No verified BIP/WAPI management-key command path. */''')
+    text = replace(text, '"Done(dbm:%d)\\n", *dbm);', '"Done(err:%d)\\n", err);')
+    start, _, end = function_spans(text, "wland_cfg80211_set_tx_power")[0]
+    operation = text[start:end]
+    operation = replace(operation, '\ts32 dbm = mbm;\n'
+                        '#endif /*LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0) */',
+                        '\ts32 dbm = mbm;\n'
+                        '#endif /*LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0) */\n'
+                        '\ts32 requested_dbm = dbm;')
+    operation = replace(operation, '\tcfg->conf->tx_power = dbm;\n', '')
+    operation = replace(operation, '''\terr = wland_fil_iovar_data_set(ifp, "qtxpower", &dbm, sizeof(dbm));''',
+                        '''\terr = wland_fil_iovar_data_set(ifp, "qtxpower", &dbm, sizeof(dbm));
+\tif (err >= 0)
+\t\tcfg->conf->tx_power = requested_dbm;''')
     text = text[:start] + operation + text[end:]
     result["rdawlan/wland_cfg80211.c"] = text
     return result

@@ -58,6 +58,12 @@ disabled. No install/sysupgrade image is defined.
 
 ## Still required on the board
 
+Fresh remote CI also completed both plain native RAM and isolated Ethernet
+builds/emulation on `62db42b`: [run 38287462054](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38287462054).
+Both artifact uploads succeeded, explicitly labeled HARDWARE-UNTESTED. This
+reproduces the offline checks; it does not establish a board boot or the later
+application/UDP/NTP integration.
+
 The guarded RAM plan must pass against the recorded bootloader inspection,
 and a fresh live loader identity/DDR/bootcmd and device CRC must pass before
 boot. Then verify actual OpenWrt startup, PHY binding, netifd lease, gateway

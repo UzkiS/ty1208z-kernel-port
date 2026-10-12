@@ -34,3 +34,8 @@ The actual cached pinned Linux/BusyBox build, core QEMU time64 and guarded boot
 regressions pass after the change. Kernel/source versions and generated board
 patches are unchanged. Remote CI must still complete to establish the repaired
 fresh-run result; local availability does not prove the CI network will work.
+
+The new remote `c25f83d` run [38298432030](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38298432030)
+has now completed the actual pinned Linux/BusyBox download/build, core time64
+and guarded boot steps successfully. Full diagnostic acceptance remains pending;
+those completed steps establish recovery of the formerly failing build stage.

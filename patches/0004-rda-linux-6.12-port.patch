@@ -350,26 +350,98 @@
  #include "wland_android.h"
  #include "wland_rx.h"
  #include "wland_usb.h"
-@@ -2023,11 +2026,14 @@
+@@ -199,10 +202,7 @@
+ 	WLAN_CIPHER_SUITE_WEP104,
+ 	WLAN_CIPHER_SUITE_TKIP,
+ 	WLAN_CIPHER_SUITE_CCMP,
+-	WLAN_CIPHER_SUITE_AES_CMAC,
+-#ifdef WLAND_WAPI_SUPPORT
+-	WLAN_CIPHER_SUITE_SMS4
+-#endif /*WLAND_WAPI_SUPPORT */
++	/* No verified BIP/WAPI management-key command path. */
+ };
+ 
+ /* Vendor specific ie. id = 221, oui and type defines exact ie */
+@@ -1945,6 +1945,7 @@
+ #else
+ 	s32 dbm = mbm;
+ #endif /*LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0) */
++	s32 requested_dbm = dbm;
+ 
+ 	WLAND_DBG(CFG80211, TRACE, "Enter\n");
+ 
+@@ -1983,9 +1984,10 @@
+ 	else
+ 		txpwrmw = (u16) dbm;
+ 
+-	cfg->conf->tx_power = dbm;
+ 	dbm = wland_mw_to_qdbm(txpwrmw);
+ 	err = wland_fil_iovar_data_set(ifp, "qtxpower", &dbm, sizeof(dbm));
++	if (err >= 0)
++		cfg->conf->tx_power = requested_dbm;
+ 
+ done:
+ 	WLAND_DBG(CFG80211, TRACE, "Done(qtxpower:%d)\n", err);
+@@ -2018,42 +2020,27 @@
+ 	*dbm = (s32) wland_qdbm_to_mw(result);
+ 
+ done:
+-	WLAND_DBG(CFG80211, TRACE, "Done(dbm:%d)\n", *dbm);
++	WLAND_DBG(CFG80211, TRACE, "Done(err:%d)\n", err);
+ 	return err;
  }
  
++// SPDX-License-Identifier: GPL-2.0-only
  static s32 wland_cfg80211_config_default_key(struct wiphy *wiphy,
 -	struct net_device *ndev, u8 key_idx, bool unicast, bool multicast)
+-{
+-	u32 index, wsec;
+-	s32 err = 0;
 +	struct net_device *ndev, int link_id, u8 key_idx, bool unicast, bool multicast)
- {
- 	u32 index, wsec;
- 	s32 err = 0;
++{
  	struct wland_if *ifp = netdev_priv(ndev);
-+
+ 
+-	WLAND_DBG(CFG80211, TRACE, "key index (%d), Enter\n", key_idx);
+-
 +	if (link_id > 0)
 +		return -EOPNOTSUPP;
++	if (key_idx >= DOT11_MAX_DEFAULT_KEYS)
++		return -EINVAL;
+ 	if (!wland_check_vif_up(ifp->vif))
+ 		return -EIO;
  
- 	WLAND_DBG(CFG80211, TRACE, "key index (%d), Enter\n", key_idx);
+-	err = wland_fil_iovar_data_get(ifp, "wsec", &wsec, sizeof(u32));
+-	if (err < 0) {
+-		WLAND_ERR("WLC_GET_WSEC error (%d)\n", err);
+-		goto done;
+-	}
+-
+-	if (wsec & WEP_ENABLED) {
+-		/*
+-		 * Just select a new current key
+-		 */
+-		index = key_idx;
+-		err = wland_fil_iovar_data_set(ifp, "set_key_primary", &index,
+-			sizeof(u32));
+-		if (err < 0)
+-			WLAND_ERR("error (%d)\n", err);
+-	}
+-done:
+-	WLAND_DBG(CFG80211, TRACE, "Done\n");
+-	return err;
+-}
++	/* No implemented default-key selector in the locked named-iovar path. */
++	return -EOPNOTSUPP;
++}
++
  
-@@ -2062,6 +2068,20 @@
+ static s32 wland_add_ptkey(struct wiphy *wiphy, struct net_device *ndev,
+ 	u8 key_idx, const u8 * mac_addr, struct key_params *params)
+@@ -2061,6 +2048,20 @@
+ 	struct wland_if *ifp = netdev_priv(ndev);
  	struct wland_ptkey ptkey;
  	s32 err = 0;
- 
++
 +	err = wland_port_validate_key(params, key_idx);
 +	if (err)
 +		return err;
@@ -383,11 +455,10 @@
 +	/* This wire format has no key-index field for extended PTK slots. */
 +	if (key_idx)
 +		return -EOPNOTSUPP;
-+
+ 
  	WLAND_DBG(CFG80211, INFO, "Enter key_idx=%d, params->key_len=%d, params->cipher=0x%x\n",
  		key_idx, params->key_len, params->cipher);
- 
-@@ -2080,18 +2100,11 @@
+@@ -2080,18 +2081,11 @@
  
  		WLAND_DBG(CFG80211, TRACE, "Setting the key index %d\n", key_idx);
  		ptkey.ken_len = params->key_len;
@@ -411,7 +482,7 @@
  		if (ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_STATION ||
  			ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_P2P_CLIENT) {
  			wland_netdev_wait_pend8021x(ndev);
-@@ -2100,7 +2113,7 @@
+@@ -2100,7 +2094,7 @@
  			MIN(sizeof(ptkey), params->key_len+ETH_ALEN+1));
  		if (err < 0) {
  			WLAND_ERR("Set WID_ADD_PTK error (%d)\n", err);
@@ -420,7 +491,7 @@
  		}
  
  	}
-@@ -2116,32 +2129,40 @@
+@@ -2116,32 +2110,40 @@
  	struct wland_rx_gtkey gtkey;
  	s32 err = 0;
  
@@ -477,7 +548,7 @@
  		err = wland_fil_set_cmd_data(ifp, WID_ADD_TX_GTK, &(gtkey.key_idx),
  			MIN(sizeof(gtkey)-offsetof(struct wland_rx_gtkey, key_idx),
  			params->key_len+2));
-@@ -2161,14 +2182,19 @@
+@@ -2161,14 +2163,19 @@
  			MIN(sizeof(gtkey), params->key_len+ETH_ALEN+10));
  		break;
  	default:
@@ -501,7 +572,7 @@
  	WLAND_DBG(CFG80211, TRACE, "Done.\n");
  	return 0;
  }
-@@ -2198,7 +2224,7 @@
+@@ -2198,7 +2205,7 @@
  #endif /* STRUCT_REF */
  
  static s32 wland_cfg80211_add_key(struct wiphy *wiphy, struct net_device *ndev,
@@ -510,7 +581,7 @@
  	struct key_params *params)
  {
  	struct wland_if *ifp = netdev_priv(ndev);
-@@ -2209,6 +2235,17 @@
+@@ -2209,6 +2216,17 @@
  	s32 val, wsec;
  	u8 keybuf[8] = { 0 };
  #endif
@@ -528,7 +599,7 @@
  	WLAND_DBG(CFG80211, DEBUG, "key index (%d),Enter\n", key_idx);
  	WLAND_DBG(CFG80211, INFO,
  		"Add Key(%pM):\n"
-@@ -2227,8 +2264,7 @@
+@@ -2227,8 +2245,7 @@
  	if (mac_addr)
  		WLAND_DUMP(TX_CTRL, mac_addr, 6, "MAddr:\n");
  
@@ -538,43 +609,136 @@
  
  	if (params->seq_len)
  		WLAND_DUMP(TX_CTRL, params->seq, params->seq_len, "Seq:\n");
-@@ -2246,11 +2282,14 @@
+@@ -2245,110 +2262,49 @@
+ 	return err;
  }
  
++// SPDX-License-Identifier: GPL-2.0-only
  static s32 wland_cfg80211_del_key(struct wiphy *wiphy, struct net_device *ndev,
 -	u8 key_idx, bool pairwise, const u8 * mac_addr)
-+	int link_id, u8 key_idx, bool pairwise, const u8 * mac_addr)
++	int link_id, u8 key_idx, bool pairwise, const u8 *mac_addr)
  {
  	struct wland_if *ifp = netdev_priv(ndev);
- 	struct wland_wsec_key key;
- 	s32 err = 0;
+-	struct wland_wsec_key key;
+-	s32 err = 0;
+-
+-	WLAND_DBG(CFG80211, TRACE, "Enter\n");
+-
 +
 +	if (link_id > 0)
 +		return -EOPNOTSUPP;
++	if (key_idx >= DOT11_MAX_DEFAULT_KEYS)
++		return -EINVAL;
+ 	if (!wland_check_vif_up(ifp->vif))
+ 		return -EIO;
  
- 	WLAND_DBG(CFG80211, TRACE, "Enter\n");
- 
-@@ -2285,7 +2324,7 @@
- }
- 
- static s32 wland_cfg80211_get_key(struct wiphy *wiphy, struct net_device *ndev,
+-	return err;
+-
+-	if (key_idx >= DOT11_MAX_DEFAULT_KEYS) {
+-		/*
+-		 * we ignore this key index in this case
+-		 */
+-		WLAND_ERR("invalid key index (%d)\n", key_idx);
++	/* The pinned source has no implemented key-removal request. */
++	return -EOPNOTSUPP;
++}
++
++
++// SPDX-License-Identifier: GPL-2.0-only
++static s32 wland_cfg80211_get_key(struct wiphy *wiphy, struct net_device *ndev,
++	int link_id, u8 key_idx, bool pairwise, const u8 *mac_addr, void *cookie,
++	void (*callback)(void *cookie, struct key_params *params))
++{
++	struct wland_if *ifp = netdev_priv(ndev);
++
++	if (link_id > 0)
++		return -EOPNOTSUPP;
++	if (key_idx >= DOT11_MAX_DEFAULT_KEYS || !callback)
+ 		return -EINVAL;
+-	}
+-
+-	memset(&key, 0, sizeof(key));
+-
+-	key.index = (u32) key_idx;
+-	key.flags = WL_PRIMARY_KEY;
+-	key.algo = CRYPTO_ALGO_OFF;
+-
+-	WLAND_DBG(CFG80211, TRACE, "key index (%d)\n", key_idx);
+-
+-	/*
+-	 * Set the new key/index
+-	 */
+-	err = wland_send_key_to_chip(ndev, &key);
+-
+-	WLAND_DBG(CFG80211, TRACE, "Done(err:%d)\n", err);
+-	return err;
+-}
+-
+-static s32 wland_cfg80211_get_key(struct wiphy *wiphy, struct net_device *ndev,
 -	u8 key_idx, bool pairwise, const u8 * mac_addr, void *cookie,
-+	int link_id, u8 key_idx, bool pairwise, const u8 * mac_addr, void *cookie,
- 	void (*callback) (void *cookie, struct key_params * params))
- {
- 	struct key_params params;
-@@ -2294,6 +2333,9 @@
- 	struct wland_cfg80211_security *sec;
- 	s32 wsec = 0;
- 	s32 err = 0;
+-	void (*callback) (void *cookie, struct key_params * params))
+-{
+-	struct key_params params;
+-	struct wland_if *ifp = netdev_priv(ndev);
+-	struct wland_cfg80211_profile *profile = ndev_to_prof(ndev);
+-	struct wland_cfg80211_security *sec;
+-	s32 wsec = 0;
+-	s32 err = 0;
+-
+-	WLAND_DBG(CFG80211, INFO, "ifd:%d, key index (%d),Enter\n", ifp->bssidx, key_idx);
+-
+ 	if (!wland_check_vif_up(ifp->vif))
+ 		return -EIO;
+ 
+-	memset(&params, 0, sizeof(params));
+-
+-	err = wland_fil_iovar_data_get(ifp, "wsec", &wsec, sizeof(wsec));
+-	if (err) {
+-		WLAND_ERR("WLC_GET_WSEC error (%d)\n", err);
+-		/*
+-		 * Ignore this error, may happen during DISASSOC
+-		 */
+-		err = -EAGAIN;
+-		goto done;
+-	}
+-
+-	if (wsec & WEP_ENABLED) {
+-		sec = &profile->sec;
+-		if (sec->cipher_pairwise & WLAN_CIPHER_SUITE_WEP40) {
+-			params.cipher = WLAN_CIPHER_SUITE_WEP40;
+-			WLAND_DBG(CFG80211, TRACE, "WLAN_CIPHER_SUITE_WEP40\n");
+-		} else if (sec->cipher_pairwise & WLAN_CIPHER_SUITE_WEP104) {
+-			params.cipher = WLAN_CIPHER_SUITE_WEP104;
+-			WLAND_DBG(CFG80211, TRACE, "WLAN_CIPHER_SUITE_WEP104\n");
+-		}
+-	} else if (wsec & TKIP_ENABLED) {
+-		params.cipher = WLAN_CIPHER_SUITE_TKIP;
+-		WLAND_DBG(CFG80211, TRACE, "WLAN_CIPHER_SUITE_TKIP\n");
+-	} else if (wsec & AES_ENABLED) {
+-		params.cipher = WLAN_CIPHER_SUITE_AES_CMAC;
+-		WLAND_DBG(CFG80211, TRACE, "WLAN_CIPHER_SUITE_AES_CMAC\n");
+-	}
+-#ifdef WLAND_WAPI_SUPPORT
+-	else if (wsec & SMS4_ENABLED) {
+-		params.cipher = WLAN_CIPHER_SUITE_SMS4;
+-		WLAND_DBG(CFG80211, TRACE, "WLAN_CIPHER_SUITE_SMS4\n");
+-	}
+-#endif /* WLAND_WAPI_SUPPORT */
+-	else {
+-		WLAND_ERR("Invalid algo (0x%x)\n", wsec);
+-		err = -EINVAL;
+-		goto done;
+-	}
+-	callback(cookie, &params);
+-
+-done:
+-	WLAND_DBG(CFG80211, TRACE, "Done\n");
+-	return err;
+-}
++	/* Do not deliver empty or guessed key material to cfg80211. */
++	return -EOPNOTSUPP;
++}
 +
-+	if (link_id > 0)
-+		return -EOPNOTSUPP;
- 
- 	WLAND_DBG(CFG80211, INFO, "ifd:%d, key index (%d),Enter\n", ifp->bssidx, key_idx);
- 
-@@ -2347,8 +2389,11 @@
- }
  
  static s32 wland_cfg80211_config_default_mgmt_key(struct wiphy *wiphy,
 -	struct net_device *ndev, u8 key_idx)
@@ -587,7 +751,7 @@
  	WLAND_DBG(CFG80211, TRACE, "Not supported\n");
  
  	return -EOPNOTSUPP;
-@@ -2857,16 +2902,9 @@
+@@ -2857,16 +2813,9 @@
  
  static u64 wland_get_systime_us(void)
  {
@@ -607,23 +771,58 @@
  
  static s32 wland_inform_single_bss(struct wland_cfg80211_info *cfg,
  	struct wland_bss_info_le *bi)
-@@ -5533,10 +5571,13 @@
+@@ -5533,29 +5482,44 @@
  	return err;
  }
  
 -static int wland_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev)
-+static int wland_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev, unsigned int link_id)
++// SPDX-License-Identifier: GPL-2.0-only
++static int wland_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev,
++	unsigned int link_id)
  {
  	struct wland_if *ifp = netdev_priv(ndev);
- 	s32 err = 0;
+-	s32 err = 0;
+-
+-	WLAND_DBG(CFG80211, INFO, "Enter:id:%d, type:%d\n", ifp->bssidx, ifp->vif->wdev.iftype);
+-
+-	if (ifp->bssidx == P2PAPI_BSSCFG_DEVICE) {
+-		err = wland_fil_set_cmd_data(ifp, WID_STOP_AP_MAC1, ifp->mac_addr, ETH_ALEN);
+-		if (err < 0)
+-			WLAND_ERR("SET SSID error:%d\n", err);
+-	}
+-
++	enum nl80211_iftype role = ifp->vif->wdev.iftype;
++	s32 err;
 +
-+	if (link_id > 0)
++	if (link_id)
 +		return -EOPNOTSUPP;
- 
- 	WLAND_DBG(CFG80211, INFO, "Enter:id:%d, type:%d\n", ifp->bssidx, ifp->vif->wdev.iftype);
- 
-@@ -5554,8 +5595,9 @@
- }
++	if (role != NL80211_IFTYPE_AP && role != NL80211_IFTYPE_P2P_GO)
++		return -EOPNOTSUPP;
++	if (ndev->ieee80211_ptr->iftype != role)
++		return -EINVAL;
++	if (!wland_check_vif_up(ifp->vif))
++		return -EIO;
++	/* Only this interface has a stop command in the pinned implementation. */
++	if (ifp->bssidx != P2PAPI_BSSCFG_DEVICE)
++		return -EOPNOTSUPP;
++	if (!is_valid_ether_addr(ifp->mac_addr))
++		return -EINVAL;
++
++	err = wland_fil_set_cmd_data(ifp, WID_STOP_AP_MAC1,
++				     ifp->mac_addr, ETH_ALEN);
++	if (err < 0)
++		return err;
++
++	/* Keep the configured AP role, but publish stopped state after the reply. */
+ 	set_bit(VIF_STATUS_AP_CREATING, &ifp->vif->sme_state);
+ 	clear_bit(VIF_STATUS_AP_CREATED, &ifp->vif->sme_state);
+-
+-	WLAND_DBG(CFG80211, TRACE, "Done(err:%d)\n", err);
+-	return err;
+-}
++	return 0;
++}
++
  
  static s32 wland_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *ndev,
 -	struct cfg80211_beacon_data *info)
@@ -634,7 +833,7 @@
  	s32 err = 0;
  	struct wland_if *ifp = netdev_priv(ndev);
  	struct wland_tlv *rsn_ie;
-@@ -5750,31 +5792,15 @@
+@@ -5750,31 +5714,15 @@
  }
  //#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) */
  
@@ -673,7 +872,7 @@
  
  static s32 wland_cfg80211_change_bss(struct wiphy *wiphy, struct net_device *dev,
  	struct bss_parameters *params)
-@@ -6273,7 +6299,7 @@
+@@ -6273,7 +6221,7 @@
  	.sched_scan_start = wland_cfg80211_sched_scan_start,
  	.sched_scan_stop = wland_cfg80211_sched_scan_stop,
  #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) */
@@ -682,7 +881,7 @@
  	.change_bss = wland_cfg80211_change_bss,
  	.mgmt_tx = wland_cfg80211_mgmt_tx,
  #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 5, 0)
-@@ -6954,18 +6980,18 @@
+@@ -6954,18 +6902,18 @@
  		conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
  
  #else
@@ -706,7 +905,7 @@
  				.req_ie = conn_info->req_ie,
  				.req_ie_len = conn_info->req_ie_len,
  				.resp_ie = conn_info->resp_ie,
-@@ -7026,7 +7052,7 @@
+@@ -7026,7 +6974,7 @@
  	bool find = false;
  	int ret = 0;
  
@@ -1050,7 +1249,61 @@
  
  /*
   * @wid_msg_len length include msg_information
-@@ -2385,8 +2331,8 @@
+@@ -780,45 +726,18 @@
+ s32 wland_fil_iovar_data_set(struct wland_if * ifp, char *name, void *data,
+ 	u16 len)
+ {
+-	s32 err = 0;
+-
+-#if 0
+-	struct wland_private *drvr = ifp->drvr;
+-
+-	mutex_lock(&drvr->proto_block);
+-
+-	WLAND_DBG(DCMD, TRACE, "name=%s, len=%d\n", name, len);
+-
+-	memcpy(drvr->proto_buf, data, len);
+-	err = wland_proto_cdc_set_dcmd(drvr, ifp->ifidx, drvr->proto_buf, len);
+-	mutex_unlock(&drvr->proto_block);
+-#endif
+-	return err;
+-}
++	/* The locked source has no transport for named iovars. */
++	return -EOPNOTSUPP;
++}
++
+ 
+ s32 wland_fil_iovar_data_get(struct wland_if * ifp, char *name, void *data,
+ 	u16 len)
+ {
+-	s32 err = 0;
+-
+-#if 0
+-	struct wland_private *drvr = ifp->drvr;
+-
+-	mutex_lock(&drvr->proto_block);
+-
+-	memcpy(drvr->proto_buf, data, len);
+-
+-	err = wland_proto_cdc_query_dcmd(drvr, ifp->ifidx, drvr->proto_buf,
+-		len);
+-	if (err == 0)
+-		memcpy(data, drvr->proto_buf, len);
+-
+-	WLAND_DBG(DCMD, TRACE, "name=%s, len=%d\n", name, len);
+-
+-	mutex_unlock(&drvr->proto_block);
+-#endif
+-	return err;
+-}
++	/* The locked source has no transport for named iovars. */
++	return -EOPNOTSUPP;
++}
++
+ 
+ void wland_config_and_efuse(struct wland_if *ifp)
+ {
+@@ -2385,8 +2304,8 @@
  s32 wland_set_power_config(struct wland_if *ifp)
  {
  #ifdef WLAND_FIRMWARE_PATH
@@ -1061,7 +1314,7 @@
  	char filename[256];
  #elif defined WLAND_DOWNLOAD_FIRMWARE_FROM_HEX
  	/*no need value*/
-@@ -2430,16 +2376,15 @@
+@@ -2430,16 +2349,15 @@
  	};
  #endif
  #ifdef WLAND_FIRMWARE_PATH
@@ -1087,7 +1340,7 @@
  	buf = kzalloc(config_size+1, GFP_KERNEL);
  	if(!buf) {
  		WLAND_ERR("no more space!\n");
-@@ -2452,7 +2397,7 @@
+@@ -2452,7 +2370,7 @@
  		WLAND_DBG(DEFAULT, WARNING, "read power save config file failed!\n");
  		goto out;
  	}
@@ -1096,7 +1349,7 @@
  
  #elif defined WLAND_DOWNLOAD_FIRMWARE_FROM_HEX
  	config_size = POWER_CONFIG_HEX_SIZE;
-@@ -2483,7 +2428,7 @@
+@@ -2483,7 +2401,7 @@
  			return -1;
  		}
  		memcpy(buf, config_firmware->data, config_size);
