@@ -61,8 +61,8 @@ The built candidate and completed local checks are recorded in the
 
 ## Remaining milestones
 
-Measure inherited controls/revision/capabilities, then prepare a distinct
-guarded RAM host0 profile and validate EHCI/OHCI enumeration with storage disabled.
+Measure inherited controls/revision/capabilities, then enable the separately
+prepared host0 profile for RAM validation and test EHCI/OHCI enumeration.
 Check exact RDA revision, firmware source/license/hash, bounded control and
 bulk transfers, firmware startup, scan/association and AP support separately.
 The Hinas log warned that the high-speed RDA bulk endpoints `03/83` advertise
@@ -74,8 +74,8 @@ review the source's transfer sizing and actual hardware behavior first.
 `make usb-host-compile` separately compiles `clk-ty1208z-usb.o` and the
 mainline EHCI/OHCI core/platform objects. It produces no DTB, kernel image or
 RAM-boot permission. The option is absent from all existing diagnostic,
-native-network and router images. Its distinct board compatible has no DTS
-in this repository; current images cannot bind this provider.
+native-network and router images. A distinct offline host0 profile now supplies
+the only board DTS that can bind this provider; its RAM boot remains disabled.
 
 The new GPL-2.0-only implementation represents the pinned SDK's hardware
 register protocol as independent command tables and bounded read/modify/write
@@ -102,3 +102,27 @@ Last-user shutdown follows the SDK; it does **not** restore the inherited
 analog PHY tuning. PM, modules, network and storage are disabled for this
 compile experiment. Companion lifetime, probe-failure and system-shutdown
 behavior still require validation in the eventual real host profile.
+
+## Offline enumeration image
+
+`make usb-host` builds the independent `usb-host1` kernel/initramfs and board
+DTS. It enables only the generic EHCI/OHCI host0 controllers and shared clock
+provider. Exact MMIO/IRQ/clock-phandle/config checks exclude host1, class
+drivers, firmware loading, networking, storage, PM, modules and SMP. VT is
+explicitly disabled because it would otherwise select INPUT despite an
+explicit `# CONFIG_INPUT is not set` line.
+
+The ARM `usb-diag` script observes platform bindings and USB device descriptor
+attributes in sysfs. It reports whether root hubs and RDA `1e04:8888` were seen;
+it does not report firmware or radio acceptance. The same embedded script runs
+under QEMU virt to check actual ARM shell behavior, where it correctly reports
+no board controllers/devices. Image/layout and time64 checks pass; see the
+[offline report](../verification/usb-host-offline-20261013.md).
+
+`prepare_ram_boot.py` explicitly rejects this actual built image before opening
+a serial port or emitting loader commands. This remains in place until the
+separate hardware USB audit establishes controls, SYSID0 and capabilities, and
+the measured values are reviewed against the prepared initialization recipe.
+The currently bootable native-Ethernet and router images do not acquire USB
+permissions through this addition. No additional physical reboot is requested
+for this offline milestone.

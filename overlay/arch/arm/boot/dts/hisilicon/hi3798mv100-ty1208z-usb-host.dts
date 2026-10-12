@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: GPL-2.0-only
+/* Offline only until the independent USB register audit has been measured. */
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA offline USB host0 enumeration experiment";
+	compatible = "tianyi,ty1208z-ca-usb-host-experiment", "hi3798mv100-series";
+
+	soc {
+		usbclk: clock-controller@f8a220b8 {
+			compatible = "tianyi,ty1208z-usb-host0-clock";
+			reg = <0xf8a220b8 4>, <0xf8a220bc 4>,
+			      <0xf8a20120 4>, <0xf8a20124 4>, <0xf8000ee0 4>;
+			#clock-cells = <0>;
+		};
+
+		usb@f9890000 {
+			compatible = "generic-ehci";
+			reg = <0xf9890000 0x10000>;
+			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&usbclk>;
+		};
+
+		usb@f9880000 {
+			compatible = "generic-ohci";
+			reg = <0xf9880000 0x10000>;
+			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
+			clocks = <&usbclk>;
+		};
+	};
+};

@@ -10,6 +10,10 @@ mount -t tmpfs tmpfs /tmp
 echo
 echo 'TY1208Z: Linux 6.12 RAM candidate; see the profile-specific hardware report.'
 case "$(uname -r)" in
+    *-usb-host1)
+        echo 'USB host0 enumeration experiment; network/storage/class drivers disabled.'
+        echo 'Run usb-diag for descriptor observations; no firmware is loaded.'
+        ;;
     *-ethernet-net1)
         echo 'Single core; inherited-PHY Ethernet experiment; storage disabled.'
         echo 'Network is down by default. ethernet-diag --dhcp requests a temporary lease.'
@@ -33,6 +37,9 @@ for arg in $(cat /proc/cmdline); do
             echo 'QEMU_SELFTEST_REFUSED: board is not the virt machine'
             break
         fi
+        case "$(uname -r)" in
+            *-usb-host1) /bin/usb-diag || echo USB_HOST0_OBSERVER_FAIL ;;
+        esac
         clock_ok=0
         /bin/time64-probe --set-clock-2040 && clock_ok=1
         year=$(date -u +%Y)

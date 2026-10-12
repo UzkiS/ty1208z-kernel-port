@@ -1,0 +1,36 @@
+#!/bin/sh
+# Descriptor/sysfs observations only: no USB control/bulk endpoint tools.
+set -eu
+[ "$(uname -r)" = '6.12.112-ty1208z-usb-host1' ] || exit 1
+echo '=== USB host0 platform bindings ==='
+for host in f9890000.usb f9880000.usb; do
+    printf '%s driver=' "$host"
+    if [ -L "/sys/bus/platform/devices/$host/driver" ]; then
+        readlink "/sys/bus/platform/devices/$host/driver"
+    else
+        echo unbound
+    fi
+done
+echo '=== USB device descriptors ==='
+rda_seen=0
+ehci_seen=0
+ohci_seen=0
+for device in /sys/bus/usb/devices/*; do
+    [ -f "$device/idVendor" ] || continue
+    vendor=$(cat "$device/idVendor")
+    product=$(cat "$device/idProduct")
+    printf 'device=%s id=%s:%s' "${device##*/}" "$vendor" "$product"
+    for field in speed bcdDevice bDeviceClass bNumConfigurations bNumInterfaces; do
+        if [ -f "$device/$field" ]; then
+            printf ' %s=%s' "$field" "$(cat "$device/$field")"
+        fi
+    done
+    echo
+    case "$vendor:$product" in
+        1d6b:0002) ehci_seen=1 ;;
+        1d6b:0001) ohci_seen=1 ;;
+        1e04:8888) rda_seen=1 ;;
+    esac
+done
+echo "USB_HOST0_OBSERVATION ehci_root=$ehci_seen ohci_root=$ohci_seen rda=$rda_seen"
+echo 'USB_HOST0_OBSERVATION_COMPLETE no-class-driver no-firmware-loading'

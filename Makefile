@@ -29,11 +29,13 @@ help:
 	@echo 'make openwrt-app-ram - validate applications with a 240-MiB usable budget and package separate RAM initrd'
 	@echo 'make openwrt-router - build isolated applications plus measured Ethernet for RAM validation'
 	@echo 'make usb-host-compile - compile optional host0 clock/PHY plus generic EHCI/OHCI, no boot image'
+	@echo 'make usb-host - build offline host0 enumeration image; RAM boot remains blocked pending hardware audit'
 
 lint:
 	python3 tools/check_repository.py
 	python3 tools/fetch_wifi.py --check-lock
 	shellcheck tools/*.sh initramfs/init initramfs/diag initramfs/ethernet-diag initramfs/ethernet-dhcp
+	shellcheck initramfs/usb-diag
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
 
@@ -126,3 +128,7 @@ openwrt-router:
 .PHONY: usb-host-compile
 usb-host-compile:
 	bash tools/build-usb-host-compile.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"
+
+.PHONY: usb-host
+usb-host:
+	bash tools/build-usb-host.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"

@@ -99,6 +99,10 @@ jobs:
         run: |
           make usb-host-compile > logs/usb-host-compile.log 2>&1 || { tail -n 100 logs/usb-host-compile.log; exit 1; }
           tail -n 25 logs/usb-host-compile.log
+      - name: Build offline USB host0 enumeration profile and verify RAM-boot denial
+        run: |
+          make usb-host > logs/usb-host.log 2>&1 || { tail -n 100 logs/usb-host.log; exit 1; }
+          tail -n 30 logs/usb-host.log
       - name: Build read-only USB host0 register audit and run MMIO/profile/QEMU checks
         run: |
           make usb-audit > logs/usb-audit.log 2>&1 || { tail -n 100 logs/usb-audit.log; exit 1; }
@@ -122,6 +126,7 @@ jobs:
             artifacts/ethernet-net1/
             artifacts/usb-audit1/
             artifacts/usb-host-compile/
+            artifacts/usb-host1/
             artifacts/restart1/
             artifacts/wifi-port/
             logs/

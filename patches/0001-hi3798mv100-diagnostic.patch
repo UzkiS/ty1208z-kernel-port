@@ -26,7 +26,7 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,13 @@
+@@ -1,4 +1,14 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
@@ -37,6 +37,7 @@
 +dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb
 +dtb-$(CONFIG_POWER_RESET_TY1208Z_SP805) += hi3798mv100-ty1208z-restart.dtb
 +dtb-$(CONFIG_TY1208Z_ETHERNET_INHERITED) += hi3798mv100-ty1208z-ethernet-net.dtb
++dtb-$(CONFIG_TY1208Z_USB_HOST0_EXPERIMENT) += hi3798mv100-ty1208z-usb-host.dtb
  dtb-$(CONFIG_ARCH_HI3xxx) += \
  	hi3620-hi4511.dtb
  dtb-$(CONFIG_ARCH_HIP01) += \
@@ -296,14 +297,14 @@
 +	  No PHY reset/firmware or complete cold-start support.
 +
 +config TY1208Z_USB_HOST0_EXPERIMENT
-+	bool "TY1208Z USB host0 clock/PHY compile experiment"
++	bool "TY1208Z USB host0 clock/PHY experiment"
 +	depends on ARCH_HI3798MV100 && USB_EHCI_HCD_PLATFORM=y
 +	depends on USB_OHCI_HCD_PLATFORM=y && !BLOCK && !MMC && !MTD
 +	depends on !NET && !MODULES && !PM && !SMP && !DEBUG_FS
 +	help
 +	  Optional shared host0 clock provider for an independent experiment.
-+	  Not enabled by any RAM image. Requires a separate reviewed board
-+	  identity/DT after hardware control and capability measurements.
++	  Only the separate USB host profile enables this provider. Physical
++	  startup requires hardware control and capability measurements.
 +
  config COMMON_CLK_HI3516CV300
  	tristate "HI3516CV300 Clock Driver"
@@ -923,6 +924,40 @@
 +	};
 +};
 --- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-usb-host.dts
+@@ -0,0 +1,31 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Offline only until the independent USB register audit has been measured. */
++#include "hi3798mv100-ty1208z-diagnostic.dts"
++
++/ {
++	model = "TY1208Z CA offline USB host0 enumeration experiment";
++	compatible = "tianyi,ty1208z-ca-usb-host-experiment", "hi3798mv100-series";
++
++	soc {
++		usbclk: clock-controller@f8a220b8 {
++			compatible = "tianyi,ty1208z-usb-host0-clock";
++			reg = <0xf8a220b8 4>, <0xf8a220bc 4>,
++			      <0xf8a20120 4>, <0xf8a20124 4>, <0xf8000ee0 4>;
++			#clock-cells = <0>;
++		};
++
++		usb@f9890000 {
++			compatible = "generic-ehci";
++			reg = <0xf9890000 0x10000>;
++			interrupts = <GIC_SPI 66 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&usbclk>;
++		};
++
++		usb@f9880000 {
++			compatible = "generic-ohci";
++			reg = <0xf9880000 0x10000>;
++			interrupts = <GIC_SPI 67 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&usbclk>;
++		};
++	};
++};
+--- /dev/null
 +++ b/arch/arm/mach-hisi/hi3798mv100.c
 @@ -0,0 +1,16 @@
 +// SPDX-License-Identifier: GPL-2.0-only
@@ -1047,7 +1082,7 @@
 +++ b/drivers/clk/hisilicon/clk-ty1208z-usb.c
 @@ -0,0 +1,106 @@
 +// SPDX-License-Identifier: GPL-2.0-only
-+/* Optional, compile-only host0 clock/PHY experiment; no board DTS yet. */
++/* Optional host0 clock/PHY experiment; hardware USB audit remains pending. */
 +#include <linux/clk-provider.h>
 +#include <linux/module.h>
 +#include <linux/of.h>

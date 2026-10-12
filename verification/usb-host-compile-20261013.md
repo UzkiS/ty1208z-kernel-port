@@ -6,7 +6,9 @@ device enumeration, RDA firmware loading or Wi-Fi operation was performed.**
 The separate `make usb-host-compile` target compiles the optional provider and
 the existing Linux 6.12.112 EHCI/OHCI core/platform objects. It does not produce
 a DTB/uImage or grant RAM-boot permission. Existing Ethernet/router candidates
-remain separate. The distinct USB experiment compatible has no board DTS.
+remain separate. At this compile milestone the distinct USB experiment
+compatible had no board DTS. The later [offline enumeration image](usb-host-offline-20261013.md)
+adds a distinct DTS and linked image while retaining explicit RAM-boot denial.
 
 ## Inputs and scope
 

@@ -250,18 +250,22 @@ changes["drivers/clk/hisilicon/Kconfig"] = (
     changes["drivers/clk/hisilicon/Kconfig"][0],
     changes["drivers/clk/hisilicon/Kconfig"][1] +
     'config TY1208Z_USB_HOST0_EXPERIMENT\n'
-    '\tbool "TY1208Z USB host0 clock/PHY compile experiment"\n'
+    '\tbool "TY1208Z USB host0 clock/PHY experiment"\n'
     '\tdepends on ARCH_HI3798MV100 && USB_EHCI_HCD_PLATFORM=y\n'
     '\tdepends on USB_OHCI_HCD_PLATFORM=y && !BLOCK && !MMC && !MTD\n'
     '\tdepends on !NET && !MODULES && !PM && !SMP && !DEBUG_FS\n'
     '\thelp\n'
     '\t  Optional shared host0 clock provider for an independent experiment.\n'
-    '\t  Not enabled by any RAM image. Requires a separate reviewed board\n'
-    '\t  identity/DT after hardware control and capability measurements.\n\n')
+    '\t  Only the separate USB host profile enables this provider. Physical\n'
+    '\t  startup requires hardware control and capability measurements.\n\n')
 changes["drivers/clk/hisilicon/Makefile"] = (
     changes["drivers/clk/hisilicon/Makefile"][0],
     changes["drivers/clk/hisilicon/Makefile"][1] +
     'obj-$(CONFIG_TY1208Z_USB_HOST0_EXPERIMENT) += clk-ty1208z-usb.o\n')
+changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][0],
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +
+    'dtb-$(CONFIG_TY1208Z_USB_HOST0_EXPERIMENT) += hi3798mv100-ty1208z-usb-host.dtb\n')
 
 diffs = []
 with tarfile.open(args.archive) as archive:

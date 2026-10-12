@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Optional, compile-only host0 clock/PHY experiment; no board DTS yet. */
+/* Optional host0 clock/PHY experiment; hardware USB audit remains pending. */
 #include <linux/clk-provider.h>
 #include <linux/module.h>
 #include <linux/of.h>
