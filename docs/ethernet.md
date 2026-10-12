@@ -94,7 +94,8 @@ The internal PHY clock/reset, selection and address fields met the remaining
 conditions; LDO was `0x8`. No PHY ID has been measured.
 
 The vendor driver selects different volatile expanded-register fixup tables
-by actual PHY ID. No PHY ID has yet been established for this board. The
+by actual PHY ID. The [clock/ID experiment](../verification/ethernet-clock-id-20261012.md)
+measured `0x20669823`, matching FESTAv220. The
 SDK's OTP-derived trim routine explicitly excludes MV100 and must not be
 copied from MV200/MV300 support. No OTP/eFuse writes belong in this port.
 
@@ -120,6 +121,8 @@ a complete cold-start sequence remain unresolved. Exact-state guards,
 bit-only writes, busy/invalid-ID errors and restoration/readback failures are
 executed under ASan/UBSan; DT/profile, serial identity, build and QEMU gates
 are separate. A successful PHY read still does not establish network traffic.
+The physical experiment passed with the exact clock restoration sequence
+and FESTAv220 ID. No reset, fixup, link or MAC data transfer ran.
 
 Keep network experiments separate from the storage and plain diagnostic
 profiles. Use an MV100 compatible and an explicit upstream adaptation where
