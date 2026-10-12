@@ -384,6 +384,73 @@ def transform(files):
 \t\tclear_bit(VIF_STATUS_READY, &ifp->vif->sme_state);
 \tmutex_unlock(&cfg->usr_sync);''')
     text = text[:start] + operation + text[end:]
+    start, _, end = function_spans(text, "wland_wait_for_scancmp_event")[0]
+    operation = text[start:end]
+    operation = replace(operation, 'cfg->scanid_wait, !(*lockvar),',
+                        'cfg->scanid_wait, !READ_ONCE(*lockvar),')
+    operation = replace(operation, '\treturn ret;', '''\tif (ret < 0)
+\t\treturn ret;
+\treturn ret ? 0 : -ETIMEDOUT;''')
+    text = text[:start] + operation + text[end:]
+    # Alternative preprocessor branches open the same block twice in raw C.
+    # Both neighboring signatures are unique in the hash-locked source.
+    begin = "static s32 wland_run_escan("
+    after = "\nstatic s32 wland_do_escan("
+    if text.count(begin) != 1 or text.count(after) != 1:
+        raise ValueError("Changed conditional scan-function boundaries")
+    start = text.index(begin)
+    end = text.index(after, start)
+    if not text[start:end].endswith("}\n"):
+        raise ValueError("Changed scan-function terminator")
+    operation = text[start:end]
+    insertion = operation.index('\tWLAND_DBG(')
+    operation = operation[:insertion] + '''\t/* Validate the whole directed request before arming a timer. */
+\tif (!request || request->n_ssids < 0 || request->n_ssids > SCAN_NUM_MAX ||
+\t    (request->n_ssids && !request->ssids))
+\t\treturn -EINVAL;
+\tif (request->n_ssids) {
+\t\tint index;
+
+\t\tfor (index = 0; index < request->n_ssids; index++)
+\t\t\tif (request->ssids[index].ssid_len > sizeof(ssid_le.SSID))
+\t\t\t\treturn -EINVAL;
+\t}
+\tif (wland_check_test_mode() ||
+\t    !strcmp(rdawlan_firmware_path, "ap"))
+\t\treturn -EOPNOTSUPP;
+\tWRITE_ONCE(cfg->ctrl_scan_wait, false);
+
+''' + operation[insertion:]
+    operation = replace(operation, '''\t\t\t\terr = wland_start_scan_set(ifp, &ssid_le, true);''',
+                        '''\t\t\t\t/* Publish the wait before a fast firmware completion. */
+\t\t\t\tWRITE_ONCE(cfg->ctrl_scan_wait, cfg->scannum > 0);
+\t\t\t\terr = wland_start_scan_set(ifp, &ssid_le, true);''')
+    operation = replace(operation, '''\t\t\tif (err < 0) {
+\t\t\t\tWLAND_ERR("SCAN error (%d)\\n", err);
+\t\t\t} else if (cfg->scannum > 0) {
+\t\t\t\tcfg->ctrl_scan_wait = true;
+\t\t\t\terr = wland_wait_for_scancmp_event(cfg, &cfg->ctrl_scan_wait);
+\t\t\t}''', '''\t\t\tif (err < 0) {
+\t\t\t\tWLAND_ERR("SCAN error (%d)\\n", err);
+\t\t\t\tgoto scan_failed;
+\t\t\t}
+\t\t\tif (cfg->scannum > 0) {
+\t\t\t\terr = wland_wait_for_scancmp_event(cfg, &cfg->ctrl_scan_wait);
+\t\t\t\tif (err < 0)
+\t\t\t\t\tgoto scan_failed;
+\t\t\t}''')
+    operation = replace(operation, '''\treturn err;
+}''', '''\treturn err;
+
+scan_failed:
+\t/* Do not let later SSIDs overwrite a firmware/timeout failure. */
+\tcfg->scannum = 0;
+\tWRITE_ONCE(cfg->ctrl_scan_wait, false);
+\treturn err;
+}''')
+    text = text[:start] + operation + text[end:]
+    text = replace(text, '\t\t\tcfg->ctrl_scan_wait = false;',
+                   '\t\t\tWRITE_ONCE(cfg->ctrl_scan_wait, false);')
     result["rdawlan/wland_cfg80211.c"] = text
     return result
 

@@ -64,3 +64,14 @@ The full remote diagnostic [run 38304430531](https://github.com/UzkiS/ty1208z-ke
 also passed on `fbc1e79`, including the actual startup rollback regression
 and fresh module link. It does not resolve the reproduced initialization
 blocker or provide hardware USB/radio evidence.
+
+The downloaded remote module's manifest files and the actual standalone
+`RDA_STARTUP_ROLLBACK_PASS` marker were subsequently verified. Remote module
+bytes/SHA are 339376 /
+`cdd503f7d2209f8020a8a12fe6aa9ade1560aa3e58763d94ec176cd5501583e9`,
+and the build-log SHA is
+`8544895e4f8fb305a5f0ffdf213c24d9eb5637f340722df75764155d902b3ad5`.
+Its generated patch matches the recorded startup version. The remote config
+differs in Rust compiler availability metadata, although Rust is not enabled;
+remote/local module identities are kept separate. The later local
+[scan changes](wifi-scan-20261013.md) supersede the local identity above.
