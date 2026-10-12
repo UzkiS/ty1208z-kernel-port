@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help lint test-serial build test verify references references-wifi wifi-usb-audit wifi-port emmc-audit emmc-ident emmc-read openwrt-config openwrt-toolchain openwrt-ram
+.PHONY: help lint test-serial build test verify references references-wifi wifi-usb-audit wifi-port emmc-audit emmc-ident emmc-read openwrt-config openwrt-toolchain openwrt-ram openwrt-app-config openwrt-applications
 help:
 	@echo 'make lint       - Python/shell/config repository checks'
 	@echo 'make build      - download pinned sources and build RAM-only ARM candidate'
@@ -18,6 +18,8 @@ help:
 	@echo 'make openwrt-config - resolve the independent pinned native RAM target'
 	@echo 'make openwrt-toolchain - build the native target toolchain as a regular user'
 	@echo 'make openwrt-ram - build native OpenWrt RAM userspace/image (hardware untested)'
+	@echo 'make openwrt-app-config - resolve pinned Passwall/Xray/LuCI in an isolated tree'
+	@echo 'make openwrt-applications - build and emulate applications (no board image)'
 
 lint:
 	python3 tools/check_repository.py
@@ -69,3 +71,9 @@ openwrt-toolchain:
 
 openwrt-ram:
 	bash tools/build-openwrt-ram.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" build
+
+openwrt-app-config:
+	bash tools/build-openwrt-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" config
+
+openwrt-applications:
+	bash tools/build-openwrt-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" build

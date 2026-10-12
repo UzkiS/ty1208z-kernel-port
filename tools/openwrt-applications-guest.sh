@@ -1,0 +1,205 @@
+#!/bin/sh
+# Test fixture executed only by the isolated QEMU harness; all writes are in RAM.
+set -eu
+tr '\000' '\n' < /sys/firmware/devicetree/base/compatible | grep -qx linux,dummy-virt
+
+finish() {
+    result=$?
+    trap - EXIT
+    if [ "$result" -eq 0 ]; then
+        echo OPENWRT_APPLICATIONS_QEMU_PASS
+    else
+        echo "OPENWRT_APPLICATIONS_QEMU_FAIL status=$result"
+        cat /tmp/time64-test/*.log /tmp/etc/passwall/qemu.log 2>/dev/null || true
+        cat /tmp/time64-test/luci.txt 2>/dev/null || true
+        curl --noproxy '*' -v --max-time 5 http://127.0.0.1/cgi-bin/luci/ 2>&1 || true
+        logread | tail -n 40
+        uci show uhttpd
+    fi
+    poweroff -f
+}
+trap finish EXIT
+
+wait_http() {
+    attempts=0
+    until curl --noproxy '*' -fsS --max-time 2 "$1" > "$2" 2>/dev/null; do
+        attempts=$((attempts+1))
+        [ "$attempts" -lt 30 ] || return 1
+        sleep 1
+    done
+}
+
+wait_luci_login() {
+    attempts=0
+    while :; do
+        # Current LuCI returns 403 with its login form to unauthenticated users.
+        # Require that exact response instead of treating every HTTP error as OK.
+        status=$(curl --noproxy '*' -sS --max-time 3 -D luci.headers \
+            -o luci.txt -w '%{http_code}' http://127.0.0.1/cgi-bin/luci/ 2>/dev/null) || status=000
+        if [ "$status" = 403 ] && grep -qi '^x-luci-login-required: yes' luci.headers \
+                && grep -q 'bootstrap.sysauth' luci.txt \
+                && grep -q 'name="luci_password"' luci.txt; then
+            return 0
+        fi
+        attempts=$((attempts+1))
+        [ "$attempts" -lt 30 ] || return 1
+        sleep 1
+    done
+}
+
+mkdir -p /tmp/time64-test/www /tmp/log
+cd /tmp/time64-test
+attempts=0
+until ubus call system board > board.json 2>/dev/null && [ -S /dev/log ]; do
+    attempts=$((attempts+1))
+    [ "$attempts" -lt 30 ] || exit 1
+    sleep 1
+done
+
+# A valid CA spans both dates. An old leaf certificate must expire in 2040.
+date -u -s @1791676800
+openssl req -x509 -newkey rsa:2048 -nodes -keyout ca.key -out ca.pem \
+    -subj /CN=TY1208Z-QEMU-Test-CA -days 6000 > cert.log 2>&1
+openssl req -newkey rsa:2048 -nodes -keyout server.key -out server.csr \
+    -subj /CN=time64.test >> cert.log 2>&1
+printf '%s\n' 'subjectAltName=DNS:time64.test' > leaf.ext
+openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
+    -out expired.pem -days 1 -extfile leaf.ext >> cert.log 2>&1
+time64-probe --set-clock-2040
+test "$(date -u +%Y)" = 2040
+touch stamp
+test "$(stat -c %Y stamp)" -ge 2208988800
+openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial \
+    -out valid.pem -days 365 -extfile leaf.ext >> cert.log 2>&1
+openssl verify -CAfile ca.pem valid.pem
+if openssl verify -CAfile ca.pem expired.pem >> cert.log 2>&1; then
+    echo 'Expired certificate was accepted'
+    exit 1
+fi
+echo CERTIFICATE_TIME64_PASS
+
+# Use the installed dnsmasq implementation without external DNS or a WAN.
+/etc/init.d/dnsmasq stop
+dnsmasq --keep-in-foreground --conf-file=/dev/null --no-resolv --no-hosts \
+    --listen-address=127.0.0.1 --bind-interfaces --address=/time64.test/127.0.0.1 \
+    --local=/time64.test/ \
+    --pid-file=/tmp/time64-test/dnsmasq.pid > dnsmasq.log 2>&1 &
+printf 'nameserver 127.0.0.1\n' > /tmp/resolv.conf
+attempts=0
+until resolveip -4 -t 2 time64.test > dns.txt 2>/dev/null; do
+    attempts=$((attempts+1))
+    [ "$attempts" -lt 20 ] || exit 1
+    sleep 1
+done
+grep -qx 127.0.0.1 dns.txt
+echo DNS_TIME64_PASS
+echo '=== resolver immediately before TLS ==='
+cat /etc/resolv.conf
+resolveip -4 -t 2 time64.test
+curl --version > curl-version.txt
+cat curl-version.txt
+grep -q 'Features:.*AsynchDNS' curl-version.txt
+
+printf 'TY1208Z_LOCAL_PAYLOAD_2040\n' > www/index.html
+uhttpd -f -p 127.0.0.1:18080 -s 127.0.0.1:18443 -h /tmp/time64-test/www \
+    -C /tmp/time64-test/valid.pem -K /tmp/time64-test/server.key > uhttpd.log 2>&1 &
+uhttpd -f -s 127.0.0.1:18444 -h /tmp/time64-test/www \
+    -C /tmp/time64-test/expired.pem -K /tmp/time64-test/server.key > expired.log 2>&1 &
+wait_http http://127.0.0.1:18080/ direct.txt
+grep -qx TY1208Z_LOCAL_PAYLOAD_2040 direct.txt
+if ! curl --noproxy '*' -fvS --max-time 10 --cacert ca.pem \
+        https://time64.test:18443/ > tls.txt 2> tls-client.log; then
+    curl -4 --noproxy '*' -fvS --max-time 10 --cacert ca.pem \
+        https://time64.test:18443/ > tls-ipv4.txt 2> tls-ipv4.log || true
+    exit 1
+fi
+grep -qx TY1208Z_LOCAL_PAYLOAD_2040 tls.txt
+if curl --noproxy '*' -fsS --max-time 10 https://time64.test:18443/ > /dev/null 2> untrusted.log; then
+    echo 'Untrusted certificate was accepted'
+    exit 1
+else
+    test "$?" -eq 60
+fi
+if curl --noproxy '*' -fsS --max-time 10 --cacert ca.pem \
+        https://time64.test:18444/ > /dev/null 2> expired-tls.log; then
+    echo 'Expired HTTPS certificate was accepted'
+    exit 1
+else
+    test "$?" -eq 60
+fi
+echo HTTPS_TIME64_PASS
+
+uci set uhttpd.main.redirect_https=0
+uci commit uhttpd
+/etc/init.d/uhttpd restart
+echo LUCI_PAGE_CHECK_START
+wait_luci_login
+echo RPCD_SESSION_CHECK_START
+ubus call session create '{"timeout":60}' > session.json
+jsonfilter -i session.json -e @.ubus_rpc_session | grep -Eq '^[0-9a-f]{32}$'
+echo PASSWALL_LUA_CHECK_START
+lua -e 'assert(require("luci.passwall.api"))'
+# This fixture password exists only in the diskless, network-isolated guest.
+printf 'qemu-fixture-only\nqemu-fixture-only\n' | passwd root > passwd.log 2>&1
+status=$(curl --noproxy '*' -sS --max-time 30 -D login.headers -c login.cookies \
+    --data-urlencode luci_username=root --data-urlencode luci_password=qemu-fixture-only \
+    -o login.html -w '%{http_code}' http://127.0.0.1/cgi-bin/luci/admin/services/passwall)
+test "$status" = 302
+grep -qi '^set-cookie: sysauth_http=' login.headers
+curl --noproxy '*' -fsS --max-time 30 -b login.cookies \
+    http://127.0.0.1/cgi-bin/luci/admin/services/passwall > passwall-page.html
+grep -qi passwall passwall-page.html
+if grep -q 'bootstrap.sysauth' passwall-page.html; then
+    echo 'Authenticated Passwall page returned the login form'
+    exit 1
+fi
+echo PASSWALL_LUCI_AUTH_TIME64_PASS
+echo LUCI_RPCD_TIME64_PASS
+
+# Exercise real Passwall Lua/config/start logic, Xray and a local upstream SOCKS.
+# This validates the controller's SOCKS path; board/WAN TPROXY is a separate gate.
+microsocks -i 127.0.0.1 -p 18081 > microsocks.log 2>&1 &
+uci set passwall.qemu=nodes
+uci set passwall.qemu.type=Xray
+uci set passwall.qemu.protocol=socks
+uci set passwall.qemu.address=127.0.0.1
+uci set passwall.qemu.port=18081
+uci set passwall.qemu.remarks=QEMU-local-only
+uci commit passwall
+mkdir -p /tmp/etc/passwall/bin /tmp/etc/passwall/script_func /tmp/etc/passwall/acl
+controller_status=0
+sh /usr/share/passwall/app.sh run_socks flag=time64 node=qemu bind=127.0.0.1 \
+    socks_port=18082 config_file=qemu.json log_file=qemu.log > controller.log 2>&1 || controller_status=$?
+# The pinned run_socks ends with a conditional direct_node_list append, which
+# returns 1 for loopback Xray nodes. Require a real config and working payload
+# below; the controller's exit status alone cannot establish success.
+case "$controller_status" in 0|1) ;; *) cat controller.log; exit 1 ;; esac
+test -s /tmp/etc/passwall/qemu.json
+xray run -test -c /tmp/etc/passwall/qemu.json > xray-test.log 2>&1
+attempts=0
+until curl --noproxy '' -fsS --max-time 3 --socks5-hostname 127.0.0.1:18082 \
+        --cacert ca.pem https://time64.test:18443/ > proxy.txt 2> proxy.log; do
+    attempts=$((attempts+1))
+    [ "$attempts" -lt 20 ] || exit 1
+    sleep 1
+done
+grep -qx TY1208Z_LOCAL_PAYLOAD_2040 proxy.txt
+echo PASSWALL_XRAY_SOCKS_TIME64_PASS
+
+# Confirm real kernel rules/counters and socket/TPROXY expression availability.
+nft add table inet time64
+nft 'add chain inet time64 output { type filter hook output priority 0; policy accept; }'
+nft add rule inet time64 output tcp dport 18080 counter
+curl --noproxy '*' -fsS --max-time 10 http://127.0.0.1:18080/ > /dev/null
+nft list chain inet time64 output > nft.txt
+grep -Eq 'counter packets [1-9][0-9]*' nft.txt
+nft 'add chain inet time64 prerouting { type filter hook prerouting priority mangle; policy accept; }'
+nft add rule inet time64 prerouting meta l4proto tcp socket transparent 1 counter
+nft add rule inet time64 prerouting tcp dport 19000 tproxy to :19001 meta mark set 1 accept
+nft list table inet time64
+nft delete table inet time64
+echo NFT_EXPRESSIONS_AND_COUNTER_PASS
+logger -t time64 OPENWRT_APPLICATIONS_LOG_2040
+sleep 1
+logread -e OPENWRT_APPLICATIONS_LOG_2040 | grep 2040
+test "$(date -u +%Y)" = 2040

@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "feeds": [
+    {
+      "name": "packages",
+      "repository": "https://github.com/openwrt/packages",
+      "commit": "54d77dd5714bb4747c4bf061735304d18076de0b",
+      "branch_observed": "openwrt-25.12",
+      "url": "https://codeload.github.com/openwrt/packages/tar.gz/54d77dd5714bb4747c4bf061735304d18076de0b",
+      "archive": "feed-packages-54d77dd5714bb4747c4bf061735304d18076de0b.tar.gz",
+      "sha256": "10014d69d53656f41af32762053570c8f41a86e6d23600d031a60af404a3018a",
+      "archive_root": "packages-54d77dd5714bb4747c4bf061735304d18076de0b"
+    },
+    {
+      "name": "luci",
+      "repository": "https://github.com/openwrt/luci",
+      "commit": "8125d1288b359f6df505d3328b712bf059843fc8",
+      "branch_observed": "openwrt-25.12",
+      "url": "https://codeload.github.com/openwrt/luci/tar.gz/8125d1288b359f6df505d3328b712bf059843fc8",
+      "archive": "feed-luci-8125d1288b359f6df505d3328b712bf059843fc8.tar.gz",
+      "sha256": "759a8a3d6505c1930326a0a9a8cd316a9c8d0557ebad88737d45ddd79280f1e1",
+      "archive_root": "luci-8125d1288b359f6df505d3328b712bf059843fc8"
+    },
+    {
+      "name": "passwall",
+      "repository": "https://github.com/openwrt-passwall/openwrt-passwall",
+      "commit": "14b4ef0bcfeb8a01a22f70a3c4f01cdb87fd0b1d",
+      "branch_observed": "main",
+      "url": "https://codeload.github.com/openwrt-passwall/openwrt-passwall/tar.gz/14b4ef0bcfeb8a01a22f70a3c4f01cdb87fd0b1d",
+      "archive": "feed-passwall-14b4ef0bcfeb8a01a22f70a3c4f01cdb87fd0b1d.tar.gz",
+      "sha256": "e60bbac99f20c9d1f7428cd6ce7840013a342bead27aed087ae757b885ae6ba2",
+      "archive_root": "openwrt-passwall-14b4ef0bcfeb8a01a22f70a3c4f01cdb87fd0b1d"
+    },
+    {
+      "name": "passwall_packages",
+      "repository": "https://github.com/openwrt-passwall/openwrt-passwall-packages",
+      "commit": "1af0a5c4fb3a227201683b64d32f61c65db9be72",
+      "branch_observed": "main",
+      "url": "https://codeload.github.com/openwrt-passwall/openwrt-passwall-packages/tar.gz/1af0a5c4fb3a227201683b64d32f61c65db9be72",
+      "archive": "feed-passwall_packages-1af0a5c4fb3a227201683b64d32f61c65db9be72.tar.gz",
+      "sha256": "147e9fac123cbe520403ab842c77c81df943e6c4d229cf1e111804b399a9a1dd",
+      "archive_root": "openwrt-passwall-packages-1af0a5c4fb3a227201683b64d32f61c65db9be72"
+    }
+  ],
+  "base_source_lock": "../sources.lock.json",
+  "scope": "Application build feeds; hardware and full application behavior unverified",
+  "recipe_patches": [
+    {
+      "feed": "passwall_packages",
+      "path": "xray-core/Makefile",
+      "patch": "patches/0001-xray-go127.patch",
+      "original_sha256": "566b5dc33ff4d2117baeba32b34badf6ecec047fad2fd18a2bf5a112a7164e4b",
+      "patched_sha256": "11d3bdc46651ed1c462b6fb0c3a284d533a506799e7fcc87915a65e6a0270aa6",
+      "reason": "Xray 26.10.10 requires Go 1.27; use the versioned 1.27.1 compiler already in the pinned packages feed."
+    }
+  ]
+}

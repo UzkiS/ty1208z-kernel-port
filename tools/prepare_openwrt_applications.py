@@ -1,0 +1,150 @@
+#!/usr/bin/env python3
+"""Prepare isolated native application sources with complete pinned feed archives."""
+import argparse
+from contextlib import redirect_stdout
+import io
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import urllib.request
+
+from prepare_openwrt import extract, prepare, sha256
+
+
+def toolchain_from_native(project, taskbase):
+    lock = json.loads((project / "openwrt/sources.lock.json").read_text())
+    native = taskbase / "build" / ("openwrt-ram-" + lock["openwrt"]["commit"])
+    candidates = list((native / "staging_dir").glob("toolchain-arm_cortex-a7+neon-vfpv4_gcc-14.3.0_musl_eabi"))
+    if len(candidates) != 1:
+        raise ValueError("Build the fixed native OpenWrt toolchain first")
+    toolchain = candidates[0]
+    if not all((toolchain / "stamp" / name).is_file()
+               for name in (".gcc_final_installed", ".musl_installed")):
+        raise ValueError("Native compiler/musl build is incomplete")
+    compiler = toolchain / "bin/arm-openwrt-linux-muslgnueabi-gcc"
+    version = subprocess.check_output([compiler, "-dumpfullversion"], text=True).strip()
+    machine = subprocess.check_output([compiler, "-dumpmachine"], text=True).strip()
+    if version != "14.3.0" or machine != "arm-openwrt-linux-muslgnueabi":
+        raise ValueError("Native toolchain identity differs")
+    return toolchain, {"gcc": version, "machine": machine, "compiler_sha256": sha256(compiler),
+                       "libc_sha256": sha256(toolchain / "lib/libc.so")}
+
+
+def pinned_feeds(project, taskbase):
+    lock = json.loads((project / "openwrt/applications/sources.lock.json").read_text())
+    lines = []
+    destinations = {}
+    for item in lock["feeds"]:
+        archive = taskbase / "downloads" / item["archive"]
+        if not archive.exists():
+            partial = archive.with_suffix(archive.suffix + ".partial")
+            urllib.request.urlretrieve(item["url"], partial)
+            if sha256(partial) != item["sha256"]:
+                raise ValueError(f"Downloaded feed hash mismatch: {item['name']}")
+            partial.replace(archive)
+        if sha256(archive) != item["sha256"]:
+            raise ValueError(f"Cached feed hash mismatch: {item['name']}")
+        destination = taskbase / "applications/feeds" / (item["name"] + "-" + item["commit"])
+        marker = destination / ".ty1208z-feed.json"
+        if destination.exists():
+            if not marker.exists() or json.loads(marker.read_text()) != item:
+                raise ValueError(f"Unrecognized feed source: {destination}")
+        else:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            with tempfile.TemporaryDirectory(prefix="feed-extract-", dir=destination.parent) as temporary:
+                extracted = Path(temporary) / "source"
+                extracted.mkdir()
+                extract(archive, extracted, item["archive_root"])
+                (extracted / marker.name).write_text(json.dumps(item, indent=2) + "\n")
+                extracted.rename(destination)
+        if any(char.isspace() for char in str(destination)):
+            raise ValueError("OpenWrt src-link feed paths must not contain whitespace")
+        lines.append(f"src-link {item['name']} {destination}\n")
+        destinations[item["name"]] = destination
+    for item in lock.get("recipe_patches", []):
+        destination = destinations[item["feed"]]
+        recipe = destination / item["path"]
+        if not recipe.resolve().is_relative_to(destination.resolve()):
+            raise ValueError("Recipe patch escapes its pinned feed")
+        digest = sha256(recipe)
+        if digest == item["original_sha256"]:
+            patch = project / "openwrt/applications" / item["patch"]
+            subprocess.run(["patch", "--batch", "--forward", "-p1", "-i", str(patch)],
+                           cwd=destination, check=True, stdout=subprocess.PIPE)
+        if sha256(recipe) != item["patched_sha256"]:
+            raise ValueError(f"Recipe patch identity differs: {recipe}")
+    return "".join(lines), lock
+
+
+def prepare_applications(project, taskbase):
+    toolchain, identity = toolchain_from_native(project, taskbase)
+    feeds_config, lock = pinned_feeds(project, taskbase)
+    appbase = taskbase / "applications"
+    appbase.mkdir(parents=True, exist_ok=True)
+    downloads = appbase / "downloads"
+    if not downloads.exists():
+        downloads.symlink_to(taskbase / "downloads", target_is_directory=True)
+    if downloads.resolve() != (taskbase / "downloads").resolve():
+        raise ValueError("Application download cache differs from the fixed taskbase")
+    with redirect_stdout(io.StringIO()):
+        source = prepare(project, appbase)
+    manifest = json.loads((source / ".ty1208z-overlay.json").read_text())
+    for path in sorted((project / "openwrt/applications/overlay").rglob("*")):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(project / "openwrt/applications/overlay")
+        output = source / relative
+        output.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, output)
+        manifest[str(relative)] = sha256(output)
+
+    relative = Path("target/linux/hi3798mv100/Makefile")
+    makefile = source / relative
+    content = makefile.read_text()
+    if content.count("SUBTARGETS:=ram\n") != 1:
+        raise ValueError("Native subtarget anchor changed")
+    makefile.write_text(content.replace("SUBTARGETS:=ram\n", "SUBTARGETS:=ram apps\n"))
+    manifest[str(relative)] = sha256(makefile)
+    relative = Path("target/linux/hi3798mv100/image/Makefile")
+    makefile = source / relative
+    original = makefile.read_text()
+    anchor = "include $(INCLUDE_DIR)/image.mk\n"
+    if original.count(anchor) != 1:
+        raise ValueError("Native image include anchor changed")
+    # SUBTARGET is resolved by image.mk -> kernel.mk -> target.mk. Dispatching
+    # before that include silently selects the board profile for an apps build.
+    makefile.write_text(original.replace(
+        anchor, anchor + "\nifeq ($(SUBTARGET),apps)\n"
+        "include $(TOPDIR)/target/linux/hi3798mv100/apps/image.mk\n"
+        "else\n") + "endif\n")
+    manifest[str(relative)] = sha256(makefile)
+    (source / "feeds.conf").write_text(feeds_config)
+    (source / ".ty1208z-overlay.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    (source / ".ty1208z-application-lock.json").write_text(json.dumps(lock, indent=2) + "\n")
+    (source / ".ty1208z-toolchain.json").write_text(json.dumps(identity, indent=2) + "\n")
+    config = (project / "openwrt/config/ram.config").read_text()
+    config += (project / "openwrt/applications/config").read_text()
+    config += (
+        "CONFIG_EXTERNAL_TOOLCHAIN=y\n"
+        f"CONFIG_TOOLCHAIN_ROOT={json.dumps(str(toolchain))}\n"
+        'CONFIG_TARGET_NAME="arm-openwrt-linux-muslgnueabi"\n'
+        'CONFIG_TOOLCHAIN_PREFIX="arm-openwrt-linux-muslgnueabi-"\n'
+        'CONFIG_EXTERNAL_GCC_VERSION="14.3.0"\n'
+        "CONFIG_EXTERNAL_TOOLCHAIN_LIBC_USE_MUSL=y\n")
+    (source / ".config").write_text(config)
+    (source / ".ty1208z-application.config").write_text(config)
+    print(source)
+    return source
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--taskbase", type=Path, required=True)
+    args = parser.parse_args()
+    prepare_applications(Path(__file__).resolve().parents[1], args.taskbase.resolve())
+
+
+if __name__ == "__main__":
+    main()

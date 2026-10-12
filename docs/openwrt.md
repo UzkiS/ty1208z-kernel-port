@@ -105,6 +105,12 @@ must select an explicit set and measure size/memory rather than accepting
 the entire default list. This file audit does not fix all feeds, Go modules,
 runtime downloads or choose a working backend.
 
+The separate `apps` subtarget now fixes complete feeds and selects Xray only.
+It has passed a real native build and ARM QEMU tests of DNS/TLS, authenticated
+LuCI/Passwall, controller-generated Xray SOCKS data flow and nft expressions
+at 2040. It emits no hardware CA image. See [application build and boundaries](openwrt-applications.md)
+and [exact local acceptance](../verification/openwrt-applications-20261012.md).
+
 Pin Passwall and its actual selected backend/transport/DNS dependencies as a
 separate application layer. The user requires Passwall; the choice of engine
 must be buildable on ARMv7 and validated under the board's measured memory

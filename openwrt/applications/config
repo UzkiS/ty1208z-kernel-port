@@ -1,0 +1,36 @@
+CONFIG_TARGET_hi3798mv100_apps=y
+CONFIG_TARGET_hi3798mv100_apps_DEVICE_ty1208z_apps=y
+# CONFIG_TARGET_hi3798mv100_ram is not set
+# CONFIG_TARGET_hi3798mv100_ram_DEVICE_ty1208z_ca_ram is not set
+CONFIG_TARGET_ROOTFS_INITRAMFS_SEPARATE=y
+CONFIG_PACKAGE_luci=y
+CONFIG_PACKAGE_luci-ssl=y
+CONFIG_PACKAGE_luci-app-passwall=y
+CONFIG_PACKAGE_luci-i18n-passwall-zh-cn=y
+CONFIG_PACKAGE_luci-app-passwall_Nftables_Transparent_Proxy=y
+# CONFIG_PACKAGE_luci-app-passwall_Iptables_Transparent_Proxy is not set
+CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray=y
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_SingBox is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Geoview is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Haproxy is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Hysteria is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_NaiveProxy is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Client is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadowsocks_Rust_Server is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Client is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_ShadowsocksR_Libev_Server is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Shadow_TLS is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Simple_Obfs is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Geodata is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_V2ray_Plugin is not set
+# CONFIG_PACKAGE_luci-app-passwall_INCLUDE_Xray_Plugin is not set
+CONFIG_PACKAGE_xray-core=y
+CONFIG_PACKAGE_firewall4=y
+CONFIG_PACKAGE_nftables-json=y
+CONFIG_PACKAGE_dnsmasq-full=y
+# CONFIG_PACKAGE_dnsmasq is not set
+CONFIG_PACKAGE_openssl-util=y
+CONFIG_PACKAGE_curl=y
+CONFIG_LIBCURL_THREADED_RESOLVER=y
+CONFIG_PACKAGE_tcpdump-mini=y
+# CONFIG_GDB is not set

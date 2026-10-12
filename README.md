@@ -62,6 +62,10 @@ Passwall/time64 验收边界见 [OpenWrt 集成](docs/openwrt.md)。
 QEMU 2040 年验证。`make openwrt-ram` 使用锁定 OpenWrt 源码和 musl，
 复用板级及 BusyBox time64 补丁，执行原生用户空间的 QEMU 验证。
 它目前仅提供 RAM bring-up，没有网口、Wi-Fi 或 Passwall 的实机验收。
+独立 `make openwrt-applications` 已在 ARM QEMU 的 2040 年时钟下通过真实
+DNS/TLS、LuCI 登录与 Passwall 页面、Xray SOCKS 数据流和 nftables 检查；
+见 [应用构建说明](docs/openwrt-applications.md) 与 [验收记录](verification/openwrt-applications-20261012.md)。
+该应用测试仅输出 QEMU kernel/initrd，不提供刷机镜像。
 
 已有 Hinas 的只读 SSH 基线见 [baseline.md](docs/baseline.md)。本机已确认
 RDA USB `1e04:8888` 无驱动绑定；下一步先按 [TTL 记录步骤](docs/ttl-baseline.md)
@@ -86,7 +90,8 @@ MMC/BLOCK，`make emmc-ident` 的受限 PIO 卡识别已实机通过，型号和
 ARMv7 诊断用户空间使用静态 glibc、`_TIME_BITS=64` 和 BusyBox time64 配置。
 QEMU 内测试 2040 年时钟设置/读回、日期转换、睡眠和 RAM 文件时间。
 另有 BusyBox `stat` 的时间输出修复：原版仍会将 64 位 `time_t` 缩窄为 ARM32
-的 `long`。这不代表现有 Hinas 程序、Passwall、代理核心、证书和 NTP 已验收。
+的 `long`。原生 musl 应用测试另行覆盖了所选 Passwall/Xray、DNS、证书和
+LuCI 的 2040 年行为；现有 Hinas、NTP、持久文件系统和整机仍未完成验收。
 
 ## 贡献和许可
 

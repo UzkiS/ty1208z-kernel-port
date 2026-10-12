@@ -1,0 +1,70 @@
+name: Native OpenWrt application validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'openwrt/**'
+      - 'patches/0001-*'
+      - 'patches/0002-*'
+      - 'tools/*openwrt*'
+      - 'tools/time64-probe.c'
+      - '.github/workflows/openwrt-applications.yml'
+  pull_request:
+    paths:
+      - 'openwrt/**'
+      - 'patches/0001-*'
+      - 'patches/0002-*'
+      - 'tools/*openwrt*'
+      - 'tools/time64-probe.c'
+      - '.github/workflows/openwrt-applications.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openwrt-applications-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  applications:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      JOBS: '2'
+      GOMAXPROCS: '2'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install native build and QEMU dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang g++ gcc-multilib \
+            g++-multilib bc bison flex gawk gettext git libncurses-dev \
+            libssl-dev python3 python3-setuptools rsync swig unzip zlib1g-dev \
+            file wget curl zstd time qemu-system-arm device-tree-compiler
+      - name: Build fixed native compiler and musl
+        run: |
+          mkdir -p logs
+          make openwrt-toolchain > logs/application-toolchain.log 2>&1 || { tail -n 100 logs/application-toolchain.log; exit 1; }
+      - name: Build applications and exercise actual ARM rootfs at 2040
+        run: |
+          make openwrt-applications > logs/openwrt-applications.log 2>&1 || { tail -n 100 logs/openwrt-applications.log; exit 1; }
+          tail -n 30 logs/openwrt-applications.log
+      - name: Upload QEMU-only artifacts and checks
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ty1208z-applications-QEMU-ONLY-${{ github.sha }}
+          path: |
+            .work/applications/build/openwrt-ram-*/bin/targets/hi3798mv100/apps/
+            .work/applications/build/openwrt-ram-*/.ty1208z-application-lock.json
+            .work/applications/build/openwrt-ram-*/.ty1208z-toolchain.json
+            logs/application-toolchain.log
+            logs/openwrt-applications.log
+          retention-days: 14
+          if-no-files-found: warn
