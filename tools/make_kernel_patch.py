@@ -37,7 +37,8 @@ changes = {
         'dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb\n'
-        'dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb\n'),
+        'dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb\n'
+        'dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb\n'),
     "drivers/soc/hisilicon/Kconfig": (
         'config KUNPENG_HCCS\n',
         'config HI3798MV100_EMMC_AUDIT\n'
@@ -52,12 +53,20 @@ changes = {
         '\thelp\n'
         '\t  Observe fixed clock/reset registers. If already enabled, read\n'
         '\t  PHY 1 ID via bounded MDIO. No PHY/clock/reset or DMA writes.\n\n'
+        'config HI3798MV100_ETHERNET_CLOCK_ID\n'
+        '\tbool "TY1208Z temporary MAC clock enable and PHY ID"\n'
+        '\tdepends on ARCH_HI3798MV100 && !NET && !MMC && !BLOCK\n'
+        '\tdepends on !HI3798MV100_ETHERNET_AUDIT && !DEBUG_FS\n'
+        '\thelp\n'
+        '\t  Require measured state, enable only CRG51 bit 3, read PHY ID,\n'
+        '\t  then restore the clock. No PHY reset, DMA or storage access.\n\n'
         'config KUNPENG_HCCS\n'),
     "drivers/soc/hisilicon/Makefile": (
         '# SPDX-License-Identifier: GPL-2.0-only\n',
         '# SPDX-License-Identifier: GPL-2.0-only\n'
         'obj-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-emmc-audit.o\n'
-        'obj-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ethernet-audit.o\n'),
+        'obj-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ethernet-audit.o\n'
+        'obj-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ethernet-clock-id.o\n'),
     "drivers/clocksource/Kconfig": (
         'config ARM_TIMER_SP804\n',
         'config HI3798MV100_TIMER\n'

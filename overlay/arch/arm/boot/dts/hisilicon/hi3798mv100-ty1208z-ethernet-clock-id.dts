@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA temporary Ethernet clock and PHY ID";
+};
+
+&{/soc} {
+	ethernet-clock-id@f9841100 {
+		compatible = "tianyi,ty1208z-ethernet-clock-id";
+		reg = <0xf9841100 8>, <0xf8a220cc 4>, <0xf8a22120 4>,
+		      <0xf8a20008 4>, <0xf8a20118 4>, <0xf8a20844 4>;
+		reg-names = "mdio", "crg51", "phy-crg", "phy-select", "phy-address", "phy-ldo";
+	};
+};

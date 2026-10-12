@@ -63,6 +63,11 @@ class DiagnosticTests(unittest.TestCase):
                         b"ETH_AUDIT PHY_SELECT=00000000\r\nETH_AUDIT PHY_ADDRESS=00000001\r\n"
                         b"ETH_AUDIT PHY_LDO=00000068\r\n"
                         b"ETH_AUDIT_COMPLETE no-phy-writes no-clock-reset-writes no-dma")
+                    clock_id = (
+                        b"ETH_CLOCK_ID_FAILED error=-5" if mode == "failed-clock-id" else
+                        b"ETH_CLOCK_ID_STATE before=00000003 enabled=0000000b restored=00000003 changed=1 verified=1\r\n"
+                        b"ETH_CLOCK_ID_PHY_ID=20669901 addr=1\r\n"
+                        b"ETH_CLOCK_ID_COMPLETE clock-restored no-phy-reset-writes no-dma")
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
@@ -70,6 +75,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\n" + (ident if profile in ("emmc-ident1", "emmc-read1") else b""),
                                  b"\r\n" + (samples if profile == "emmc-read1" else b""),
                                  b"\r\n" + (ethernet if profile == "ethernet-audit1" else b""),
+                                 b"\r\n" + (clock_id if profile == "ethernet-clock-id1" else b""),
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -139,6 +145,12 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_ethernet_audit_captures_measured_state(self):
         self.exercise("success", profile="ethernet-audit1")
+
+    def test_clock_id_requires_restoration_and_phy_id(self):
+        self.exercise("failed-clock-id", profile="ethernet-clock-id1")
+
+    def test_clock_id_captures_restored_clock_and_phy_id(self):
+        self.exercise("success", profile="ethernet-clock-id1")
 
 
 if __name__ == "__main__":

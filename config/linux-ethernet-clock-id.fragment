@@ -1,0 +1,7 @@
+CONFIG_LOCALVERSION="-ty1208z-ethernet-clock-id1"
+CONFIG_HI3798MV100_ETHERNET_CLOCK_ID=y
+# CONFIG_HI3798MV100_ETHERNET_AUDIT is not set
+# CONFIG_BLOCK is not set
+# CONFIG_MMC is not set
+# CONFIG_NET is not set
+# CONFIG_DEBUG_FS is not set

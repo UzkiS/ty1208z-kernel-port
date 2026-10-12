@@ -112,39 +112,40 @@ class ProfileTests(unittest.TestCase):
             "reg-names": {"strings": ["mac", "crg51", "phy-crg", "phy-select", "phy-address", "phy-ldo"]},
         }}]}
         self.config = 'CONFIG_LOCALVERSION="-ty1208z-ethernet-audit1"\nCONFIG_HI3798MV100_ETHERNET_AUDIT=y\n'
+        self.validator = ethernet_audit_profile
 
     def test_exact_profile_and_plain_profile(self):
-        self.assertTrue(ethernet_audit_profile(self.tree, self.config))
-        self.assertFalse(ethernet_audit_profile({"nodes": []}, ""))
+        self.assertTrue(self.validator(self.tree, self.config))
+        self.assertFalse(self.validator({"nodes": []}, ""))
 
     def test_no_node_without_explicit_profile(self):
         with self.assertRaises(ValueError):
-            ethernet_audit_profile(self.tree, "")
+            self.validator(self.tree, "")
 
     def test_changed_and_duplicate_resources_are_rejected(self):
         for index in range(12):
             tree = copy.deepcopy(self.tree)
             tree["nodes"][0]["properties"]["reg"]["cells"][index] += 4
             with self.assertRaises(ValueError):
-                ethernet_audit_profile(tree, self.config)
+                self.validator(tree, self.config)
         tree = copy.deepcopy(self.tree)
         tree["nodes"] += tree["nodes"]
         with self.assertRaises(ValueError):
-            ethernet_audit_profile(tree, self.config)
+            self.validator(tree, self.config)
 
     def test_unreviewed_properties_and_subsystems_are_rejected(self):
         tree = copy.deepcopy(self.tree)
         tree["nodes"][0]["properties"]["interrupts"] = {"cells": [0, 71, 4]}
         with self.assertRaises(ValueError):
-            ethernet_audit_profile(tree, self.config)
+            self.validator(tree, self.config)
         tree = copy.deepcopy(self.tree)
         tree["nodes"][0]["properties"]["reg-names"]["strings"].reverse()
         with self.assertRaises(ValueError):
-            ethernet_audit_profile(tree, self.config)
+            self.validator(tree, self.config)
         for option in ("BLOCK", "MMC", "NET", "MODULES", "SMP", "MTD", "USB_SUPPORT",
                        "HI3798MV100_EMMC_AUDIT", "MMC_DW_HI3798MV100_IDENT", "DEBUG_FS"):
             with self.assertRaises(ValueError):
-                ethernet_audit_profile(self.tree, self.config + f"CONFIG_{option}=y\n")
+                self.validator(self.tree, self.config + f"CONFIG_{option}=y\n")
 
 
 if __name__ == "__main__":

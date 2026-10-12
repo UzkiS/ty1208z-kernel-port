@@ -10,7 +10,7 @@ import zlib
 
 from inspect_images import parse_fdt
 from emmc_profiles import identification_profile
-from ethernet_profiles import ethernet_audit_profile
+from ethernet_profiles import ethernet_audit_profile, ethernet_clock_id_profile
 
 ADDRESS = 0x01FFFFC0
 DDR_START = 0x01000000
@@ -75,6 +75,7 @@ def prepare(artifacts, inspection):
     config = (artifacts / "linux.config").read_text()
     ident = identification_profile(tree, config)
     ethernet_audit_profile(tree, config)
+    ethernet_clock_id_profile(tree, config)
     for name in ("BLOCK", "MMC", "MTD", "ATA", "SCSI", "NET", "USB_SUPPORT", "MODULES", "SMP"):
         if name == "MMC" and ident:
             continue

@@ -100,6 +100,27 @@ copied from MV200/MV300 support. No OTP/eFuse writes belong in this port.
 
 ## Integration and acceptance
 
+`make ethernet-clock-id` builds a distinct `ethernet-clock-id1` RAM experiment,
+with a different compatible, release and an eight-byte MDIO resource. It
+requires the exact measured controls: CRG51 `0x3`, PHY CRG `0x101`, select
+`0x0e000004`, address `0x03000001`, LDO `0x8`. Only CRG51 bit 3 is enabled;
+the complete readback must be `0xb`. After the SDK's 5-ms MDCK settling delay,
+the same bounded PHY 1 ID helper runs and CRG51 is restored to `0x3` on success,
+MDIO timeout or absent ID. Restoration is verified. Unexpected changed
+control state stops the experiment without overwriting that state and without
+claiming completion. NET/storage/USB/debugfs remain disabled.
+
+This experiment makes volatile clock writes and MDIO read-command writes;
+it is not the inherited-state read-only audit. It never changes the PHY clock,
+reset, address, selection or LDO and never starts MAC DMA. The SDK clock table
+sets mask/value `0xb` at `PERI_CRG51_SF` (`0xcc`), and the SDK DTS assigns this
+clock to hieth. The common vendor prepare/enable path also toggles reset,
+so it is deliberately not called by this limited experiment. Clock rate and
+a complete cold-start sequence remain unresolved. Exact-state guards,
+bit-only writes, busy/invalid-ID errors and restoration/readback failures are
+executed under ASan/UBSan; DT/profile, serial identity, build and QEMU gates
+are separate. A successful PHY read still does not establish network traffic.
+
 Keep network experiments separate from the storage and plain diagnostic
 profiles. Use an MV100 compatible and an explicit upstream adaptation where
 needed; do not masquerade as a hi3516 board to skip SoC integration work.
@@ -113,5 +134,6 @@ link loss/reconnection and cold boot without depending on Hinas to initialize
 the PHY first. MAC addresses and identifying logs remain local.
 
 Source identities are pinned in `config/sources.lock.json` and
-`reference/reference-manifest.json`. This document records an offline audit;
-it is not a tested DT, driver, clock configuration or working network image.
+`reference/reference-manifest.json`. This document records source analysis
+and inherited-state measurements; a working Ethernet driver/image has not
+yet been demonstrated.

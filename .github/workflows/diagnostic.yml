@@ -87,6 +87,10 @@ jobs:
         run: |
           make ethernet-audit > logs/ethernet-audit.log 2>&1 || { tail -n 100 logs/ethernet-audit.log; exit 1; }
           tail -n 20 logs/ethernet-audit.log
+      - name: Build guarded temporary Ethernet clock/PHY-ID experiment
+        run: |
+          make ethernet-clock-id > logs/ethernet-clock-id.log 2>&1 || { tail -n 100 logs/ethernet-clock-id.log; exit 1; }
+          tail -n 20 logs/ethernet-clock-id.log
       - name: Upload UNTESTED diagnostics and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -98,6 +102,7 @@ jobs:
             artifacts/emmc-ident1/
             artifacts/emmc-read1/
             artifacts/ethernet-audit1/
+            artifacts/ethernet-clock-id1/
             artifacts/wifi-port/
             logs/
           retention-days: 14
