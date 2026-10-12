@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "scope": "One pinned iperf3 recipe; no feeds or application coupling",
+  "recipe_source": {
+    "url": "https://codeload.github.com/openwrt/packages/tar.gz/54d77dd5714bb4747c4bf061735304d18076de0b",
+    "archive": "feed-packages-54d77dd5714bb4747c4bf061735304d18076de0b.tar.gz",
+    "sha256": "10014d69d53656f41af32762053570c8f41a86e6d23600d031a60af404a3018a",
+    "member": "packages-54d77dd5714bb4747c4bf061735304d18076de0b/net/iperf3/Makefile",
+    "member_sha256": "f7f3eb455b8fbd3bf9cd75a0e57c968e3defa0ca59c9c5c7d7221c697849a4bb"
+  },
+  "iperf3": {
+    "version": "3.20",
+    "url": "https://downloads.es.net/pub/iperf/iperf-3.20.tar.gz",
+    "mirrors": ["https://sources.openwrt.org/iperf-3.20.tar.gz"],
+    "archive": "iperf-3.20.tar.gz",
+    "sha256": "3acc572d1ecca4e0b20359c7bf0132ddc80d982efeee20c86f6726a9a6094388"
+  }
+}

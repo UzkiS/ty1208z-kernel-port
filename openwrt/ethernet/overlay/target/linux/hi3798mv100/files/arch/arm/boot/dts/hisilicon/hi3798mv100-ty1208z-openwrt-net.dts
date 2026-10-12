@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-ethernet-net.dts"
+
+/* Reuse measured resources, not a copy of the diagnostic MAC description. */
+/ {
+	model = "TY1208Z CA OpenWrt inherited-PHY Ethernet RAM experiment";
+	compatible = "tianyi,ty1208z-ca-openwrt-net", "hi3798mv100-series";
+
+	chosen {
+		bootargs = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=7 panic=0";
+	};
+};

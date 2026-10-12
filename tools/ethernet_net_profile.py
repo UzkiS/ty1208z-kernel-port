@@ -10,6 +10,22 @@ NETWORK_NODES = {
 
 
 def ethernet_net_profile(tree, config):
+    return _ethernet_profile(tree, config, "tianyi,ty1208z-ca-diagnostic", "-ty1208z-ethernet-net1")
+
+
+def openwrt_ethernet_profile(tree, config):
+    valid = _ethernet_profile(tree, config, "tianyi,ty1208z-ca-openwrt-net", "-ty1208z-openwrt-net")
+    if not valid:
+        return False
+    props = {node["path"]: node["properties"] for node in tree["nodes"]}
+    if (props["/chosen"].get("bootargs", {}).get("strings") != [
+            "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=7 panic=0"] or
+            props["/memory@0"].get("reg", {}).get("cells") != [0, 0x10000000]):
+        raise ValueError("Native Ethernet RAM-root command line/memory differs")
+    return True
+
+
+def _ethernet_profile(tree, config, board, release):
     props = {node["path"]: node["properties"] for node in tree["nodes"]}
     enabled = "CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" in config
     nodes = props.keys() & NETWORK_NODES
@@ -17,10 +33,10 @@ def ethernet_net_profile(tree, config):
         if nodes:
             raise ValueError("Ethernet network nodes outside explicit profile")
         return False
-    if nodes != NETWORK_NODES or 'CONFIG_LOCALVERSION="-ty1208z-ethernet-net1"\n' not in config:
+    if nodes != NETWORK_NODES or f'CONFIG_LOCALVERSION="{release}"\n' not in config:
         raise ValueError("Unexpected Ethernet network nodes/release")
     if props["/"]["compatible"]["strings"] != [
-            "tianyi,ty1208z-ca-diagnostic", "hi3798mv100-series"]:
+            board, "hi3798mv100-series"]:
         raise ValueError("Unexpected Ethernet board compatible")
     clock = props["/soc/clock-controller@f8a220cc"]
     mdio = props["/soc/mdio@f9841100"]
@@ -71,7 +87,8 @@ def ethernet_net_profile(tree, config):
                   "HI3798MV100_ETHERNET_AUDIT", "HI3798MV100_ETHERNET_CLOCK_ID",
                   "HI3798MV100_EMMC_AUDIT", "MMC_DW_HI3798MV100_IDENT"}
     if active.keys() & prohibited:
-        raise ValueError("Prohibited subsystem in Ethernet network profile")
+        raise ValueError("Prohibited subsystem in Ethernet network profile: " +
+                         ", ".join(sorted(active.keys() & prohibited)))
     # No extra board peripherals may ride on the new NET permission.
     base_nodes = {"/", "/aliases", "/chosen", "/memory@0", "/cpus", "/cpus/cpu@0",
                   "/clock-24m", "/clock-83m3", "/interrupt-controller@f8a01000", "/soc",

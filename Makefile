@@ -23,6 +23,7 @@ help:
 	@echo 'make openwrt-ram - build native OpenWrt RAM userspace/image (hardware untested)'
 	@echo 'make openwrt-app-config - resolve pinned Passwall/Xray/LuCI in an isolated tree'
 	@echo 'make openwrt-applications - build and emulate applications (no board image)'
+	@echo 'make openwrt-net - build independent native Ethernet RAM candidate with traffic tools'
 
 lint:
 	python3 tools/check_repository.py
@@ -36,6 +37,7 @@ test-serial:
 	python3 tools/test_ymodem_sender.py
 	python3 tools/test_board_diag_cli.py
 	python3 tools/test_ethernet_board_cli.py
+	python3 tools/test_openwrt_ethernet_board_cli.py
 
 build:
 	bash tools/build-diagnostic.sh $(if $(TASKBASE),"$(TASKBASE)")
@@ -91,3 +93,10 @@ openwrt-app-config:
 
 openwrt-applications:
 	bash tools/build-openwrt-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" build
+
+.PHONY: openwrt-net-config openwrt-net
+openwrt-net-config:
+	bash tools/build-openwrt-ethernet.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" config
+
+openwrt-net:
+	bash tools/build-openwrt-ethernet.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" build

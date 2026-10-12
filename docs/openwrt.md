@@ -6,6 +6,10 @@ steps; neither is a working OpenWrt target or an installable image.
 
 ## Audited upstream state
 
+The separate [native Ethernet experiment](openwrt-ethernet.md) integrates the
+physically measured inherited-PHY datapath without changing the plain RAM
+target or application-validation profile.
+
 The 2026-10-12 audit is pinned in
 [`reference/openwrt-kwrt-audit.lock.json`](../reference/openwrt-kwrt-audit.lock.json):
 

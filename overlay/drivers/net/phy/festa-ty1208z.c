@@ -8,7 +8,8 @@ static int ty1208z_festa_probe(struct phy_device *phy)
 {
 	int high, low;
 
-	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic") ||
+	if ((!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic") &&
+	     !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-net")) ||
 	    phy->mdio.addr != 1 || phy->phy_id != 0x20669823)
 		return -ENODEV;
 	high = phy_read(phy, MII_PHYSID1);

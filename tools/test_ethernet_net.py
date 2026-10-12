@@ -7,7 +7,7 @@ import subprocess
 import tempfile
 import unittest
 
-from ethernet_net_profile import ethernet_net_profile, NETWORK_NODES
+from ethernet_net_profile import ethernet_net_profile, openwrt_ethernet_profile, NETWORK_NODES
 from inspect_images import parse_fdt
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -182,6 +182,30 @@ class ProfileTests(unittest.TestCase):
                      "HI3798MV100_ETHERNET_CLOCK_ID", "HI3798MV100_ETHERNET_AUDIT"):
             with self.subTest(option=name), self.assertRaises(ValueError):
                 ethernet_net_profile(self.tree, self.config + f"CONFIG_{name}=y\n")
+
+    def test_native_profile_has_separate_identity_and_same_hardware_limits(self):
+        tree = copy.deepcopy(self.tree)
+        props = {node["path"]: node["properties"] for node in tree["nodes"]}
+        props["/"]["compatible"]["strings"][0] = "tianyi,ty1208z-ca-openwrt-net"
+        props["/chosen"]["bootargs"] = {"strings": [
+            "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=7 panic=0"]}
+        props["/memory@0"]["reg"] = {"cells": [0, 0x10000000]}
+        config = self.config.replace("-ty1208z-ethernet-net1", "-ty1208z-openwrt-net")
+        self.assertTrue(openwrt_ethernet_profile(tree, config))
+        with self.assertRaises(ValueError):
+            ethernet_net_profile(tree, config)
+        with self.assertRaises(ValueError):
+            openwrt_ethernet_profile(self.tree, self.config)
+        for option in ("BLOCK", "MMC", "USB_SUPPORT", "MODULES", "NETFILTER", "SMP"):
+            with self.subTest(option=option), self.assertRaises(ValueError):
+                openwrt_ethernet_profile(tree, config + f"CONFIG_{option}=y\n")
+        for path, key, changed in (("/chosen", "bootargs", {"strings": ["root=/dev/mmcblk0p9"]}),
+                                   ("/memory@0", "reg", {"cells": [0, 0x40000000]}),
+                                   ("/soc/ethernet@f9840000", "interrupts", {"cells": [0, 66, 4]})):
+            mutated = copy.deepcopy(tree)
+            next(node for node in mutated["nodes"] if node["path"] == path)["properties"][key] = changed
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                openwrt_ethernet_profile(mutated, config)
 
 
 if __name__ == "__main__":

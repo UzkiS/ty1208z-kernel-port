@@ -11,7 +11,7 @@ import zlib
 from inspect_images import parse_fdt
 from emmc_profiles import identification_profile
 from ethernet_profiles import ethernet_audit_profile, ethernet_clock_id_profile
-from ethernet_net_profile import ethernet_net_profile
+from ethernet_net_profile import ethernet_net_profile, openwrt_ethernet_profile
 
 ADDRESS = 0x01FFFFC0
 DDR_START = 0x01000000
@@ -77,7 +77,12 @@ def prepare(artifacts, inspection):
     ident = identification_profile(tree, config)
     ethernet_audit_profile(tree, config)
     ethernet_clock_id_profile(tree, config)
-    network = ethernet_net_profile(tree, config)
+    if properties["/"]["compatible"].get("strings", [None])[0] == "tianyi,ty1208z-ca-openwrt-net":
+        network = openwrt_ethernet_profile(tree, config)
+        if not network:
+            raise ValueError("Native Ethernet profile lacks its built-in hardware drivers")
+    else:
+        network = ethernet_net_profile(tree, config)
     for name in ("BLOCK", "MMC", "MTD", "ATA", "SCSI", "NET", "USB_SUPPORT", "MODULES", "SMP"):
         if name == "MMC" and ident:
             continue

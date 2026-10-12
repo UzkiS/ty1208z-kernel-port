@@ -56,7 +56,8 @@ static int ty1208z_ethernet_clock_probe(struct platform_device *pdev)
 	unsigned int i;
 	int ret;
 
-	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic"))
+	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic") &&
+	    !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-net"))
 		return -ENODEV;
 	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);

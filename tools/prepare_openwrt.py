@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import shutil
+import subprocess
 import tarfile
 import tempfile
 import urllib.request
@@ -13,6 +14,26 @@ import urllib.request
 def sha256(path):
     with path.open("rb") as source:
         return hashlib.file_digest(source, "sha256").hexdigest()
+
+
+def toolchain_from_native(project, taskbase):
+    """Reuse only the completed, fixed native compiler and musl installation."""
+    lock = json.loads((project / "openwrt/sources.lock.json").read_text())
+    native = taskbase / "build" / ("openwrt-ram-" + lock["openwrt"]["commit"])
+    candidates = list((native / "staging_dir").glob("toolchain-arm_cortex-a7+neon-vfpv4_gcc-14.3.0_musl_eabi"))
+    if len(candidates) != 1:
+        raise ValueError("Build the fixed native OpenWrt toolchain first")
+    toolchain = candidates[0]
+    if not all((toolchain / "stamp" / name).is_file()
+               for name in (".gcc_final_installed", ".musl_installed")):
+        raise ValueError("Native compiler/musl build is incomplete")
+    compiler = toolchain / "bin/arm-openwrt-linux-muslgnueabi-gcc"
+    version = subprocess.check_output([compiler, "-dumpfullversion"], text=True).strip()
+    machine = subprocess.check_output([compiler, "-dumpmachine"], text=True).strip()
+    if version != "14.3.0" or machine != "arm-openwrt-linux-muslgnueabi":
+        raise ValueError("Native toolchain identity differs")
+    return toolchain, {"gcc": version, "machine": machine, "compiler_sha256": sha256(compiler),
+                       "libc_sha256": sha256(toolchain / "lib/libc.so")}
 
 
 def extract(archive, destination, root_name):
