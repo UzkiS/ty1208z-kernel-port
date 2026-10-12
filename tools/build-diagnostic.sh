@@ -19,22 +19,7 @@ rootfs="$taskbase/build/initramfs-root"
 artifacts="$project/artifacts/diag1"
 mkdir -p "$kout" "$bout" "$rootfs" "$artifacts/checks"
 
-python3 - "$project" "$taskbase" <<'PY'
-import hashlib, json, sys, urllib.request
-from pathlib import Path
-project, taskbase = map(Path, sys.argv[1:])
-lock = json.loads((project / 'config/sources.lock.json').read_text())
-for kind in ('linux', 'busybox'):
-    item = lock[kind]
-    archive = taskbase / 'downloads' / item['url'].split('/')[-1]
-    if not archive.exists():
-        urllib.request.urlretrieve(item['url'], archive)
-    with archive.open('rb') as source:
-        digest = hashlib.file_digest(source, 'sha256').hexdigest()
-    if digest != item['sha256']:
-        raise SystemExit(f'{kind}: archive hash mismatch')
-    print(f'{kind}: pinned archive SHA256 verified')
-PY
+python3 "$project/tools/fetch_pinned_archives.py" --taskbase "$taskbase"
 if [ ! -d "$linuxsrc" ]; then
     tar -xf "$taskbase/downloads/linux-6.12.112.tar.xz" -C "$taskbase/src"
 fi

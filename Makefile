@@ -38,6 +38,7 @@ lint:
 	shellcheck initramfs/usb-diag
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
+	python3 tools/test_pinned_archives.py
 
 test-serial:
 	python3 tools/test_serial_cli.py
