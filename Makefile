@@ -12,6 +12,7 @@ help:
 	@echo 'make references-wifi - verify/download pinned optional RDA driver code (no firmware)'
 	@echo 'make wifi-usb-audit - compile one RDA USB object with a separate kernel config'
 	@echo 'make wifi-port - link the optional RDA USB module and test production guards'
+	@echo 'make openwrt-wifi-port - compile/package RDA with the native OpenWrt kernel in an isolated tree'
 	@echo 'make emmc-audit - build a separate read-only eMMC-register RAM diagnostic'
 	@echo 'make emmc-ident - build a separate restricted PIO eMMC identification image'
 	@echo 'make emmc-read - build fixed four-sector read-only samples (no block device)'
@@ -70,6 +71,10 @@ wifi-usb-audit:
 
 wifi-port:
 	bash tools/build-wifi-port.sh $(if $(TASKBASE),"$(TASKBASE)")
+
+.PHONY: openwrt-wifi-port
+openwrt-wifi-port:
+	bash tools/build-openwrt-wifi.sh $(if $(TASKBASE),"$(TASKBASE)")
 
 emmc-audit:
 	bash tools/build-emmc-audit.sh $(if $(TASKBASE),"$(TASKBASE)")

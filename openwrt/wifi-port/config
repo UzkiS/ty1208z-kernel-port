@@ -1,0 +1,6 @@
+# Compile-only package tree. No boot/rootfs image is delivered by this entry.
+CONFIG_PACKAGE_kmod-ty1208z-rda-port=y
+CONFIG_KERNEL_DEBUG_FS=n
+CONFIG_KERNEL_SMP=n
+# CONFIG_PACKAGE_kmod-cfg80211 is not set
+# CONFIG_PACKAGE_kmod-mac80211 is not set

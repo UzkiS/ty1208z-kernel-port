@@ -58,6 +58,10 @@ OpenWrt 通用补丁叠加、完整原生 GCC/musl 镜像构建及核心用户�
 - `tools/make_kernel_patch.py` 从已校验的原版压缩包生成新增和修改文件的补丁。
 - `tools/make_busybox_patch.py` 从原版 BusyBox 生成时间输出修复。
 - `reference/wifi-rda-usb.lock.json` 固定可选 RDA 来源与逐文件哈希；下载器不下载固件。
+- `wifi/Kbuild` 维护共享模块对象列表；`openwrt/wifi-port/` 只负责独立原生
+  OpenWrt 编译/打包入口，引用同一来源锁和生成补丁，不与普通诊断/路由镜像
+  同时启用。它使用原生 Linux 6.12 cfg80211，并排除 OpenWrt backports；
+  目标内核 ABI、实际 APK 与实机无线分别验收，见 [说明](openwrt-wifi.md)。
 - `tools/make_wifi_usb_patch.py` 生成单独的 USB API 审计补丁。
 - `tools/make_wifi_port_patch.py` 从锁定来源生成完整模块补丁；无线新增文件在
   `wifi/overlay/`，现有控制协议函数的替换实现维护在 `wifi/replacements/`。

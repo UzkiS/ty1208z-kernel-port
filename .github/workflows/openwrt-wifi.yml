@@ -1,0 +1,76 @@
+name: Native OpenWrt RDA compile package
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'openwrt/wifi-port/**'
+      - 'openwrt/overlay/**'
+      - 'openwrt/config/ram.config'
+      - 'openwrt/sources.lock.json'
+      - 'wifi/**'
+      - 'reference/wifi-rda-usb.lock.json'
+      - 'patches/0003-*'
+      - 'patches/0004-*'
+      - 'tools/*openwrt*wifi*'
+      - 'tools/prepare_openwrt.py'
+      - 'tools/prepare_openwrt_applications.py'
+      - 'tools/fetch_wifi.py'
+      - 'tools/make_wifi*'
+      - '.github/workflows/openwrt-wifi.yml'
+  pull_request:
+    paths:
+      - 'openwrt/wifi-port/**'
+      - 'wifi/**'
+      - 'patches/0003-*'
+      - 'patches/0004-*'
+      - 'tools/*openwrt*wifi*'
+      - '.github/workflows/openwrt-wifi.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: openwrt-rda-package-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  native-package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      JOBS: '2'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+      - name: Install native build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential clang g++ gcc-multilib \
+            g++-multilib bc bison flex gawk gettext git libncurses-dev \
+            libssl-dev python3 python3-setuptools rsync swig unzip zlib1g-dev \
+            file wget curl zstd time device-tree-compiler
+      - name: Build fixed native compiler and musl
+        run: |
+          mkdir -p logs
+          make openwrt-toolchain > logs/toolchain.log 2>&1 || { tail -n 100 logs/toolchain.log; exit 1; }
+          tail -n 20 logs/toolchain.log
+      - name: Compile native kernel and RDA APK, verify actual payload and ABI
+        run: |
+          make openwrt-wifi-port > logs/openwrt-wifi.log 2>&1 || { tail -n 100 logs/openwrt-wifi.log; exit 1; }
+          tail -n 30 logs/openwrt-wifi.log
+      - name: Upload COMPILE-ONLY hardware-untested package and provenance
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ty1208z-native-rda-COMPILE-ONLY-${{ github.sha }}
+          path: |
+            artifacts/openwrt-wifi-port/
+            logs/toolchain.log
+            logs/openwrt-wifi.log
+          retention-days: 14
+          if-no-files-found: warn

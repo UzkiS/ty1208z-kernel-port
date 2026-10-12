@@ -81,6 +81,10 @@ MMC/BLOCK，`make emmc-ident` 的受限 PIO 卡识别已实机通过，型号和
 尚未启动原 Hinas，见 [固定读取记录](verification/emmc-reads-20261012.md)。
 `make wifi-usb-audit` 独立编译 RDA USB 对象；`make wifi-port` 已完成完整模块的
 本地编译链接及制造入口/密钥回归，尚未加载到盒子或证明联网。
+`make openwrt-wifi-port` 另外在独立的原生 OpenWrt 内核下生成实际 APK，
+模块/内核 ABI、包内文件与错误包拒绝已通过本地验证，见
+[打包说明](docs/openwrt-wifi.md) 和 [验收记录](verification/openwrt-wifi-package-20261013.md)。
+实机 USB、固件初始化及无线联网仍待验证。
 
 源码和研究说明可提交；原始固件、fastboot、DTB、源码下载和大体积编译产物
 保存在本地。厂商参考只提交出处和哈希，可执行 `make references` 重新获取。
@@ -91,7 +95,9 @@ ARMv7 诊断用户空间使用静态 glibc、`_TIME_BITS=64` 和 BusyBox time64 
 QEMU 内测试 2040 年时钟设置/读回、日期转换、睡眠和 RAM 文件时间。
 另有 BusyBox `stat` 的时间输出修复：原版仍会将 64 位 `time_t` 缩窄为 ARM32
 的 `long`。原生 musl 应用测试另行覆盖了所选 Passwall/Xray、DNS、证书和
-LuCI 的 2040 年行为；现有 Hinas、NTP、持久文件系统和整机仍未完成验收。
+LuCI 的 2040 年行为；所选一次性 NTP 客户端的 2036/2038/2040 案例也已通过
+QEMU 和 CI，见 [NTP 记录](verification/openwrt-ntp-time64-20261013.md)。现有 Hinas、
+实机 NTP 服务、持久文件系统和整机仍未完成验收。
 
 ## 贡献和许可
 
