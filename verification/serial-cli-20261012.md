@@ -25,8 +25,10 @@ by this tool. Raw local logs are ignored by Git.
 
 These checks do not validate the board's CA authentication, bootloader commands,
 safe RAM ranges or the Linux 6.12 candidate on hardware. The subsequently
-completed original boot log is recorded separately below. The tool has no transmit or
-interactive mode; future bootloader command support must be added explicitly.
+completed original boot log is recorded separately below. The original capture
+mode has no transmit or interactive support. The later guarded inspection mode
+and its physical limitations are documented in
+[the inspection record](bootloader-inspection-20261012.md).
 
 GitHub CI passed for code commit `a4adc78`, including the PTY tests, clean kernel
 build and QEMU time64 regression:

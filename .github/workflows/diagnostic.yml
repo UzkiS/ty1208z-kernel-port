@@ -39,7 +39,7 @@ jobs:
           echo "$PWD/.work/lint-venv/bin" >> "$GITHUB_PATH"
       - name: Repository and script checks
         run: make lint
-      - name: RX-only serial CLI integration without board hardware
+      - name: Capture and guarded bootloader CLI integration without board hardware
         run: make test-serial
       - name: Parse local PowerShell SSH wrapper
         shell: pwsh

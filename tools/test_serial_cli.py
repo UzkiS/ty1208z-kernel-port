@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Exercise the RX-only CLI against a Linux pseudo-terminal, without hardware."""
+"""Exercise capture and guarded inspection against a Linux PTY, without hardware."""
 import hashlib
 import json
 import os
@@ -39,11 +39,11 @@ class CaptureTests(unittest.TestCase):
         self.stop = self.root / "stop"
         self.console = self.root / "console.txt"
 
-    def launch(self, *extra):
+    def launch(self, *extra, operation="capture"):
         output = self.console.open("wb")
         self.addCleanup(output.close)
         process = subprocess.Popen([
-            sys.executable, "-u", str(CLI), "capture", "--port", self.port,
+            sys.executable, "-u", str(CLI), operation, "--port", self.port,
             "--output", str(self.prefix), "--stop-file", str(self.stop), *extra,
         ], stdout=output, stderr=subprocess.STDOUT)
 
@@ -131,6 +131,100 @@ class CaptureTests(unittest.TestCase):
         metadata = json.loads(self.prefix.with_suffix(".json").read_text())
         self.assertEqual(metadata["stop_reason"], "serial-error")
         self.assertEqual(raw.read_bytes(), b"partial boot\r\n")
+
+    def peer_read(self, expected):
+        received = b""
+        deadline = time.monotonic() + 5
+        while len(received) < len(expected) and time.monotonic() < deadline:
+            if select.select([self.master], [], [], 0.1)[0]:
+                received += os.read(self.master, 4096)
+        self.assertEqual(received, expected)
+
+    def test_probe_waits_for_fresh_boot_and_completes_queries(self):
+        process = self.launch(operation="inspect-bootloader")
+        self.ready(process)
+        # A prompt or stale autoboot text alone must not authorize TX.
+        os.write(self.master, b"fastboot# \r\nPress Ctrl+C to stop autoboot\r\n")
+        self.assertFalse(select.select([self.master], [], [], 0.2)[0])
+        for fragment in (
+            b"\r\nBootrom sta", b"rt\r\nFastboot 3.3.0-dirty (vendor)\r\n",
+            b"CPU: Hi3798Mv100 (CA)\r\nReserve Memory\r\n",
+        ):
+            os.write(self.master, fragment)
+        self.peer_read(b"\x03")
+        commands = (
+            b"help\r", b"printenv bootcmd bootargs bootdelay loadaddr bootm_low bootm_size\r",
+            b"help bootm\r", b"help tftp\r", b"help loadb\r",
+        )
+        for command in commands:
+            # Split prompt delivery exercises actual serial stream boundaries.
+            os.write(self.master, b"\r\nresponse\r\nfastbo")
+            self.assertFalse(select.select([self.master], [], [], 0.03)[0])
+            os.write(self.master, b"ot# ")
+            self.peer_read(command)
+        os.write(self.master, b"\r\nlast response\r\nfastboot# ")
+        self.assertEqual(process.wait(timeout=5), 0, self.console.read_text())
+        metadata = json.loads(self.prefix.with_suffix(".json").read_text())
+        self.assertEqual(metadata["stop_reason"], "probe-complete")
+        self.assertEqual(metadata["probe"]["completed_commands"], 5)
+        records = [json.loads(line) for line in Path(str(self.prefix) + ".tx.jsonl").read_text().splitlines()]
+        written = [bytes.fromhex(row["hex"]) for row in records if row["status"] == "written"]
+        self.assertEqual(written, [b"\x03", *commands])
+
+    def test_probe_rejects_different_board_without_transmitting(self):
+        process = self.launch(operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"Bootrom start\r\nFastboot 3.3.0-dirty (vendor)\r\n"
+                 b"CPU: Hi3798Mv200 (CA)\r\nPress Ctrl+C to stop autoboot\r\n")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+        self.assertEqual(Path(str(self.prefix) + ".tx.jsonl").read_bytes(), b"")
+
+    def test_probe_expiry_at_linux_login_transmits_nothing(self):
+        process = self.launch("--duration", "0.4", operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"Ubuntu 24.04.4 LTS\r\nhi3798mv100 login: ")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+
+    def test_probe_stops_if_interrupt_did_not_stop_autoboot(self):
+        process = self.launch(operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"Bootrom start\r\nFastboot 3.3.0-dirty (vendor)\r\n"
+                 b"CPU: Hi3798Mv100 (CA)\r\nPress Ctrl+C to stop autoboot\r\n")
+        self.peer_read(b"\x03")
+        os.write(self.master, b"\r\nStarting kernel ...\r\n")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+
+    def test_probe_rejects_late_autoboot_observation(self):
+        process = self.launch(operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"Bootrom start\r\nFastboot 3.3.0-dirty (vendor)\r\n"
+                 b"CPU: Hi3798Mv100 (CA)\r\nPress Ctrl+C to stop autoboot\r\n"
+                 b"Starting kernel ...\r\n")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+
+    def test_probe_stops_on_second_boot_before_autoboot(self):
+        process = self.launch(operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"Bootrom start\r\nFastboot 3.3.0-dirty (vendor)\r\n"
+                 b"CPU: Hi3798Mv100 (CA)\r\nBootrom start\r\nReserve Memory\r\n")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+
+    def test_probe_stops_on_restart_after_interrupt(self):
+        process = self.launch(operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"Bootrom start\r\nFastboot 3.3.0-dirty (vendor)\r\n"
+                 b"CPU: Hi3798Mv100 (CA)\r\nReserve Memory\r\n")
+        self.peer_read(b"\x03")
+        os.write(self.master, b"Bootrom sta")
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+        os.write(self.master, b"rt\r\nfastboot# ")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
 
 
 if __name__ == "__main__":

@@ -51,7 +51,41 @@ New-Item -ItemType File evidence/ttl-stop
 
 Linux 下使用同一个脚本和依赖，将串口替换为实测的 `/dev/ttyUSB*`。
 `make test-serial` 用 Linux 伪终端验证原始字节、分段 UTF-8、接收时零发送、
-实时写盘、停止释放、端口冲突、断线和日志防覆盖，不访问真实硬件。
+实时写盘、停止释放、端口冲突、断线、日志防覆盖及下述引导器检查协议，
+不访问真实硬件。
+
+## 引导器检查模式
+
+`capture` 仍为只接收。新增 `inspect-bootloader` 是独立、限时的诊断模式：
+看到本次 `Bootrom start`、已测量的 Fastboot 版本及 `Hi3798Mv100 (CA)` 后，
+在内存分配表或 autoboot 提示处发送一次 Ctrl+C。只在收到行首的完整
+`fastboot# ` 提示后，依次发送以下固定查询，每条都等待新的提示符：
+
+```text
+help
+printenv bootcmd bootargs bootdelay loadaddr bootm_low bootm_size
+help bootm
+help tftp
+help loadb
+```
+
+没有自定义命令入口。若身份不同、已进入 Linux、设备再次重启或等待超时，
+立即停止，释放端口，不重试发送。默认总时限 180 秒，每次命令响应时限 10 秒。
+日志额外提供 `.tx.jsonl`，记录尝试写入及驱动接受的字节；这不能证明板端收到。
+
+```powershell
+& ./.work/serial-venv/Scripts/python.exe tools/serial_cli.py inspect-bootloader --port COM5
+```
+
+须先出现 `READY` 才能安排正常重启；用户输入 `reboot` 后立即回复即可，
+串口监听不依赖回复时机。2026-10-12 两次实机检查均未打断启动，查询命令
+发送数为零。不能把 PTY 测试通过称为引导器已可交互。当前先核对 TTL 的
+发送/回显及极短启动窗口，不要求反复重启，详情见
+[检查记录](../verification/bootloader-inspection-20261012.md)。
+
+已知成功的 CA fastboot 可以用 `tools/inspect_bootloader.py` 离线提取字符串；
+脚本要求固定 SHA-256，输出仅保留在 `evidence/`，不会执行或刷入文件。
+字符串中的命令名称也不能替代当前引导器的真实帮助输出。
 
 ## 采集之后
 

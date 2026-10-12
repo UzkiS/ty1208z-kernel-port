@@ -89,7 +89,10 @@ Hinas uImage CRC 正常，加载/入口 `0x02000000`，DTB 位于文件偏移 10
 
 当前引导器为 Fastboot `3.3.0-dirty`，2016-12-21 构建，CPU 标签为
 `Hi3798Mv100 (CA)`，DDR Size 为 1GB。日志明确提供 `Press Ctrl+C to stop autoboot`，
-但首轮没有发送任何字节，也没有进入命令行查看命令表。
+首轮只接收；之后两次发送 Ctrl+C 均未进入引导器命令行，查询命令发送数为零。
+本地 bootargs 文件包含 `bootdelay=0`，尚未读取当前环境确认。CLI 的空行测试
+只收到原样字节，用户报告 HiTool 能获得登录提示；发送/回显差异仍待核实。
+详见 [检查记录](../verification/bootloader-inspection-20261012.md)。
 
 它从 eMMC 第 28672 块读取 40960 个 512 字节块，与 SSH 测得的内核分区对应。
 当前镜像头在 `0x01ffffc0`，数据长 10862583 字节，加载和入口均为 `0x02000000`，

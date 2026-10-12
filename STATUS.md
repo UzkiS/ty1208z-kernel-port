@@ -16,7 +16,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
 | GitHub CI | Passed for code commit `a4adc78`: serial PTY tests, collector LF/CRLF regression, PowerShell syntax, clean kernel build and QEMU time64; [run 38199621273](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38199621273) |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
-| Serial CLI | Six Linux PTY integration tests and CI passed; actual original-board boot captured at 115200 8N1, 106675 bytes, then port released |
+| Serial CLI | Original-board boot captured at 115200 8N1, 106675 bytes; guarded inspection added, two physical interrupt attempts unsuccessful and zero query commands sent; see [inspection record](verification/bootloader-inspection-20261012.md) |
 | Original Hinas TTL boot | Complete from Boot ROM to login; bootloader and allocation evidence recorded in [TTL report](verification/ttl-boot-20261012.md) |
 | Candidate boot on physical TY1208Z | Not attempted |
 | CA authentication / RAM placement | Original boot reports secure boot disabled and accepts existing ordinary uImage; candidate authentication, usable RAM and placement remain unverified |
@@ -39,6 +39,11 @@ bootloader commands and clarify RAM/DTB constraints. SSH and TTL still do not
 establish a safe candidate load map. Only then choose a real temporary-boot
 method and adjust candidate. RDA driver source/firmware assessment
 continues independently; the installed Realtek modules do not match this device.
+
+Current console issue: isolated CR and CRLF tests returned only the transmitted
+bytes; the user reports a login prompt on Enter in HiTool. Saved port settings
+match. Resolve this discrepancy before arranging another bootloader interrupt.
+Local bootargs contains `bootdelay=0`; live environment remains unqueried.
 
 The first Windows collection reached its END marker but exited 127 because
 PowerShell appended CRLF to the script. The collector now exits explicitly and

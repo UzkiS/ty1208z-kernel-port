@@ -6,7 +6,7 @@ help:
 	@echo 'make lint       - Python/shell/config repository checks'
 	@echo 'make build      - download pinned sources and build RAM-only ARM candidate'
 	@echo 'make test       - QEMU user/virt shell and 2040 timestamp regression'
-	@echo 'make test-serial - RX-only CLI integration on a Linux pseudo-terminal'
+	@echo 'make test-serial - capture and bootloader CLI integration on a Linux PTY'
 	@echo 'make verify     - lint + build + test'
 	@echo 'make references - download pinned SDK references for read-only source audit'
 
