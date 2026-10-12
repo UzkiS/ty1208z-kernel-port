@@ -35,6 +35,7 @@ changes = {
         '# SPDX-License-Identifier: GPL-2.0\n'
         'dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb\n'
         'dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb\n'
+        'dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb\n'),
     "drivers/soc/hisilicon/Kconfig": (
         'config KUNPENG_HCCS\n',
@@ -69,8 +70,19 @@ changes.update({
          '\t&dev_attr_ty1208z_ident.attr,\n'
          '#endif\n'),
     ],
+    "drivers/mmc/core/Makefile": (
+        'obj-$(CONFIG_MMC)\t\t+= mmc_core.o\n',
+        'obj-$(CONFIG_MMC)\t\t+= mmc_core.o\n'
+        'obj-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += ty1208z-samples.o\n'),
     "drivers/mmc/host/Kconfig": (
         'config MMC_DW_HI3798CV200\n',
+        'config HI3798MV100_EMMC_READ_SAMPLES\n'
+        '\tbool "TY1208Z fixed four-sector read-only diagnostic"\n'
+        '\tdepends on MMC_DW_HI3798MV100_IDENT && !BLOCK\n'
+        '\tselect CRC32\n'
+        '\thelp\n'
+        '\t  Read only two sectors each of the measured Hinas kernel header\n'
+        '\t  and ext4 superblock. No block interface or card-setting writes.\n\n'
         'config MMC_DW_HI3798MV100_IDENT\n'
         '\tbool "TY1208Z restricted eMMC identification diagnostic"\n'
         '\tdepends on MMC_DW && ARCH_HI3798MV100 && !BLOCK\n'

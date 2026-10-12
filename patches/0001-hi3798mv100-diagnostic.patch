@@ -26,10 +26,11 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,7 @@
+@@ -1,4 +1,8 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
++dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb
 +dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb
  dtb-$(CONFIG_ARCH_HI3xxx) += \
  	hi3620-hi4511.dtb
@@ -96,12 +97,30 @@
  	&dev_attr_cid.attr,
  	&dev_attr_csd.attr,
  	&dev_attr_date.attr,
+--- a/drivers/mmc/core/Makefile
++++ b/drivers/mmc/core/Makefile
+@@ -4,6 +4,7 @@
+ #
+ 
+ obj-$(CONFIG_MMC)		+= mmc_core.o
++obj-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += ty1208z-samples.o
+ mmc_core-y			:= core.o bus.o host.o \
+ 				   mmc.o mmc_ops.o sd.o sd_ops.o \
+ 				   sdio.o sdio_ops.o sdio_bus.o \
 --- a/drivers/mmc/host/Kconfig
 +++ b/drivers/mmc/host/Kconfig
-@@ -802,6 +802,14 @@
+@@ -802,6 +802,22 @@
  	  Synopsys DesignWare Memory Card Interface driver. Select this option
  	  for platforms based on Exynos4 and Exynos5 SoC's.
  
++config HI3798MV100_EMMC_READ_SAMPLES
++	bool "TY1208Z fixed four-sector read-only diagnostic"
++	depends on MMC_DW_HI3798MV100_IDENT && !BLOCK
++	select CRC32
++	help
++	  Read only two sectors each of the measured Hinas kernel header
++	  and ext4 superblock. No block interface or card-setting writes.
++
 +config MMC_DW_HI3798MV100_IDENT
 +	bool "TY1208Z restricted eMMC identification diagnostic"
 +	depends on MMC_DW && ARCH_HI3798MV100 && !BLOCK
@@ -341,6 +360,15 @@
 +	};
 +};
 --- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-emmc-read.dts
+@@ -0,0 +1,6 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-emmc-ident.dts"
++
++/ {
++	model = "TY1208Z CA fixed four-sector read-only diagnostic";
++};
+--- /dev/null
 +++ b/arch/arm/mach-hisi/hi3798mv100.c
 @@ -0,0 +1,16 @@
 +// SPDX-License-Identifier: GPL-2.0-only
@@ -520,6 +548,126 @@
 +	card->host->ios.timing);
 +#endif
 --- /dev/null
++++ b/drivers/mmc/core/ty1208z-samples.c
+@@ -0,0 +1,117 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Fixed four-sector RAM diagnostic. No block interface or card-setting writes. */
++#include <linux/crc32.h>
++#include <linux/mmc/card.h>
++#include <linux/mmc/core.h>
++#include <linux/mmc/host.h>
++#include <linux/mmc/mmc.h>
++#include <linux/mmc/ty1208z-samples.h>
++#include <linux/module.h>
++#include <linux/scatterlist.h>
++#include <linux/slab.h>
++#include <linux/unaligned.h>
++
++#include "core.h"
++#include "bus.h"
++
++static int ty1208z_read_sector(struct mmc_card *card, u32 sector, u8 *buffer)
++{
++	struct mmc_request mrq = {};
++	struct mmc_command cmd = {};
++	struct mmc_data data = {};
++	struct scatterlist sg;
++
++	if (!ty1208z_sample_sector(sector))
++		return -EPERM;
++	cmd.opcode = MMC_READ_SINGLE_BLOCK;
++	cmd.arg = sector;
++	cmd.flags = MMC_RSP_R1 | MMC_CMD_ADTC;
++	cmd.data = &data;
++	data.blksz = 512;
++	data.blocks = 1;
++	data.flags = MMC_DATA_READ;
++	sg_init_one(&sg, buffer, 512);
++	data.sg = &sg;
++	data.sg_len = 1;
++	mmc_set_data_timeout(&data, card);
++	mrq.cmd = &cmd;
++	mrq.data = &data;
++	mmc_wait_for_req(card->host, &mrq);
++	if (cmd.error || data.error)
++		return cmd.error ? cmd.error : data.error;
++	if (data.bytes_xfered != 512 || R1_STATUS(cmd.resp[0]))
++		return -EIO;
++	dev_info(&card->dev, "EMMC_SAMPLE_SECTOR lba=%u crc32=%08x\n",
++		 sector, crc32_le(~0U, buffer, 512) ^ ~0U);
++	return 0;
++}
++
++static int ty1208z_samples_probe(struct mmc_card *card)
++{
++	u8 *buffer;
++	u32 first_crc, block_shift;
++	int ret;
++
++	/* Never change the selected partition or issue a sector on a different card. */
++	if (!mmc_card_mmc(card) || !mmc_card_is_blockaddr(card) ||
++	    strcmp(card->cid.prod_name, "008G30") || card->cid.manfid != 0x11 ||
++	    card->ext_csd.sectors != 15269888 || (card->ext_csd.part_config & 7) ||
++	    card->host->ios.bus_width != MMC_BUS_WIDTH_1 ||
++	    card->host->ios.timing != MMC_TIMING_LEGACY ||
++	    card->host->ios.clock > 25000000)
++		return -ENODEV;
++	buffer = kmalloc(1024, GFP_KERNEL);
++	if (!buffer)
++		return -ENOMEM;
++
++	mmc_claim_host(card->host);
++	ret = ty1208z_read_sector(card, TY1208Z_SAMPLE_KERNEL, buffer);
++	if (ret)
++		goto out;
++	first_crc = crc32_le(~0U, buffer, 512) ^ ~0U;
++	if (first_crc != 0x2ba1a125 || get_unaligned_be32(buffer) != 0x27051956 ||
++	    get_unaligned_be32(buffer + 16) != 0x02000000 ||
++	    get_unaligned_be32(buffer + 20) != 0x02000000) {
++		ret = -EBADMSG;
++		goto out;
++	}
++	ret = ty1208z_read_sector(card, TY1208Z_SAMPLE_KERNEL + 1, buffer + 512);
++	if (ret)
++		goto out;
++	dev_info(&card->dev, "EMMC_SAMPLE_HINAS_HEADER_MATCH crc32=%08x\n", first_crc);
++	ret = ty1208z_read_sector(card, TY1208Z_SAMPLE_EXT4, buffer);
++	if (ret)
++		goto out;
++	ret = ty1208z_read_sector(card, TY1208Z_SAMPLE_EXT4 + 1, buffer + 512);
++	if (ret)
++		goto out;
++	block_shift = get_unaligned_le32(buffer + 24);
++	if (get_unaligned_le16(buffer + 56) != 0xef53 || block_shift > 6 ||
++	    !get_unaligned_le32(buffer) || !get_unaligned_le32(buffer + 4)) {
++		ret = -EBADMSG;
++		goto out;
++	}
++	dev_info(&card->dev, "EMMC_SAMPLE_EXT4 magic=ef53 block_size=%u\n",
++		 1024U << block_shift);
++	dev_info(&card->dev, "EMMC_SAMPLE_READ_COMPLETE count=4 no-block-device\n");
++out:
++	mmc_release_host(card->host);
++	kfree(buffer);
++	if (ret)
++		dev_err(&card->dev, "EMMC_SAMPLE_READ_FAILED error=%d\n", ret);
++	return ret;
++}
++
++static void ty1208z_samples_remove(struct mmc_card *card)
++{
++}
++
++static struct mmc_driver ty1208z_samples_driver = {
++	.drv = { .name = "ty1208z-fixed-read-samples" },
++	.probe = ty1208z_samples_probe,
++	.remove = ty1208z_samples_remove,
++};
++
++module_driver(ty1208z_samples_driver, mmc_register_driver, mmc_unregister_driver);
++MODULE_DESCRIPTION("TY1208Z fixed read-only Hinas header/superblock RAM diagnostic");
++MODULE_LICENSE("GPL");
+--- /dev/null
 +++ b/drivers/mmc/host/dw_mmc-hi3798mv100-ident.c
 @@ -0,0 +1,162 @@
 +// SPDX-License-Identifier: GPL-2.0-only
@@ -686,7 +834,7 @@
 +MODULE_LICENSE("GPL");
 --- /dev/null
 +++ b/drivers/mmc/host/hi3798mv100-ident-policy.h
-@@ -0,0 +1,54 @@
+@@ -0,0 +1,59 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +#ifndef HI3798MV100_IDENT_POLICY_H
 +#define HI3798MV100_IDENT_POLICY_H
@@ -694,8 +842,9 @@
 +#include <linux/errno.h>
 +#include <linux/mmc/core.h>
 +#include <linux/mmc/mmc.h>
++#include <linux/mmc/ty1208z-samples.h>
 +
-+/* Card identification only. No switch, sector I/O, erase or vendor commands. */
++/* Identification plus optional fixed read samples. No settings or data writes. */
 +static inline int hi3798mv100_ident_request(struct mmc_request *mrq)
 +{
 +	struct mmc_command *cmd = mrq->cmd;
@@ -705,18 +854,22 @@
 +		return -EPERM;
 +	if (cmd->data != data || (data && data->stop))
 +		return -EPERM;
-+	if (data && (data->flags != MMC_DATA_READ || data->blocks != 1 ||
-+		     data->blksz != 512 || cmd->opcode != MMC_SEND_EXT_CSD ||
-+		     cmd->arg != 0))
++	if (data) {
++		if (data->flags != MMC_DATA_READ || data->blocks != 1 ||
++		    data->blksz != 512)
++			return -EPERM;
++		if (cmd->opcode == MMC_SEND_EXT_CSD && cmd->arg == 0)
++			return 0;
++#ifdef CONFIG_HI3798MV100_EMMC_READ_SAMPLES
++		if (cmd->opcode == MMC_READ_SINGLE_BLOCK && ty1208z_sample_sector(cmd->arg))
++			return 0;
++#endif
 +		return -EPERM;
++	}
 +
 +	/* Core treats -EBADMSG as an unsupported optional card setting. */
 +	if (cmd->opcode == MMC_SWITCH)
 +		return -EBADMSG;
-+	if (cmd->opcode == MMC_SEND_EXT_CSD)
-+		return data ? 0 : -EPERM;
-+	if (data)
-+		return -EPERM;
 +
 +	switch (cmd->opcode) {
 +	case MMC_GO_IDLE_STATE:
@@ -811,3 +964,25 @@
 +};
 +builtin_platform_driver(hi3798mv100_emmc_audit_driver);
 +MODULE_LICENSE("GPL");
+--- /dev/null
++++ b/include/linux/mmc/ty1208z-samples.h
+@@ -0,0 +1,19 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef TY1208Z_SAMPLES_H
++#define TY1208Z_SAMPLES_H
++
++#include <linux/types.h>
++
++/* Measured Hinas partition starts, expressed as user-area 512-byte sectors. */
++#define TY1208Z_SAMPLE_KERNEL 28672U
++#define TY1208Z_SAMPLE_EXT4 1249282U /* 610 MiB + 1024-byte superblock offset */
++
++static inline bool ty1208z_sample_sector(u32 sector)
++{
++	return sector == TY1208Z_SAMPLE_KERNEL ||
++	       sector == TY1208Z_SAMPLE_KERNEL + 1 ||
++	       sector == TY1208Z_SAMPLE_EXT4 ||
++	       sector == TY1208Z_SAMPLE_EXT4 + 1;
++}
++
++#endif

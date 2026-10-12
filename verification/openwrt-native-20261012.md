@@ -39,8 +39,10 @@ An explicit `ram` subtarget resolves device-profile image selection. Archive
 build metadata records the actual source commit, uses local package revision
 1 and passes a fixed epoch to make; the APK `unknown` version fallback is not used.
 
-The separate OpenWrt GitHub workflow has been added; its actual result will
-be recorded separately. Local acceptance is not a clean CI result. No native
+The separate OpenWrt GitHub workflow passed on commit `99bdd88`:
+[run 38230366184](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38230366184).
+It performed a clean native build and the core QEMU tests. Later storage and
+application changes are outside that run. No native
 image has been accepted by the physical
 CA bootloader and no router/Passwall/Wi-Fi operation is claimed.
 

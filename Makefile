@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help lint test-serial build test verify references references-wifi wifi-usb-audit wifi-port emmc-audit emmc-ident openwrt-config openwrt-toolchain openwrt-ram
+.PHONY: help lint test-serial build test verify references references-wifi wifi-usb-audit wifi-port emmc-audit emmc-ident emmc-read openwrt-config openwrt-toolchain openwrt-ram
 help:
 	@echo 'make lint       - Python/shell/config repository checks'
 	@echo 'make build      - download pinned sources and build RAM-only ARM candidate'
@@ -14,6 +14,7 @@ help:
 	@echo 'make wifi-port - link the optional RDA USB module and test production guards'
 	@echo 'make emmc-audit - build a separate read-only eMMC-register RAM diagnostic'
 	@echo 'make emmc-ident - build a separate restricted PIO eMMC identification image'
+	@echo 'make emmc-read - build fixed four-sector read-only samples (no block device)'
 	@echo 'make openwrt-config - resolve the independent pinned native RAM target'
 	@echo 'make openwrt-toolchain - build the native target toolchain as a regular user'
 	@echo 'make openwrt-ram - build native OpenWrt RAM userspace/image (hardware untested)'
@@ -56,6 +57,9 @@ emmc-audit:
 
 emmc-ident:
 	bash tools/build-emmc-ident.sh $(if $(TASKBASE),"$(TASKBASE)")
+
+emmc-read:
+	bash tools/build-emmc-ident.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" read
 
 openwrt-config:
 	bash tools/build-openwrt-ram.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" config

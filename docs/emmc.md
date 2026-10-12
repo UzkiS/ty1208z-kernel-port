@@ -85,3 +85,29 @@ OCR 白名单拦截；第三候选补上主线忙查询重试使用的双电压 
 `0x40ff8080`，确认需要 bit 7。PIO 单线、25 MHz、legacy timing，BLOCK 关闭，
 CLI 卡识别验收通过。CMD6 设置仍全部拒绝，扇区读写及 Hinas 启动尚未验证。日志身份和范围见
 [识别测试记录](../verification/emmc-identification-20261012.md)。
+
+### 固定扇区只读候选
+
+`make emmc-read` 单独生成 `artifacts/emmc-read1/`，通过显式 Kconfig 选择固定读取器。
+普通 diag1 和 emmc-ident1 不允许 CMD17。读取器与主机请求过滤分别检查范围：
+
+| 用户区 LBA（512 字节） | 用途 |
+|---:|---|
+| 28672、28673 | 已测量的 14 MiB 内核分区起点，读取 1024 字节 |
+| 1249282、1249283 | 已测量的 610 MiB 根分区起点加 1024 字节，读取 ext4 超级块 |
+
+每次为单块 CMD17，PIO/单线/25 MHz；只有这四个地址可以通过请求队列。
+关闭 BLOCK/MMC_BLOCK、模块、debugfs，不提供挂载或任意块读取入口。
+所有 CMD6、数据写入、擦除、引导区/RPMB 访问和附带命令仍被拒绝。
+读取器核对卡型号、厂商、容量、用户区选择及 legacy 总线状态，再发出请求；
+错误、短读、R1 错误或元数据不符立即停止并释放 host/buffer。
+
+内核首扇区要求 CRC32=`2ba1a125`，并核对 ordinary uImage magic/load/entry。
+CRC 来自已校验 SHA-256 的本地 Hinas 镜像，不提交固件字节。ext4 要求 magic=`ef53`、
+合理块大小和非零计数，不输出 UUID、不挂载、不回放日志。读取这些头部不等于
+已验证 ext4 文件读取、完整分区、Hinas 启动或存储写入。
+
+实际读取器 probe 和请求函数均有主机回归：身份不符零请求，所有扇区地址边界，
+四个请求的命令/数据错误、短读、R1 错误和坏元数据；读取器运行 ASan/UBSan。
+DT/config、镜像布局、串口身份/完成门禁与 QEMU 继续独立验证。
+本次镜像和实测状态见 [固定读取记录](../verification/emmc-reads-20261012.md)。

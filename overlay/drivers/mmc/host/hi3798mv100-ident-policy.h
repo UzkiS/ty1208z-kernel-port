@@ -5,8 +5,9 @@
 #include <linux/errno.h>
 #include <linux/mmc/core.h>
 #include <linux/mmc/mmc.h>
+#include <linux/mmc/ty1208z-samples.h>
 
-/* Card identification only. No switch, sector I/O, erase or vendor commands. */
+/* Identification plus optional fixed read samples. No settings or data writes. */
 static inline int hi3798mv100_ident_request(struct mmc_request *mrq)
 {
 	struct mmc_command *cmd = mrq->cmd;
@@ -16,18 +17,22 @@ static inline int hi3798mv100_ident_request(struct mmc_request *mrq)
 		return -EPERM;
 	if (cmd->data != data || (data && data->stop))
 		return -EPERM;
-	if (data && (data->flags != MMC_DATA_READ || data->blocks != 1 ||
-		     data->blksz != 512 || cmd->opcode != MMC_SEND_EXT_CSD ||
-		     cmd->arg != 0))
+	if (data) {
+		if (data->flags != MMC_DATA_READ || data->blocks != 1 ||
+		    data->blksz != 512)
+			return -EPERM;
+		if (cmd->opcode == MMC_SEND_EXT_CSD && cmd->arg == 0)
+			return 0;
+#ifdef CONFIG_HI3798MV100_EMMC_READ_SAMPLES
+		if (cmd->opcode == MMC_READ_SINGLE_BLOCK && ty1208z_sample_sector(cmd->arg))
+			return 0;
+#endif
 		return -EPERM;
+	}
 
 	/* Core treats -EBADMSG as an unsupported optional card setting. */
 	if (cmd->opcode == MMC_SWITCH)
 		return -EBADMSG;
-	if (cmd->opcode == MMC_SEND_EXT_CSD)
-		return data ? 0 : -EPERM;
-	if (data)
-		return -EPERM;
 
 	switch (cmd->opcode) {
 	case MMC_GO_IDLE_STATE:

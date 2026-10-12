@@ -72,7 +72,9 @@ TTL 记录直接使用仓库中的 Python CLI，不依赖 HiTool。安装锁定�
 `make test-serial` 可在 Linux 伪终端验证接收工具，不连接盒子。
 eMMC 的 [独立寄存器审计](docs/emmc.md) 已实机通过；`make emmc-audit` 不启用
 MMC/BLOCK，`make emmc-ident` 的受限 PIO 卡识别已实机通过，型号和容量与 Hinas 一致；
-尚未读取扇区或启动原 Hinas，见 [卡识别记录](verification/emmc-identification-20261012.md)。
+见 [卡识别记录](verification/emmc-identification-20261012.md)。`make emmc-read` 另行通过
+四个固定扇区的只读实测，Hinas 内核头和 ext4 超级块正确；没有块设备、挂载或写入，
+尚未启动原 Hinas，见 [固定读取记录](verification/emmc-reads-20261012.md)。
 `make wifi-usb-audit` 独立编译 RDA USB 对象；`make wifi-port` 已完成完整模块的
 本地编译链接及制造入口/密钥回归，尚未加载到盒子或证明联网。
 

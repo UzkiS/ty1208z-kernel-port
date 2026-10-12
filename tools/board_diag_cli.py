@@ -16,6 +16,7 @@ PROFILES = {
     "diag1": b"6.12.112-ty1208z-diag1",
     "emmc-audit1": b"6.12.112-ty1208z-emmc-audit1",
     "emmc-ident1": b"6.12.112-ty1208z-emmc-ident1",
+    "emmc-read1": b"6.12.112-ty1208z-emmc-read1",
 }
 
 
@@ -68,11 +69,18 @@ def run(args, serial_module):
                     raise TransferError("Diagnostic time64 probe did not pass")
                 if args.profile == "emmc-audit1" and b"EMMC_AUDIT_READ_ONLY_COMPLETE" not in report:
                     raise TransferError("eMMC register audit did not complete")
-                if args.profile == "emmc-ident1" and not all(marker in report for marker in (
+                if args.profile in ("emmc-ident1", "emmc-read1") and not all(marker in report for marker in (
                         b"EMMC_IDENT_GUARD_PASS", b"Using PIO mode.", b"new MMC card",
                         b"name=008G30", b"type=MMC", b"BLOCK_DISABLED",
                         b"EMMC_IDENT_COMPLETE sectors=15269888 bytes=7818182656")):
                     raise TransferError("Restricted eMMC card identification did not complete")
+                if args.profile == "emmc-read1" and (
+                        not all(marker in report for marker in (
+                            b"EMMC_SAMPLE_HINAS_HEADER_MATCH crc32=2ba1a125",
+                            b"EMMC_SAMPLE_EXT4 magic=ef53",
+                            b"EMMC_SAMPLE_READ_COMPLETE count=4 no-block-device"))
+                        or b"EMMC_SAMPLE_READ_FAILED" in report):
+                    raise TransferError("Fixed read-only eMMC samples did not pass")
                 result["report_complete"] = True
                 result["status"] = "diagnostic-captured"
             except (TransferError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:

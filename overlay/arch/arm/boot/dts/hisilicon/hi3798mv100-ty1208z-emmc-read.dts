@@ -1,0 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-emmc-ident.dts"
+
+/ {
+	model = "TY1208Z CA fixed four-sector read-only diagnostic";
+};

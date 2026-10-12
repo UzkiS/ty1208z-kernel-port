@@ -133,6 +133,26 @@ int main(void) {
     cmd.arg = 0x20000; check(&mrq, -EPERM);
     cmd.arg = 0x10000; check(&mrq, 0);
     cmd.opcode = MMC_SWITCH; cmd.arg = 0xffffffff; check(&mrq, -EBADMSG);
+    /* Sector reads require the separate fixed-sample profile, exact READ data,
+     * and one of four measured user-area LBAs. Adjacent/boot/vendor I/O fails. */
+    cmd.opcode = MMC_READ_SINGLE_BLOCK;
+    cmd.data = mrq.data = &data;
+    for (unsigned int sector = 0; sector < 1249290; sector++) {
+        cmd.arg = sector;
+        int allowed = 0;
+#ifdef CONFIG_HI3798MV100_EMMC_READ_SAMPLES
+        allowed = sector == 28672 || sector == 28673 ||
+                  sector == 1249282 || sector == 1249283;
+#endif
+        check(&mrq, allowed ? 0 : -EPERM);
+    }
+    cmd.arg = 28672;
+    data.flags = MMC_DATA_WRITE; check(&mrq, -EPERM);
+    data.flags = MMC_DATA_READ; mrq.stop = &secondary; check(&mrq, -EPERM);
+    mrq.stop = NULL; mrq.sbc = &secondary; check(&mrq, -EPERM);
+    mrq.sbc = NULL; data.blocks = 2; check(&mrq, -EPERM);
+    data.blocks = 1; cmd.arg = 0xffffffff; check(&mrq, -EPERM);
+    cmd.data = mrq.data = NULL; cmd.arg = 28672; check(&mrq, -EPERM);
     /* Other platforms with no hook must retain their normal queue behavior. */
     struct dw_mci host = {0};
     struct dw_mci_slot unfiltered = {.host = &host};
@@ -158,6 +178,8 @@ with tempfile.TemporaryDirectory() as directory:
     # Use the real pinned MMC structures/opcode constants, not a rewritten model.
     for name in ("core.h", "mmc.h"):
         shutil.copyfile(source / "include/linux/mmc" / name, temp / "linux/mmc" / name)
+    shutil.copyfile(ROOT / "overlay/include/linux/mmc/ty1208z-samples.h",
+                    temp / "linux/mmc/ty1208z-samples.h")
     for name in ("errno.h", "errno-base.h"):
         shutil.copyfile(source / "include/uapi/asm-generic" / name, temp / "asm-generic" / name)
     (temp / "linux/errno.h").write_text('#include <asm-generic/errno.h>\n')
@@ -171,4 +193,9 @@ with tempfile.TemporaryDirectory() as directory:
                     "-I", str(ROOT / "overlay/drivers/mmc/host"), str(temp / "harness.c"),
                     "-o", str(temp / "test")], check=True)
     subprocess.run([str(temp / "test")], check=True)
+    subprocess.run(["cc", "-std=c11", "-O2", "-Wall", "-Wextra", "-Werror", "-I", str(temp),
+                    "-I", str(ROOT / "overlay/drivers/mmc/host"),
+                    "-DCONFIG_HI3798MV100_EMMC_READ_SAMPLES=1", str(temp / "harness.c"),
+                    "-o", str(temp / "test-read")], check=True)
+    subprocess.run([str(temp / "test-read")], check=True)
 print("Source ordering passed: identity/init, request rejection, PIO and final slot limits")

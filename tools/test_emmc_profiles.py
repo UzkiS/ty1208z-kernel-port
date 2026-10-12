@@ -19,6 +19,18 @@ class ProfileTests(unittest.TestCase):
     def test_actual_identification_config_passes(self):
         self.assertTrue(identification_profile(self.tree, self.config))
 
+    def test_fixed_samples_are_a_separate_explicit_profile(self):
+        artifact = ROOT / "artifacts/emmc-read1"
+        if not artifact.exists():
+            self.skipTest("Fixed-read artifact is built by make emmc-read")
+        tree = parse_fdt((artifact / "ty1208z-diagnostic.dtb").read_bytes())
+        config = (artifact / "linux.config").read_text()
+        self.assertTrue(identification_profile(tree, config))
+        with self.assertRaises(ValueError):
+            identification_profile(tree, config.replace('emmc-read1', 'emmc-ident1'))
+        with self.assertRaises(ValueError):
+            identification_profile(tree, config + 'CONFIG_BLOCK=y\n')
+
     def test_unreviewed_subsystems_are_rejected(self):
         for option in ("MMC_BLOCK", "MMC_TEST", "MMC_DW_HI3798CV200", "BLOCK", "DEBUG_FS",
                        "PWRSEQ_EMMC", "NET", "MODULES"):

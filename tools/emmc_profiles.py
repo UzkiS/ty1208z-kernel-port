@@ -5,11 +5,13 @@ import re
 def identification_profile(tree, config):
     nodes = [node for node in tree["nodes"] if node["path"] == "/soc/mmc@f9830000"]
     enabled = "CONFIG_MMC_DW_HI3798MV100_IDENT=y\n" in config
+    samples = "CONFIG_HI3798MV100_EMMC_READ_SAMPLES=y\n" in config
     if not enabled:
-        if nodes:
+        if nodes or samples:
             raise ValueError("Identification node outside its explicit profile")
         return False
-    if len(nodes) != 1 or 'CONFIG_LOCALVERSION="-ty1208z-emmc-ident1"\n' not in config:
+    release = "emmc-read1" if samples else "emmc-ident1"
+    if len(nodes) != 1 or f'CONFIG_LOCALVERSION="-ty1208z-{release}"\n' not in config:
         raise ValueError("Unexpected identification node/release")
     props = nodes[0]["properties"]
     expected = {
@@ -36,6 +38,8 @@ def identification_profile(tree, config):
                   "HI3798MV100_EMMC_AUDIT", "MODULES", "NET", "USB_SUPPORT", "MTD", "SMP"}
     if active.keys() & prohibited:
         raise ValueError("Prohibited subsystem in identification profile")
+    if samples and active.get("CRC32") != "y":
+        raise ValueError("Fixed sector samples require the CRC32 library")
     if any(node["path"] == "/soc/emmc-audit@f9830000" for node in tree["nodes"]):
         raise ValueError("Conflicting register audit node")
     return True

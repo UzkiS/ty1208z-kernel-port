@@ -74,6 +74,10 @@ jobs:
         run: |
           make emmc-ident > logs/emmc-ident.log 2>&1 || { tail -n 100 logs/emmc-ident.log; exit 1; }
           tail -n 20 logs/emmc-ident.log
+      - name: Build fixed read-only eMMC samples and run request/content/QEMU checks
+        run: |
+          make emmc-read > logs/emmc-read.log 2>&1 || { tail -n 100 logs/emmc-read.log; exit 1; }
+          tail -n 20 logs/emmc-read.log
       - name: Link optional RDA USB module and test manufacturing/key guards
         run: |
           make wifi-port > logs/wifi-port.log 2>&1 || { tail -n 100 logs/wifi-port.log; exit 1; }
@@ -88,6 +92,7 @@ jobs:
             artifacts/diag1/
             artifacts/emmc-audit1/
             artifacts/emmc-ident1/
+            artifacts/emmc-read1/
             artifacts/wifi-port/
             logs/
           retention-days: 14

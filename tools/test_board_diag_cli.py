@@ -54,11 +54,16 @@ class DiagnosticTests(unittest.TestCase):
                         b"EMMC_IDENT_GUARD_PASS\r\nUsing PIO mode.\r\nnew MMC card\r\n"
                         b"name=008G30\r\ntype=MMC\r\nBLOCK_DISABLED\r\n"
                         b"EMMC_IDENT_COMPLETE sectors=15269888 bytes=7818182656")
+                    samples = b"No samples" if mode == "missing-samples" else (
+                        b"EMMC_SAMPLE_HINAS_HEADER_MATCH crc32=2ba1a125\r\n"
+                        b"EMMC_SAMPLE_EXT4 magic=ef53 block_size=4096\r\n"
+                        b"EMMC_SAMPLE_READ_COMPLETE count=4 no-block-device")
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
                                  b"\r\n" + audit,
                                  b"\r\n" + ident,
+                                 b"\r\n" + samples,
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -116,6 +121,12 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_identification_captures_card_and_capacity(self):
         self.exercise("success", profile="emmc-ident1")
+
+    def test_sector_reads_require_content_checks(self):
+        self.exercise("missing-samples", profile="emmc-read1")
+
+    def test_sector_reads_capture_verified_content(self):
+        self.exercise("success", profile="emmc-read1")
 
 
 if __name__ == "__main__":
