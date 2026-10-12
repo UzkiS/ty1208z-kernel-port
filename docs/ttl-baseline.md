@@ -1,7 +1,7 @@
-# 用 CLI 记录原系统的 TTL 启动
+# TTL CLI：原系统记录、引导器检查与 RAM 诊断
 
-SSH 已完成 Linux 运行时信息采集。现在需要看到现有高安 fastboot 的启动输出、
-内存声明和命令能力，才能决定诊断内核如何临时加载。本阶段先记录原系统启动。
+SSH 基线、原 Hinas 启动、当前高安 fastboot 检查和 Linux 6.12 RAM 诊断均已完成。
+本文记录各 CLI 的用途及前置条件；原系统记录仍可用于后续外设对照。
 
 1. 使用 **3.3 V 电平**的 USB–TTL 串口，按此前成功使用的板端针脚连接 GND、
    TX、RX；TX/RX 交叉，不接适配器 VCC。未确认针脚时先核实，不能猜接。
@@ -22,10 +22,10 @@ SSH 已完成 Linux 运行时信息采集。现在需要看到现有高安 fastb
 python -m venv .work/serial-venv
 & ./.work/serial-venv/Scripts/python.exe -m pip install --require-hashes -r tools/requirements-serial.txt
 & ./.work/serial-venv/Scripts/python.exe tools/serial_cli.py list
-& ./.work/serial-venv/Scripts/python.exe tools/serial_cli.py capture --port COM5
+& ./.work/serial-venv/Scripts/python.exe tools/serial_cli.py capture --port COM9
 ```
 
-COM5 是此次本地识别结果，不是固定配置；换 USB 接口后重新 `list`。默认参数是
+当前适配器为 COM9，不是固定配置；换 USB 接口后重新 `list`。默认参数是
 **115200、8N1、无流控**。出现 `READY` 后才正常重启 Hinas，首轮不打断 autoboot。
 程序只接收，不读取键盘、不向设备发送回车或命令，也不尝试自动重连。
 打开串口前将 DTR/RTS 设为 false；设备连接仅使用 GND/TX/RX。
@@ -78,20 +78,53 @@ help loadb
 ```
 
 须先出现 `READY` 才能安排正常重启；用户输入 `reboot` 后立即回复即可，
-串口监听不依赖回复时机。2026-10-12 两次实机检查均未打断启动，查询命令
-发送数为零。不能把 PTY 测试通过称为引导器已可交互。当前先核对 TTL 的
-发送/回显及极短启动窗口，不要求反复重启，详情见
+串口监听不依赖回复时机。旧 TTL 适配器上的两次检查未打断启动，查询命令
+发送数为零；更换适配器后，COM9 的 CLI 已成功自动打断 bootdelay=0 的启动。
+详情见
 [检查记录](../verification/bootloader-inspection-20261012.md)。
 
 已知成功的 CA fastboot 可以用 `tools/inspect_bootloader.py` 离线提取字符串；
 脚本要求固定 SHA-256，输出仅保留在 `evidence/`，不会执行或刷入文件。
 字符串中的命令名称也不能替代当前引导器的真实帮助输出。
 
-## 采集之后
+## 接管已经停止的引导器
 
-待核查的是 RAM 加载/启动命令、验签要求、bootloader 占用及安全保留区域、
-候选输入与解压位置是否重叠。尚不运行加载、擦除、刷写、环境保存或安全状态
-修改命令。原系统能接受某个镜像，不能证明普通未签名候选一定能启动。
+盒子已经停在空的 `fastboot#` 提示符时，无需再次重启。使用：
 
-确认这些条件后，才校正诊断设备树和镜像包装，生成明确可审阅的临时启动步骤。
-第一个候选只启动自身 initramfs，后续 eMMC 与 Hinas 兼容验证另作阶段。
+```powershell
+& ./.work/serial-venv/Scripts/python.exe tools/serial_cli.py inspect-current-bootloader --port COM9
+```
+
+该模式只发回车，核对 Fastboot 版本，再读取 bootm/TFTP/YMODEM/Kermit/CRC32
+帮助、ddrfree 和环境；不会打断启动、加载或启动镜像。检测到 Linux、版本
+不同或响应超时则停止。其完整 `.json` 和哈希匹配的 `.rx` 是 RAM CLI 的输入。
+
+## 已测量路径的 RAM 诊断
+
+此路径针对当前已测量的 TY1208Z CA 引导器和诊断产物，不接受任意地址或命令。
+`prepare_ram_boot.py` 校验镜像、附加 DTB、内核解压足迹和内存限制；
+`ram_boot_cli.py` 在发送前再次核对当前版本、DDR 范围和 bootcmd。
+
+```powershell
+& ./.work/serial-venv/Scripts/python.exe tools/ram_boot_cli.py --port COM9 --artifacts artifacts/diag1 --inspection evidence/ttl-cli-20261012T052211.866908Z.json --boot --capture-seconds 60
+```
+
+YMODEM 传入 DDR 后，只有盒子报告的大小和 CRC 都匹配才发送 bootm。
+不带 `--boot` 时只传输和校验；`--boot-existing` 仅适用于已传入同一个镜像且
+尚未重启的情形，仍须重新核对 RAM CRC。普通 unsigned uImage 已在本机
+被接受，具体镜像及 shell 结果见 [实机报告](../verification/ram-boot-20261012.md)。
+自动构建的其他镜像仍须逐个验证，不据此称为可刷固件。
+
+进入诊断 shell 后可以运行固定诊断采集：
+
+```powershell
+& ./.work/serial-venv/Scripts/python.exe tools/board_diag_cli.py --port COM9
+```
+
+工具先核对诊断提示符和 exact kernel release，再运行 `diag`，读取 CPU、内存、
+计时器/串口中断、uptime、time64 和 dmesg。不设墙钟；探针只操作 RAM `/tmp`。
+较大的报告批量读取，避免网络目录逐字节写盘拖慢采集。所有模式均释放端口，
+保留 RX 哈希与 TX 日志，不自动重连或覆盖已有记录。
+
+本阶段无 eMMC/网络/USB 驱动；启动的是自身 initramfs。持久安装、原 Hinas
+兼容性、外设和路由应用须独立验证，尚无刷写或安全状态修改命令。

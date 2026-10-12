@@ -59,9 +59,14 @@
  obj-$(CONFIG_KEYSTONE_TIMER)		+= timer-keystone.o
 --- /dev/null
 +++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-diagnostic.dts
-@@ -0,0 +1,84 @@
+@@ -0,0 +1,90 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/dts-v1/;
++
++/* getinfo ddrfree starts at 16 MiB. Keep the lower range out of allocation;
++ * the ARM kernel itself decompresses below it, as in the existing boot path.
++ */
++/memreserve/ 0x00000000 0x01000000;
 +#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
 +/*
@@ -84,7 +89,9 @@
 +		bootargs = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=8 ignore_loglevel keep_bootcon panic=0";
 +	};
 +
-+	/* PLACEHOLDER: 256 MiB, not an assertion of safe available RAM. */
++	/* Restrict diagnosis to low 256 MiB of the measured 1 GiB DDR. This
++	 * excludes all observed high boot allocations; it is not an OTP map.
++	 */
 +	memory@0 {
 +		device_type = "memory";
 +		reg = <0x00000000 0x10000000>;
@@ -136,7 +143,6 @@
 +
 +		uart0: serial@f8b00000 {
 +			compatible = "arm,pl011", "arm,primecell";
-+			arm,primecell-periphid = <0x001fe011>;
 +			reg = <0xf8b00000 0x1000>;
 +			interrupts = <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>;
 +			clocks = <&uartclk>, <&uartclk>;

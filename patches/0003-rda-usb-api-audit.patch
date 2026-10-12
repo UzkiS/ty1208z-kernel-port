@@ -1,0 +1,49 @@
+--- a/rdawlan/wland_usb.c
++++ b/rdawlan/wland_usb.c
+@@ -1530,7 +1530,7 @@
+ }
+ 
+ MODULE_DEVICE_TABLE(usb, wland_usb_devid_table);
+-static void wland_ops_usb_shutdown(struct device *dev);
++static void wland_ops_usb_shutdown(struct usb_interface *intf);
+ static struct usb_driver wland_usbdrvr = {
+ 	.name = KBUILD_MODNAME,
+ 	.probe = wland_usb_probe,
+@@ -1543,11 +1543,7 @@
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 5, 0)
+ 	.disable_hub_initiated_lpm = 1,
+ #endif
+-	.drvwrap = {
+-		.driver = {
+-			.shutdown = &wland_ops_usb_shutdown,
+-		},
+-	},
++	.shutdown = wland_ops_usb_shutdown,
+ };
+ 
+ static int wland_usb_reset_device(struct device *dev, void *notused)
+@@ -1576,19 +1572,15 @@
+ 	return 0;
+ }
+ 
+-static void wland_ops_usb_shutdown(struct device *dev)
+-{
+-	struct device_driver *drv = &wland_usbdrvr.drvwrap.driver;
+-	int ret;
+-
+-	WLAND_DBG(USB, INFO, "Enter\n");
+-
+-	ret = driver_for_each_device(drv, NULL, NULL, wland_usb_reset_device);
++static void wland_ops_usb_shutdown(struct usb_interface *intf)
++{
++	/* USB core shuts down each interface; do not iterate unrelated devices. */
++	wland_usb_reset_device(&intf->dev, NULL);
+ }
+ 
+ void wland_usb_exit(void)
+ {
+-	struct device_driver *drv = &wland_usbdrvr.drvwrap.driver;
++	struct device_driver *drv = &wland_usbdrvr.driver;
+ 	int ret;
+ 
+ 	WLAND_DBG(USB, INFO, "Enter\n");

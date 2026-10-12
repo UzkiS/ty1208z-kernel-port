@@ -7,10 +7,12 @@
 |---|---|---|---|
 | Linux 板级支持 | `overlay/`、内核配置、Linux 补丁生成器 | 固定 Linux 源码、交叉工具链、板级事实 | 编译、内存临时启动、逐项外设测试 |
 | 诊断环境 | `initramfs/`、BusyBox 配置、time64 probe | ARM 用户空间、现代内核系统调用 | QEMU 启动、shell、2040 年读写 |
-| Wi-Fi，可选 | 目前为 `docs/wifi.md` 的驱动/固件清单 | 真实芯片 ID、USB 或 SDIO、相应内核驱动 | 扫描、联网、断线恢复；AP 模式单独验证 |
+| Wi-Fi，可选 | 独立来源锁、USB API 补丁和 `make wifi-usb-audit` | 真实芯片 ID、独立配置下的目标内核、相应驱动/固件 | 当前只编译 USB 对象；完整模块、扫描、联网、AP 分别验收 |
 | OpenWrt/Kwrt 集成 | 目前为实施计划；尚未建立 target | 已验证内核版本/配置、匹配模块与用户空间 | 网络、防火墙、Passwall、DNS、性能与重启 |
 
 Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线配置。
+`make wifi-usb-audit` 使用单独的内核输出目录和配置，不改变诊断镜像；目前只编译
+`wland_usb.o`，不链接模块、不加载固件。来源锁与适配范围见 [Wi-Fi 说明](wifi.md)。
 之后 OpenWrt/Kwrt 集成应引用固定版本的内核补丁，不能修改上层服务时暗中
 改变板级驱动。Wi-Fi 可关闭而不影响有线网络；未来可以在目标配置中选择它。
 
@@ -24,6 +26,8 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 - `overlay/` 是新增 Linux 文件的唯一维护入口。
 - `tools/make_kernel_patch.py` 从已校验的原版压缩包生成新增和修改文件的补丁。
 - `tools/make_busybox_patch.py` 从原版 BusyBox 生成时间输出修复。
+- `reference/wifi-rda-usb.lock.json` 固定可选 RDA 来源与逐文件哈希；下载器不下载固件。
+- `tools/make_wifi_usb_patch.py` 生成单独的 USB API 审计补丁。
 - `patches/` 提交可审查的生成结果；CI 再生成并要求 Git 无差异。
 - `reference/` 提交来源清单，`reference/sdk/` 下载内容被忽略。
 - `evidence/` 保留本地固件解析结果，避免把用户原固件内容发布到仓库。

@@ -1,0 +1,452 @@
+{
+  "schema": 1,
+  "repository": "https://github.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source",
+  "commit": "ef379d496bc0cd4b7bbeced783245f5e450a506d",
+  "prefix": "drivers/net/wireless/rdaw80211",
+  "purpose": "Optional RDA USB port source, not hardware verified",
+  "trees": {
+    "include": "d36838ae20846141e2ac8ff930bf399cd9207b96",
+    "rdawlan": "b953cecb918cec5aafef25f83507678499508428"
+  },
+  "files": [
+    {
+      "path": "Kconfig",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/Kconfig",
+      "sha256": "943c0331bcd70a1fbd7d63611d978e31a4737bb35ac965dc2c7bdd3be2350414",
+      "bytes": 1913
+    },
+    {
+      "path": "Makefile",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/Makefile",
+      "sha256": "bc18f3308f9f95d556bc56a04ec139839060f6a13dece62de1a5db1e95855cb3",
+      "bytes": 919
+    },
+    {
+      "path": "include/80211.h",
+      "git_blob_sha": "a07020ce717d323e498dd3b90a68e2a2f3c5e261",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/include/80211.h",
+      "sha256": "c62183cdd3965ff8994a989874bce530cbc37934d9b164146afc0fc1e5bc1b60",
+      "bytes": 20611
+    },
+    {
+      "path": "include/ethernet.h",
+      "git_blob_sha": "3302a2c1ea72f05921f904efa09f7d678401a787",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/include/ethernet.h",
+      "sha256": "2e3cb94e9b9e28c0fdd4cdbe686b845bfcba6416700d42a977dfdc20e31858c9",
+      "bytes": 5434
+    },
+    {
+      "path": "include/linux_osl.h",
+      "git_blob_sha": "d6d37e26a859822c0d96e462f458ef09360201c9",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/include/linux_osl.h",
+      "sha256": "4135a6bbe59162ae0c9c2aa9a88a11576e9863ae1812377f68a3bd1938f343b7",
+      "bytes": 4288
+    },
+    {
+      "path": "include/linuxver.h",
+      "git_blob_sha": "616d3b1295b119b791fc78e2279430c7fd831d0e",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/include/linuxver.h",
+      "sha256": "e876ffda3eb0a6a35b844e2d26a0d736a7f9365c61e036f1aea0a6fa9063f05a",
+      "bytes": 10908
+    },
+    {
+      "path": "include/wland_d11.h",
+      "git_blob_sha": "5d7c1f8c2bb687fd85d4fb6e6e24756128d38423",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/include/wland_d11.h",
+      "sha256": "c960cb3a5792636fc75808288f242f6118eb3f352f04fe3a65d917f42859fc46",
+      "bytes": 5480
+    },
+    {
+      "path": "rdawlan/Makefile",
+      "git_blob_sha": "1a8c2d44db7df50991e16cd2ef2df1cc67541bce",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/Makefile",
+      "sha256": "fc221399d27d3614a531159afcf7e26853266f4567960a1ef9bb9bfc98b61f0f",
+      "bytes": 2376
+    },
+    {
+      "path": "rdawlan/Makefile_android_sdio",
+      "git_blob_sha": "1a8c2d44db7df50991e16cd2ef2df1cc67541bce",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/Makefile_android_sdio",
+      "sha256": "fc221399d27d3614a531159afcf7e26853266f4567960a1ef9bb9bfc98b61f0f",
+      "bytes": 2376
+    },
+    {
+      "path": "rdawlan/Makefile_android_usb",
+      "git_blob_sha": "48f09dd3303377d812cbac7ee12a30c98f62e2a5",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/Makefile_android_usb",
+      "sha256": "8c0716e3e7c6c6e8c2f584d7530e64c6cec0cc54c863c628d3b9e352fe221b01",
+      "bytes": 2377
+    },
+    {
+      "path": "rdawlan/Makefile_hisilicon",
+      "git_blob_sha": "255440f1bd5a754ba8fa0e122b8f1402a82bde9d",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/Makefile_hisilicon",
+      "sha256": "288140d3934ac05fb02d067eff2e5e79677d2859bc52036b0e7716c2a6063d8d",
+      "bytes": 2691
+    },
+    {
+      "path": "rdawlan/Makefile_ubuntu",
+      "git_blob_sha": "14916d2cdda7088aa71f3ae568cc7d9cc4e5d45b",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/Makefile_ubuntu",
+      "sha256": "8128c8cb55d7f35daa9e4231620d298704f3a01bdeb47847321ea302f4ef5f87",
+      "bytes": 2474
+    },
+    {
+      "path": "rdawlan/power_config.txt.hex",
+      "git_blob_sha": "a550cf27ff84cfbd7635aa39d08b1c7661439e19",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/power_config.txt.hex",
+      "sha256": "0f44927bbe25a7c5bdd2faa28262c74b6f9bbdcc0f8b00177bf4ce22cb623049",
+      "bytes": 1645
+    },
+    {
+      "path": "rdawlan/rda5995_sdio_code1_p2p.bin.hex",
+      "git_blob_sha": "07b527c2431e9192e528e17d0bdafc6923ddb3e8",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_sdio_code1_p2p.bin.hex",
+      "sha256": "1512087a22cfc36696738b959fef218ece45fbe6869e02475eba7aa4766992cb",
+      "bytes": 63969
+    },
+    {
+      "path": "rdawlan/rda5995_sdio_code_ap.bin.hex",
+      "git_blob_sha": "0cbb1efbe08fb15a19bf859126dca436e794d6fd",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_sdio_code_ap.bin.hex",
+      "sha256": "ccd50736c343503b20d2796dba2c204869e18c41ed8a89100ce9c3dbad126c9c",
+      "bytes": 692468
+    },
+    {
+      "path": "rdawlan/rda5995_sdio_code_p2p.bin.hex",
+      "git_blob_sha": "907cb797ca518e3c33ca10bec9cffb678a75c2dd",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_sdio_code_p2p.bin.hex",
+      "sha256": "c999549344b88f8fc73b36921a15d017b1454e7f78e4233aa929588d176aa9b2",
+      "bytes": 800016
+    },
+    {
+      "path": "rdawlan/rda5995_sdio_code_rf.bin.hex",
+      "git_blob_sha": "9e4ccfcea220801b4416c28eb1c78aa513d9649d",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_sdio_code_rf.bin.hex",
+      "sha256": "ce46f14ac760af9a11fb1cdd3285dca0c149c88e481c22bb1aa90b49c122d421",
+      "bytes": 667379
+    },
+    {
+      "path": "rdawlan/rda5995_sdio_data_ap.bin.hex",
+      "git_blob_sha": "d595c85bcf1d38340fb16907c1f3c5e4c1036b0b",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_sdio_data_ap.bin.hex",
+      "sha256": "d1113631a68695fdb6ff1cd322b7e649223d6b3f6ff384e89e9a0f9f5cad5380",
+      "bytes": 11015
+    },
+    {
+      "path": "rdawlan/rda5995_sdio_data_p2p.bin.hex",
+      "git_blob_sha": "e54043ebb3cd98cd8a270c809c27259a67755dfa",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_sdio_data_p2p.bin.hex",
+      "sha256": "04f7ac3c2c574d7c00b521c693b83dd5ac68da63cc1929ec28e062a659715fe0",
+      "bytes": 16301
+    },
+    {
+      "path": "rdawlan/rda5995_sdio_data_rf.bin.hex",
+      "git_blob_sha": "f153fb0e06706f622452e7e22f124d19e0a0c08e",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_sdio_data_rf.bin.hex",
+      "sha256": "daca8fa695b0abc8afc4f1c345dc8757a1ee7d3b5d957a25fb229ca5f7dd56db",
+      "bytes": 26304
+    },
+    {
+      "path": "rdawlan/rda5995_usb_code1_p2p.bin.hex",
+      "git_blob_sha": "70db5f386fec8e56d4ffb233bb5db272e62780ff",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_usb_code1_p2p.bin.hex",
+      "sha256": "0b008e6dc639b52079f7db5213aeb0b647c1347016a83fc84354918fccc638d4",
+      "bytes": 63969
+    },
+    {
+      "path": "rdawlan/rda5995_usb_code_ap.bin.hex",
+      "git_blob_sha": "4472159843ae68c7501dff3bec124def601aeb5d",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_usb_code_ap.bin.hex",
+      "sha256": "55e8002d570fe1932bea4ec15eb18ca0135c1569c1e29f41e66cc0f0718c9265",
+      "bytes": 716404
+    },
+    {
+      "path": "rdawlan/rda5995_usb_code_p2p.bin.hex",
+      "git_blob_sha": "fd3927328ed4ea2a72454a9c5339e32edb3362df",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_usb_code_p2p.bin.hex",
+      "sha256": "ce1d31bb40d1fb4f220268b964d56bb32f1b4659f55b7059299395f797650c43",
+      "bytes": 823952
+    },
+    {
+      "path": "rdawlan/rda5995_usb_code_rf.bin.hex",
+      "git_blob_sha": "6443df1d583c8123657291ca40b8721b0024b7be",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_usb_code_rf.bin.hex",
+      "sha256": "fd3f6f7466d134a24c0bd6727b07083a56b7188e56a1fcef34f4da3bfab5b5db",
+      "bytes": 699252
+    },
+    {
+      "path": "rdawlan/rda5995_usb_data_ap.bin.hex",
+      "git_blob_sha": "b85995a8dfe8c66f27bb539733a10cb9dc7e3d19",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_usb_data_ap.bin.hex",
+      "sha256": "5d457b1d074bea990358d3b303af0280c63eaf5cbbf89c53f05e644c6ff6a751",
+      "bytes": 11279
+    },
+    {
+      "path": "rdawlan/rda5995_usb_data_p2p.bin.hex",
+      "git_blob_sha": "c4a8323bd0701ef7d9df35a34f8835e46515f6a4",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_usb_data_p2p.bin.hex",
+      "sha256": "4dc14c6418320095ccb9804221131010830042165399c43c2829796fd640d4c2",
+      "bytes": 16564
+    },
+    {
+      "path": "rdawlan/rda5995_usb_data_rf.bin.hex",
+      "git_blob_sha": "6ce84b175adef5891c4114dc5db3abbacb642a38",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/rda5995_usb_data_rf.bin.hex",
+      "sha256": "0e0b92d7132764eb0931ae5d9a5ab21c0be0d995f8766a6ba583c03a451ad5c6",
+      "bytes": 26567
+    },
+    {
+      "path": "rdawlan/wland_amsdu.c",
+      "git_blob_sha": "1fbad6d510a86c19314c910be7f49e7643dbbc48",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_amsdu.c",
+      "sha256": "6a16ef23823c5ba77a0cb814f860dfe6430cc9aaeb31d7e13ad606b437ebdc91",
+      "bytes": 19019
+    },
+    {
+      "path": "rdawlan/wland_amsdu.h",
+      "git_blob_sha": "3fc93900f7a14f4a920abbcefe1a4be0ad3154ec",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_amsdu.h",
+      "sha256": "79cd13b0455405fa8f15255eb8d3b2c95dbe8def0ef00b8757b5c9724d000703",
+      "bytes": 2568
+    },
+    {
+      "path": "rdawlan/wland_android.c",
+      "git_blob_sha": "bd0b332905086fa113419c27d928f619432e46f6",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_android.c",
+      "sha256": "77c63c36ef218967921acc2eec67839881b248f3559c5c7279acad2b4f8e186f",
+      "bytes": 29802
+    },
+    {
+      "path": "rdawlan/wland_android.h",
+      "git_blob_sha": "afe6d8a4294258d5dc57fa2c7ae9de43d8cd2516",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_android.h",
+      "sha256": "64ceca565d8178fcc3960435a28ae5fae09e13cf67ca68acd14ac0794fee3e97",
+      "bytes": 5147
+    },
+    {
+      "path": "rdawlan/wland_bus.c",
+      "git_blob_sha": "007c06cefc41eca7de0161c0f41326e9fd9816e5",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_bus.c",
+      "sha256": "906b64c9895a5d0b26efabd6491b3f7b30888a7d087dfaeb0ba2c9ada23dabc8",
+      "bytes": 15110
+    },
+    {
+      "path": "rdawlan/wland_bus.h",
+      "git_blob_sha": "ac0bd05758e221f0bfd0a2db5d0cdd9c777b2a49",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_bus.h",
+      "sha256": "8e51dc042b55edee75d10f1e5a5bb20b30db02b9d0e72319635db8ad6ea0dd78",
+      "bytes": 4872
+    },
+    {
+      "path": "rdawlan/wland_cfg80211.c",
+      "git_blob_sha": "12e170c66ca46c03c6fd3c32a78626119701d52d",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_cfg80211.c",
+      "sha256": "9a3d39a438c699a3306bf1ea3f10d1714cd6d30157848be4830c469a75d35cc8",
+      "bytes": 243727
+    },
+    {
+      "path": "rdawlan/wland_cfg80211.h",
+      "git_blob_sha": "201be5ff9fd10d1a28b584b821810d8ea93f49c4",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_cfg80211.h",
+      "sha256": "ac4d0c6a65e7dead3556220a1ee262dd458d94ea2cf02f994a1c9d0644007dc3",
+      "bytes": 19286
+    },
+    {
+      "path": "rdawlan/wland_cmds.c",
+      "git_blob_sha": "2e9c9a53110ca6250e843646f5acdb5f5bde1f5a",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_cmds.c",
+      "sha256": "92e0ceb623a0d565c035d9238d9f8473389b6fc0228da0aa100b3e41a13d1261",
+      "bytes": 75196
+    },
+    {
+      "path": "rdawlan/wland_d11.c",
+      "git_blob_sha": "bc5bdfc6b162e724f6ba4e3efe8c899d7ad16898",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_d11.c",
+      "sha256": "1932f8f72051db184f7618223625d2c058e43382ee3a38c836b68b2769ad684b",
+      "bytes": 4788
+    },
+    {
+      "path": "rdawlan/wland_dbg.c",
+      "git_blob_sha": "ef85588fc699f736c9c03fcdabc8a0134b196984",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_dbg.c",
+      "sha256": "7ab68ba60ae41d69961ddf005b623e298f66906faf73918c6ce69f265415364d",
+      "bytes": 16874
+    },
+    {
+      "path": "rdawlan/wland_dbg.h",
+      "git_blob_sha": "e0ae6cf69be205b04065b178dc950fb527afb354",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_dbg.h",
+      "sha256": "e183a6961f2bab93f33d8c4b23db483f73c6fb1b054e07b3e0d8ccc8b683d774",
+      "bytes": 7391
+    },
+    {
+      "path": "rdawlan/wland_defs.h",
+      "git_blob_sha": "b255fa39f1b1aafed5af07a9a9cf77c0f24c9dad",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_defs.h",
+      "sha256": "ed3bf18294175896f69584646069f84bf06f321d4daf47f19c96208d1f8a32df",
+      "bytes": 16200
+    },
+    {
+      "path": "rdawlan/wland_dev.h",
+      "git_blob_sha": "5bd2e0b0c5ff693fe2fb5a8592cb07cb5c0693ae",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_dev.h",
+      "sha256": "aaf52b7bcd8ae85fb9d36682fa0c2903ecca719e087429021b036e5e41279413",
+      "bytes": 24849
+    },
+    {
+      "path": "rdawlan/wland_fweh.c",
+      "git_blob_sha": "097467a6d255041286123c07c46b7b66a3f3d995",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_fweh.c",
+      "sha256": "72593aa72a6766203a0b4cc657c90df5ef7b605f20d8eabb7a3523c0c34c35c2",
+      "bytes": 9106
+    },
+    {
+      "path": "rdawlan/wland_fweh.h",
+      "git_blob_sha": "2a78f0cbe1a22998804c090d9bb82aafcb225545",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_fweh.h",
+      "sha256": "7c1133bd8c748807c964c4049a320feb3cb77b0927c49a67d2cc2a321f82d501",
+      "bytes": 5520
+    },
+    {
+      "path": "rdawlan/wland_fwsmgr.c",
+      "git_blob_sha": "6957aee2d113e6e4105ee7fc2d0ce38008055b99",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_fwsmgr.c",
+      "sha256": "c077d37abbb0465779c2e903d95165adcb8917132067315e60b0325d944ca371",
+      "bytes": 7162
+    },
+    {
+      "path": "rdawlan/wland_linux.c",
+      "git_blob_sha": "b89e7324caacf865d3adf6c003b16fca944599de",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_linux.c",
+      "sha256": "074dfe3e067894d923e613d74967d12c35223e8b852c42cf606890d5a7bad7af",
+      "bytes": 44167
+    },
+    {
+      "path": "rdawlan/wland_nvram.c",
+      "git_blob_sha": "f856647c63d2aa54d684c79661fa1cb4f1ae3262",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_nvram.c",
+      "sha256": "334f796493d03ef712819bbcee5e22fcc357034bf1804f2e5664f217f6985b41",
+      "bytes": 6365
+    },
+    {
+      "path": "rdawlan/wland_p2p.c",
+      "git_blob_sha": "13d7e7bca117e6b5730b0086c40757b9ac4b5f0b",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_p2p.c",
+      "sha256": "38de6eeca0c9bea9eaae3e4b8b010b147caaf491c228443426e2aa64f5707f25",
+      "bytes": 76459
+    },
+    {
+      "path": "rdawlan/wland_p2p.h",
+      "git_blob_sha": "172daed07004d076ab52ca4701183cf6f1325d8b",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_p2p.h",
+      "sha256": "d3fe54c5af7beb61abde768c6db11135323cbccdb9d2f2ef85ecd3a3524e3e58",
+      "bytes": 9230
+    },
+    {
+      "path": "rdawlan/wland_rf.c",
+      "git_blob_sha": "64dc99476e98b0bc77fb86cd871d979ab2400a47",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_rf.c",
+      "sha256": "f0592ba0ddad72c77d02021dea532d8aa7e83a99fc476b7f1d335a2813350169",
+      "bytes": 69500
+    },
+    {
+      "path": "rdawlan/wland_rf.h",
+      "git_blob_sha": "d8831d6a013da6aeb914c0cfc48b6dbaca37dce6",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_rf.h",
+      "sha256": "003f24a01a796cb62028c7f691472699d67d6a59bcf67660b35e1aea0844044e",
+      "bytes": 6148
+    },
+    {
+      "path": "rdawlan/wland_rx.c",
+      "git_blob_sha": "1da17c4f5be78c2223bf1cb348e9b678f6310713",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_rx.c",
+      "sha256": "92d58a9269a5e7ddaa11a41c159b032b15c797b149f548650a6a4e40e4b71868",
+      "bytes": 70561
+    },
+    {
+      "path": "rdawlan/wland_rx.h",
+      "git_blob_sha": "37571a1a9fda421839a0e17faf804983fdb139a6",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_rx.h",
+      "sha256": "3b5294d00ddabc694c83df3cbed232199ec2a99a18eaf076c87911775c714bb0",
+      "bytes": 6846
+    },
+    {
+      "path": "rdawlan/wland_sdio.c",
+      "git_blob_sha": "64c52a070539837ad05f07afd60ff7e6647c46a2",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_sdio.c",
+      "sha256": "621b5e401fefed38263bfe15c5a18959a96364268590acd739b128c34277984f",
+      "bytes": 49685
+    },
+    {
+      "path": "rdawlan/wland_sdmmc.c",
+      "git_blob_sha": "ee0f7b4c0e872980bc1ad80a7396f824548b4c75",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_sdmmc.c",
+      "sha256": "941860b5ad7240f06f4442cb7dcfd6ef3568664bc2848fe119bc9a942498bb7b",
+      "bytes": 36513
+    },
+    {
+      "path": "rdawlan/wland_sdmmc.h",
+      "git_blob_sha": "961ed4b7c42dd051a1f110c8b5adef4ccb49a195",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_sdmmc.h",
+      "sha256": "250d365ba09d9dfc73ef79cf4c0231a1d139b17b546f46ecafbe9ebd3a5cfca6",
+      "bytes": 10918
+    },
+    {
+      "path": "rdawlan/wland_trap.c",
+      "git_blob_sha": "77180e53ae1d6f51a90a38ccd396fac7e7954587",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_trap.c",
+      "sha256": "d76904388afb186b634e27e052f82084907830f5a6617fa51a457dc86100ed7b",
+      "bytes": 22358
+    },
+    {
+      "path": "rdawlan/wland_trap.h",
+      "git_blob_sha": "692fd2f3488db140e0154e2419a91a03146aa29b",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_trap.h",
+      "sha256": "aff0216c46f5184101e59e9f46b2d01cb53094d31f6076891576b81c71db3e05",
+      "bytes": 1228
+    },
+    {
+      "path": "rdawlan/wland_usb.c",
+      "git_blob_sha": "a3b0850de0141f80a494eea14f7f9c177d89c511",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_usb.c",
+      "sha256": "cf70d1bd165582dc822053add12b962c2d7997e32eb6e5bf192dd687eebabc46",
+      "bytes": 39769
+    },
+    {
+      "path": "rdawlan/wland_usb.h",
+      "git_blob_sha": "b05907e970c02f624173f36d3e7852ce5da237a8",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_usb.h",
+      "sha256": "81d50bc051dfb6ec38989acbea4ec5f2b04174fdefeaa9a671e84aab16a4ff7c",
+      "bytes": 5951
+    },
+    {
+      "path": "rdawlan/wland_utils.c",
+      "git_blob_sha": "5f9a8a8a6350c14e4f6fe868bf9900eda4333050",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_utils.c",
+      "sha256": "86680431916981089c5e7ebb2e7d15992f8513ee062af8fb2e77f2c87d021e87",
+      "bytes": 18925
+    },
+    {
+      "path": "rdawlan/wland_utils.h",
+      "git_blob_sha": "f038317091bccdec8367f9d3f4b450d2e33de719",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_utils.h",
+      "sha256": "83e6b1404a414e686c4331cb456bae9de47a54645f92caa7cd48e61adf10ec4a",
+      "bytes": 10146
+    },
+    {
+      "path": "rdawlan/wland_wid.c",
+      "git_blob_sha": "cb4b49375cdb5e4af87dfcbb9c89452c11308993",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_wid.c",
+      "sha256": "20bbc69dda907d99b1306332885aea76c32dcea8552f801217c115f7670933b6",
+      "bytes": 16611
+    },
+    {
+      "path": "rdawlan/wland_wid.h",
+      "git_blob_sha": "e0dae8ccf72b41930e0856ac13c7e0c5e4b6d6be",
+      "url": "https://raw.githubusercontent.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source/ef379d496bc0cd4b7bbeced783245f5e450a506d/drivers/net/wireless/rdaw80211/rdawlan/wland_wid.h",
+      "sha256": "b2c737ec18723829fdc14c46a84985fef2661f75fab71ded85d04c0783d4c8b2",
+      "bytes": 29318
+    }
+  ]
+}

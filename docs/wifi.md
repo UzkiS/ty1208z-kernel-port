@@ -39,9 +39,31 @@
 - 同一 Kconfig 依赖该平台的 RDACBDEV/I2C 电源控制；源码仍使用旧 cfg80211
   调用形式及 `init_timer`。USB 路径还需要审查固件下载和芯片 ID 判断。
 
-这只是有匹配 ID 的旧驱动参考，尚未证明能独立编译、驱动本机或移植到 6.12。
+这个 OrangePi 版本的 USB probe 对设备级描述符有额外限制，与本机 `dc00` 不符；
+不能仅凭相同 VID/PID 选用它。它也尚未证明能驱动本机或完整移植到 6.12。
 已检查文件的固定 URL/哈希见 [wifi-rda-audit.json](../reference/wifi-rda-audit.json)。
 源码留在本地证据目录，不纳入最小诊断构建，也没有在盒子上加载旧模块。
+
+## 独立 USB 编译审计
+
+另一个公开版本来自 [realme TechLife Robot Vacuum 内核](https://github.com/realme-kernel-opensource/realme_TechLife_Robot_Vacuum-kernel-source)，
+固定提交 `ef379d496bc0cd4b7bbeced783245f5e450a506d`，目录
+`drivers/net/wireless/rdaw80211`。其 probe 接受本机设备级 `00`、接口级 `FF`
+的描述符，并包含 WID 固件下载路径；这比单纯匹配 USB ID 更接近本机条件。
+
+[来源锁](../reference/wifi-rda-usb.lock.json) 记录 63 个文件的固定 URL、长度和哈希。
+`tools/fetch_wifi.py` 只下载 48 个代码文件，排除 `.hex` 固件，保留原许可头。
+来源具备下载路径不等于固件版本、分发许可或芯片修订已经确认。
+
+`make wifi-usb-audit` 已在本地 Linux 6.12.112 / ARM 工具链下成功编译
+`wland_usb.o`。它使用独立配置和输出目录，覆盖厂商默认 SDIO 构建；
+补丁仅更新 USB driver 注册结构及按接口 shutdown 回调。
+该结果是 **USB 单个对象的编译验证**，没有链接完整 `rdawfmac.ko`，也没有
+加载到盒子、下载固件、扫描或联网。CI 将重复此独立检查并校验生成补丁。
+
+完整移植还需处理旧 cfg80211/定时器 API、平台供电、固件路径和芯片版本。
+生产驱动不得启用或包含制造测试中的 eFuse 写入入口；这些接口须在模块集成前
+审计并排除。当前最小诊断镜像仍没有 USB/Wi-Fi 驱动。
 
 ## 后续实施顺序
 

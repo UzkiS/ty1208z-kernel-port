@@ -113,8 +113,11 @@ install -m 644 "$bout/.config" "$artifacts/busybox.config"
 install -m 755 "$rootfs/bin/time64-probe" "$artifacts/time64-probe.armhf"
 install -m 755 "$bout/busybox" "$artifacts/busybox.armhf"
 cp "$project/config/sources.lock.json" "$artifacts/sources.lock.json"
-cp "$project/patches/"*.patch "$artifacts/"
+cp "$project/patches/0001-hi3798mv100-diagnostic.patch" \
+    "$project/patches/0002-busybox-stat-time64.patch" "$artifacts/"
 cp "$project/STATUS.md" "$artifacts/STATUS.md"
+python3 "$project/tools/inspect_kernel_layout.py" --build "$kout" \
+    --output "$artifacts/checks/kernel-layout.json"
 {
     "${cross}gcc" --version
     "${cross}ld" --version

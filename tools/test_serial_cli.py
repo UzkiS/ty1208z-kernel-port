@@ -226,6 +226,44 @@ class CaptureTests(unittest.TestCase):
         self.assertEqual(process.wait(timeout=5), 1)
         self.assertFalse(select.select([self.master], [], [], 0.1)[0])
 
+    def test_attach_requires_prompt_and_version_before_queries(self):
+        from bootloader_probe import BootloaderProbe
+
+        process = self.launch(operation="inspect-current-bootloader")
+        self.ready(process)
+        self.peer_read(b"\r")
+        os.write(self.master, b"\r\nfastbo")
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+        os.write(self.master, b"ot# ")
+        self.peer_read(b"version\r")
+        os.write(self.master, b"\r\nFastboot 3.3.0-dirty (Dec 21 2016)\r\nfastboot# ")
+        for command in BootloaderProbe.ATTACH_COMMANDS:
+            self.peer_read(command)
+            os.write(self.master, b"\r\nquery response\r\nfastboot# ")
+        self.assertEqual(process.wait(timeout=5), 0, self.console.read_text())
+        metadata = json.loads(self.prefix.with_suffix(".json").read_text())
+        self.assertTrue(metadata["probe"]["attach"])
+        self.assertFalse(metadata["probe"]["interrupt_sent"])
+        self.assertEqual(metadata["probe"]["completed_commands"], len(BootloaderProbe.ATTACH_COMMANDS))
+
+    def test_attach_at_linux_login_sends_no_command(self):
+        process = self.launch(operation="inspect-current-bootloader")
+        self.ready(process)
+        self.peer_read(b"\r")
+        os.write(self.master, b"\r\nhi3798mv100 login: ")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+
+    def test_attach_rejects_different_version(self):
+        process = self.launch(operation="inspect-current-bootloader")
+        self.ready(process)
+        self.peer_read(b"\r")
+        os.write(self.master, b"\r\nfastboot# ")
+        self.peer_read(b"version\r")
+        os.write(self.master, b"\r\nFastboot 4.0\r\nfastboot# ")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

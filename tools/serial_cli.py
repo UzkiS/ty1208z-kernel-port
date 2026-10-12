@@ -83,6 +83,17 @@ def capture(args, serial_module, probe=None):
                 tx_log = stack.enter_context(paths["transmit"].open("x", encoding="utf-8"))
                 metadata["transmit_log"] = paths["transmit"].name
                 metadata["probe"] = probe.snapshot()
+
+            def transmit(outgoing):
+                record = {"utc": datetime.now(timezone.utc).isoformat(),
+                          "hex": outgoing.hex(), "status": "attempted"}
+                tx_log.write(json.dumps(record) + "\n")
+                written = receiver.write(outgoing)
+                if written != len(outgoing):
+                    raise ProbeError("Partial serial write; no retry")
+                tx_log.write(json.dumps({**record, "status": "written"}) + "\n")
+                tx_log.flush()
+
             json.dump(metadata, meta, indent=2)
             meta.write("\n")
             meta.flush()
@@ -93,6 +104,9 @@ def capture(args, serial_module, probe=None):
                 print(f"Stop file: {args.stop_file.resolve()}", flush=True)
             deadline = time.monotonic() + args.duration if args.duration else None
             try:
+                if probe is not None:
+                    for outgoing in probe.start():
+                        transmit(outgoing)
                 while True:
                     if probe is not None:
                         probe.check_timeout()
@@ -113,15 +127,7 @@ def capture(args, serial_module, probe=None):
                     if probe is not None:
                         for outgoing in probe.feed(data):
                             # Keep TX ahead of network-log flushes for bootdelay=0.
-                            # Record attempts, but never retry a partial write.
-                            record = {"utc": datetime.now(timezone.utc).isoformat(),
-                                      "hex": outgoing.hex(), "status": "attempted"}
-                            tx_log.write(json.dumps(record) + "\n")
-                            written = receiver.write(outgoing)
-                            if written != len(outgoing):
-                                raise ProbeError("Partial serial write; no retry")
-                            tx_log.write(json.dumps({**record, "status": "written"}) + "\n")
-                            tx_log.flush()
+                            transmit(outgoing)
                     raw.flush()
                     text_log.flush()
                     sys.stdout.write(console_text(decoded))
@@ -177,6 +183,7 @@ def main(argv=None):
     for operation, description, duration in (
         ("capture", "Receive only; save raw/text logs locally", 0),
         ("inspect-bootloader", "Wait for identified CA boot, Ctrl+C and fixed read-only queries", 180),
+        ("inspect-current-bootloader", "Attach to an empty fastboot# prompt; fixed queries, no reboot", 90),
     ):
         receive = subparsers.add_parser(operation, help=description)
         receive.add_argument("--port", required=True, help="COM5 on Windows, /dev/ttyUSB0 on Linux")
@@ -206,7 +213,8 @@ def main(argv=None):
             if not ports:
                 print("No serial ports found.")
             return 0
-        probe = BootloaderProbe() if args.operation == "inspect-bootloader" else None
+        probe = None if args.operation == "capture" else BootloaderProbe(
+            attach=args.operation == "inspect-current-bootloader")
         return capture(args, serial, probe)
     except (serial.SerialException, OSError, ValueError) as exc:
         print(f"Serial capture unavailable: {exc}\nClose other users of this port "

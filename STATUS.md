@@ -14,15 +14,15 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Linux 6.12.112 candidate | Cross-compiled; board descriptor, UART/GIC DTB, single-core timer and embedded initramfs |
 | Structural checks | Passed: CRC, ARM uImage/zImage, appended DTB, static ARM ELF, required/disabled config |
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
-| GitHub CI | Passed for code commit `a4adc78`: serial PTY tests, collector LF/CRLF regression, PowerShell syntax, clean kernel build and QEMU time64; [run 38199621273](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38199621273) |
+| GitHub CI | Passed for code commit `57ed846`: guarded serial PTY tests, collector LF/CRLF regression, PowerShell syntax, clean kernel build and QEMU time64; [run 38203563998](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38203563998) |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
-| Serial CLI | Original-board boot captured at 115200 8N1, 106675 bytes; guarded inspection added, two physical interrupt attempts unsuccessful and zero query commands sent; see [inspection record](verification/bootloader-inspection-20261012.md) |
+| Serial CLI | Replacing the TTL adapter resolved console input; CLI attached to the stopped CA bootloader on COM9 and completed command/environment queries without another reboot; see [inspection record](verification/bootloader-inspection-20261012.md) |
 | Original Hinas TTL boot | Complete from Boot ROM to login; bootloader and allocation evidence recorded in [TTL report](verification/ttl-boot-20261012.md) |
-| Candidate boot on physical TY1208Z | Not attempted |
-| CA authentication / RAM placement | Original boot reports secure boot disabled and accepts existing ordinary uImage; candidate authentication, usable RAM and placement remain unverified |
+| Candidate boot on physical TY1208Z | Passed for the corrected candidate: Linux 6.12.112, PL011 input/output, initramfs shell, GIC timer interrupts and RAM-file time64; see [physical RAM boot](verification/ram-boot-20261012.md) |
+| CA authentication / RAM placement | Current CA bootloader accepted this ordinary unsigned uImage at the measured Hinas address; host/device CRC matched; bounded low-256-MiB diagnostic boot succeeded. This does not establish other loaders/images or persistent installation |
 | Hinas startup under new kernel | Not tested; eMMC driver and legacy modules need separate work |
 | Wired network / storage / USB / SMP | Not integrated into this minimal diagnostic image |
-| Wi-Fi | RDA USB `1e04:8888`, vendor interface FF/FF/FF, no bound driver; matching modern driver and exact chip revision remain unverified |
+| Wi-Fi | RDA USB `1e04:8888`; pinned compatible-descriptor source found and USB object compiled against a separate Linux 6.12 config; full module, chip revision, firmware and hardware operation remain unverified |
 | OpenWrt/Kwrt / Passwall | Planned; no working target or router image yet |
 | Whole-system Y2038 | Not established; diagnostic time64 passed, application-level testing remains |
 
@@ -30,20 +30,26 @@ Known-successful CA bootloader SHA-256:
 `f891870ec98b4df48de879afc1e1973cf14cc9057eb18a5a41d974fab3e935bc`.
 
 The candidate is an ordinary unsigned uImage, not ADVCA packaged or ready to
-flash. Header load/entry is copied from local Hinas, not a validated RAM map.
-Initial DTB memory is a 256 MiB placeholder with no verified secure reservations.
+flash. Header/load/entry follows the measured original Hinas RAM boot path.
+Diagnostic memory is restricted to the low 256 MiB of measured 1 GiB DDR; the
+low 16 MiB is reserved from allocation according to the live ddrfree lower
+bound. This is not a complete secure-memory or OTP map.
 
-Original TTL boot now identifies Fastboot 3.3.0-dirty, 1GB DDR, the existing image
-load path and 11 boot-time allocations. Next physical step: inspect current
-bootloader commands and clarify RAM/DTB constraints. SSH and TTL still do not
-establish a safe candidate load map. Only then choose a real temporary-boot
-method and adjust candidate. RDA driver source/firmware assessment
-continues independently; the installed Realtek modules do not match this device.
+Live bootloader help confirms bootm, TFTP, Kermit, YMODEM and CRC32. The current
+environment confirms bootdelay=0 and the existing header at 0x01ffffc0. ddrfree
+reports 0x01000000..0x40000000; this broad range includes observed high boot
+allocations, so it is not treated as an allocator map. The bounded candidate
+reuses the original load address, stays below all observed high allocations,
+and has a verified decompression footprint ending below 16 MiB. The first boot
+reached /init but lacked a console because of an incorrect UART periphid
+override. Removing the override made PL011 bind; serial diagnostic capture
+then verified timer/uptime progress and the time64 probe. The next board work
+is storage and wired-network support with separate validation, followed by
+Hinas compatibility and the OpenWrt/Kwrt target.
 
-Current console issue: isolated CR and CRLF tests returned only the transmitted
-bytes; the user reports a login prompt on Enter in HiTool. Saved port settings
-match. Resolve this discrepancy before arranging another bootloader interrupt.
-Local bootargs contains `bootdelay=0`; live environment remains unqueried.
+The current local changes also pass RAM CRC/DDR gate tests and diagnostic-shell
+identity tests. CI listed above covers the earlier commit only; the new RAM
+boot and separate RDA USB audit changes still need their pushed CI result.
 
 The first Windows collection reached its END marker but exited 127 because
 PowerShell appended CRLF to the script. The collector now exits explicitly and

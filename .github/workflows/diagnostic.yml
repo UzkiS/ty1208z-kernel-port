@@ -59,8 +59,13 @@ jobs:
           make build > logs/build.log 2>&1 || { tail -n 100 logs/build.log; exit 1; }
           tail -n 20 logs/build.log
           git diff --exit-code -- patches
-      - name: ARM and 2040 timestamp regression on QEMU virt
+      - name: ARM time64 regression and guarded RAM boot protocol
         run: make test
+      - name: Compile optional RDA USB object with separate kernel configuration
+        run: |
+          make wifi-usb-audit > logs/wifi-usb-audit.log 2>&1 || { tail -n 100 logs/wifi-usb-audit.log; exit 1; }
+          tail -n 20 logs/wifi-usb-audit.log
+          git diff --exit-code -- patches/0003-rda-usb-api-audit.patch
       - name: Upload UNTESTED diagnostics and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

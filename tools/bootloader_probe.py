@@ -21,16 +21,31 @@ class BootloaderProbe:
         b"help tftp\r",
         b"help loadb\r",
     )
+    ATTACH_COMMANDS = (
+        b"help bootm\r", b"help tftp\r", b"help loady\r", b"help loadb\r",
+        b"help getinfo\r", b"getinfo ddrfree\r", b"help crc32\r",
+        b"printenv bootcmd bootargs bootdelay loadaddr bootm_low bootm_size\r",
+        b"printenv ipaddr serverip netmask ethact ethprime autostart\r",
+    )
     PROMPT = re.compile(rb"(?:^|[\r\n])fastboot# $")
 
-    def __init__(self, timeout=10):
+    def __init__(self, timeout=10, attach=False):
         self.timeout = timeout
-        self.stage = "await-boot-rom"
+        self.attach = attach
+        self.stage = "await-existing-prompt" if attach else "await-boot-rom"
         self.buffer = b""
         self.deadline = None
         self.completed_commands = 0
         self.sent_commands = 0
         self.interrupt_sent = False
+
+    def start(self):
+        # Attach is used only after the user leaves an empty fastboot# prompt.
+        # No Ctrl+C, reboot or autoboot interruption is attempted in this mode.
+        if self.attach:
+            self.deadline = time.monotonic() + self.timeout
+            return [b"\r"]
+        return []
 
     @property
     def finished(self):
@@ -39,6 +54,7 @@ class BootloaderProbe:
     def snapshot(self):
         return {
             "stage": self.stage, "interrupt_sent": self.interrupt_sent,
+            "attach": self.attach,
             "sent_commands": self.sent_commands,
             "completed_commands": self.completed_commands,
         }
@@ -50,6 +66,23 @@ class BootloaderProbe:
     def feed(self, data):
         self.check_timeout()
         self.buffer = (self.buffer + data)[-65536:]
+        if self.attach:
+            if b"Bootrom start" in self.buffer or b"Starting kernel ..." in self.buffer or b" login:" in self.buffer:
+                raise ProbeError("Attach is not at a stopped bootloader; no further bytes will be sent")
+            if self.stage == "await-existing-prompt":
+                if not self.PROMPT.search(self.buffer):
+                    return []
+                self.stage = "await-version-prompt"
+                self.buffer = b""
+                self.deadline = time.monotonic() + self.timeout
+                return [b"version\r"]
+            if self.stage == "await-version-prompt":
+                if not self.PROMPT.search(self.buffer):
+                    return []
+                if not re.search(rb"(?:^|[\r\n])Fastboot 3\.3\.0-dirty ", self.buffer):
+                    raise ProbeError("Attached bootloader version differs from measured image; no queries sent")
+                self.stage = "await-prompt"
+                self.buffer = b"\r\nfastboot# "
         if self.stage == "await-boot-rom":
             marker = self.buffer.find(b"Bootrom start")
             if marker < 0:
@@ -88,11 +121,12 @@ class BootloaderProbe:
             if self.stage == "await-command-prompt":
                 self.completed_commands += 1
             self.buffer = b""
-            if self.sent_commands == len(self.COMMANDS):
+            commands = self.ATTACH_COMMANDS if self.attach else self.COMMANDS
+            if self.sent_commands == len(commands):
                 self.stage = "complete"
                 self.deadline = None
                 return []
-            command = self.COMMANDS[self.sent_commands]
+            command = commands[self.sent_commands]
             self.sent_commands += 1
             self.stage = "await-command-prompt"
             self.deadline = time.monotonic() + self.timeout

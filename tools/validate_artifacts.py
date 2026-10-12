@@ -22,6 +22,8 @@ assert len(raw) == struct.unpack_from("<I", raw, 0x2c)[0] - struct.unpack_from("
 dtb = (artifacts / "ty1208z-diagnostic.dtb").read_bytes()
 tree = parse_fdt(dtb)
 assert tree["size"] == len(dtb)
+uart = next(node["properties"] for node in tree["nodes"] if node["path"] == "/soc/serial@f8b00000")
+assert "arm,primecell-periphid" not in uart, "Read the real UART ID; do not override with an unsupported ID"
 assert (artifacts / "zImage-appended-dtb").read_bytes() == raw + dtb
 assert (artifacts / "uImage-UNTESTED.bin").read_bytes()[64:] == raw + dtb
 assert len(image["device_trees"]) == 1

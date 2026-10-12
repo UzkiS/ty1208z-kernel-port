@@ -2,7 +2,8 @@
 
 The complete original boot was already captured. The missing evidence is a
 live command/help and environment response at `fastboot# `, not another Linux
-boot log. No diagnostic candidate was loaded or booted.
+boot log. This inspection sent no load or boot command; subsequent RAM transfer
+and candidate boots are recorded separately in [the RAM boot report](ram-boot-20261012.md).
 
 ## Physical attempts
 
@@ -34,6 +35,32 @@ console input and echo are investigated.
 The CLI was listening before each reboot. Replying immediately after entering
 `reboot` was correct; user message timing did not control the interrupt.
 
+## Successful stopped-console inspection
+
+After replacing the USB–TTL adapter, the user reached `fastboot# ` on COM9
+(Prolific USB ID `067b:2303`). The host CLI then attached to the existing empty
+prompt, checked the measured Fastboot version and completed fixed queries. No
+Ctrl+C, reboot, load or boot command was sent during this inspection.
+
+- Latest raw capture: 2491 bytes; SHA-256
+  `9669c93e444d69dc4b332653fc9c93e45584a2ab2a3166c915c25dc88337aa5f`.
+- Live `bootdelay=0` confirmed.
+- `bootcmd=mmc read 0 0x1FFFFC0 0x7000 0xA000;bootm 0x1FFFFC0` confirmed.
+- `loadaddr`, `bootm_low`, `bootm_size`, `ethact`, `ethprime` and `autostart`
+  are undefined. No variables were changed by this inspection.
+- `bootm [addr [arg ...]]`; partial start/loados/cmdline/bdt/prep/go commands.
+- `loady [ off ] [ baud ]`: YMODEM binary receive at a specified address.
+- `loadb [ off ] [ baud ]`: Kermit binary receive.
+- `tftp [loadAddress] [bootfilename] <upload_size>` is present.
+- `crc32 address count [addr]`: omitting the third argument prints a checksum.
+- `getinfo ddrfree` reports base `0x01000000`, size `0x3f000000`.
+
+The SDK reference command computes ddrfree from DDR size and a fixed lower
+bound, so high dynamic reservations must still be excluded. The measured
+console responses establish command availability, not candidate boot success.
+The historical failed attempts above remain recorded; their console blocker
+is resolved by the adapter replacement.
+
 ## Offline evidence
 
 The known-successful CA fastboot is hash-checked before extraction:
@@ -49,8 +76,17 @@ The local `bootargs9-32.bin` has SHA-256
 `d6d2be7bd083b2e74a2d123fb968827539373600c01bdae193eea7656c015cd0`
 and contains `bootdelay=0`. This is a local image measurement, **not a live
 `printenv` result**. It suggests a very short stop window; the installed value
-still needs confirmation. Offline strings and disassembly do not prove the
-current transfer commands, DTB handoff or safe RAM placement.
+was later confirmed by live printenv. Offline strings and disassembly do not prove the
+current transfer commands, DTB handoff or safe RAM placement by themselves.
+
+## Fresh-boot interrupt after adapter replacement
+
+At 05:44 UTC, the same CLI identified a new CA boot, sent one guarded Ctrl+C
+and completed all five fresh-boot query commands. The adapter replacement
+resolved the earlier physical interrupt failure even with bootdelay=0.
+Raw capture: 7545 bytes, SHA-256
+`0fe40d34ea95c98bdd232ab62327e253afa0fc97d9b98069155a8557f6fae94e`.
+The console remained at fastboot after the port was released.
 
 ## Protocol validation
 
@@ -59,8 +95,13 @@ fresh boot identity, fragmented prompts, fixed query sequencing and TX journal,
 wrong board rejection, stale prompt rejection, expiry at Linux login, missed
 interrupt, late autoboot observation, and unexpected restart before or after
 the interrupt. The original receive-only capture checks remain in place.
-Local `make lint test-serial` passed; all 13 PTY cases passed on Linux/WSL.
+Local `make lint test-serial` passed; all 16 console PTY cases and five YMODEM
+cases passed on Linux/WSL. Attach tests cover prompt/version gating, Linux login
+rejection and a different Fastboot version. YMODEM tests cover CRC16, exact file
+length/padding, sequence wrap, receiver-requested retries, both EOT handshakes,
+cancel and startup timeout.
 
-PTY success validates the host tool only. The physical inspection is still
-unsuccessful. A written TX journal entry means the host serial driver accepted
-bytes, not that the board received or acted on them.
+PTY success validates the host tool only. Physical read-only inspection is now
+successful; RAM transfer and candidate boot are separate stages. A written TX
+journal entry alone means the host serial driver accepted bytes, not that the
+board received or acted on them.

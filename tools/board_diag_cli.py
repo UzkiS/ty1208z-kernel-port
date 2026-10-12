@@ -1,0 +1,94 @@
+#!/usr/bin/env python3
+"""Read fixed diagnostics from the already running RAM-only diag1 shell."""
+import argparse
+from datetime import datetime, timezone
+import json
+from pathlib import Path
+import re
+import sys
+
+from ram_boot_cli import Exchange
+from serial_cli import console_text, open_receiver
+from ymodem_sender import TransferError
+
+PROMPT = re.compile(rb"(?:^|[\r\n])(?:/ )?# $")
+KERNEL = b"6.12.112-ty1208z-diag1"
+
+
+class ShellExchange(Exchange):
+    def read(self, size):
+        # Shell output has no binary handshake following a prompt. Drain queued
+        # bytes together: flushing every byte to a network evidence directory
+        # can otherwise overrun the host serial buffer during a dmesg report.
+        return super().read(min(max(self.port.in_waiting, size), 4096))
+
+
+def shell_command(exchange, command, timeout=10):
+    exchange.write(command + b"\r")
+
+    def complete(data):
+        if b"fastboot# " in data or b" login:" in data or b"Bootrom start" in data:
+            raise TransferError("Not at the diagnostic shell; no further commands")
+        return PROMPT.search(data)
+
+    response = exchange.until(complete, timeout=timeout)
+    print(console_text(response.decode("utf-8", "backslashreplace")), end="", flush=True)
+    return response
+
+
+def run(args, serial_module):
+    started = datetime.now(timezone.utc)
+    prefix = args.output or Path(__file__).resolve().parents[1] / "evidence" / started.strftime("board-diag-%Y%m%dT%H%M%S.%fZ")
+    prefix.parent.mkdir(parents=True, exist_ok=True)
+    paths = {kind: Path(str(prefix) + suffix) for kind, suffix in (
+        ("raw", ".rx"), ("journal", ".tx.jsonl"), ("metadata", ".json"),
+    )}
+    if any(path.exists() for path in paths.values()):
+        raise ValueError("Output already exists; choose a fresh prefix")
+    result = {"schema": 1, "started_utc": started.isoformat(), "port": args.port,
+              "kernel_verified": False, "report_complete": False, "status": "starting"}
+    with open_receiver(serial_module, args.port, 115200, 0.02) as port:
+        with paths["raw"].open("xb") as raw, paths["journal"].open("x", encoding="utf-8") as journal:
+            exchange = ShellExchange(port, raw, journal)
+            try:
+                shell_command(exchange, b"")
+                identity = shell_command(exchange, b"uname -r")
+                if not re.search(rb"(?:^|[\r\n])" + re.escape(KERNEL) + rb"[\r\n]", identity):
+                    raise TransferError("Kernel identity differs; diagnostic command not sent")
+                result["kernel_verified"] = True
+                report = shell_command(exchange, b"diag; echo TY1208Z_DIAG_COMPLETE", timeout=30)
+                if not re.search(rb"(?:^|[\r\n])TY1208Z_DIAG_COMPLETE[\r\n]", report):
+                    raise TransferError("Diagnostic report is incomplete")
+                if not re.search(rb"(?:^|[\r\n])TIME64_PASS sizeof\(time_t\)=8 ", report):
+                    raise TransferError("Diagnostic time64 probe did not pass")
+                result["report_complete"] = True
+                result["status"] = "diagnostic-captured"
+            except (TransferError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:
+                result["status"] = "error"
+                result["error"] = str(exc) or "Host interrupted"
+                print(f"STOP: {result['error']}", file=sys.stderr, flush=True)
+            finally:
+                result.update({"ended_utc": datetime.now(timezone.utc).isoformat(),
+                               "received_bytes": exchange.rx_bytes, "raw_sha256": exchange.digest.hexdigest()})
+                with paths["metadata"].open("x", encoding="utf-8") as meta:
+                    json.dump(result, meta, indent=2)
+                    meta.write("\n")
+    print(f"Port released; result={result['status']}; raw={paths['raw']}", flush=True)
+    return 0 if result["report_complete"] else 1
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--port", required=True)
+    parser.add_argument("--output", type=Path)
+    args = parser.parse_args()
+    import serial
+    try:
+        return run(args, serial)
+    except (ValueError, OSError, serial.SerialException) as exc:
+        print(f"Board diagnostic unavailable: {exc}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
