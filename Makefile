@@ -41,6 +41,7 @@ lint:
 	python3 tools/test_pinned_archives.py
 
 test-serial:
+	python3 tools/test_tftp_readonly.py
 	python3 tools/test_serial_cli.py
 	python3 tools/test_ymodem_sender.py
 	python3 tools/test_board_diag_cli.py
@@ -54,6 +55,7 @@ build:
 test:
 	bash tools/test-qemu.sh
 	python3 tools/test_ram_boot_cli.py
+	python3 tools/test_ram_boot_tftp.py
 
 verify: lint build test
 

@@ -116,6 +116,32 @@ YMODEM 传入 DDR 后，只有盒子报告的大小和 CRC 都匹配才发送 bo
 被接受，具体镜像及 shell 结果见 [实机报告](../verification/ram-boot-20261012.md)。
 自动构建的其他镜像仍须逐个验证，不据此称为可刷固件。
 
+## 临时 TFTP RAM 加载候选
+
+`ram_boot_cli.py` 可选用引导器已报告的 TFTP 下载形式，继续使用同一份镜像、
+内存布局、身份与 CRC 检查。此传输方式通过了真实 UDP/curl 与串口 PTY
+集成测试，尚未在盒子上验收，见 [验证记录](../verification/tftp-ram-offline-20261013.md)。
+
+```powershell
+& ./.work/serial-venv/Scripts/python.exe tools/ram_boot_cli.py --port COM9 --artifacts artifacts/openwrt-net1 --inspection evidence/ttl-cli-20261012T052211.866908Z.json --tftp-host-ip <电脑IPv4地址> --tftp-board-ip <同网段未占用地址> --boot --capture-seconds 60
+```
+
+两个地址必须是同一 /24 的本地单播地址；盒子的临时地址须由操作者确认未被占用。
+服务只绑定指定电脑地址的 UDP/69，为指定盒子地址提供一到两个固定名称的内存快照，
+不开放目录、不接受上传，退出时停止。若绑定失败或数据不能抵达，CLI 会停止；
+不会自动修改 Windows 防火墙、网络接口或启动常驻服务。
+
+串口仍需双向可用。CLI 先检查当前 `help tftp` 和 `help setenv` 的设定/删除语法，
+保存原网络变量，将 `autostart` 临时设为 `no`，再设临时地址。下载的服务端
+确认记录、盒子的 `filesize` 和 RAM CRC 必须全部匹配。外部 initrd 单独传输和校验。
+最后恢复并读回原网络变量，停止服务，才可能发送原计划的 `bootm`。
+不调用 `saveenv`，不改变启动参数或引导命令。
+
+若串口失联，工具不向未知控制台继续发送恢复或启动命令；报告会注明临时变量
+未恢复。它们仍仅在引导器 RAM 中，下一次真实断电启动会重新载入原环境。
+此模式不能与 `--boot-existing` 组合。网络加载速度、CA 引导器行为及硬件成功
+仍须独立实测，不能由本地协议测试推断。
+
 换镜像前先确认盒子当前运行的内核。RAM 诊断没有 SSH/网络，不能通过先前的
 Hinas SSH 会话重启它；当前诊断也尚未适配硬件复位。此时需在 CLI 已显示
 `READY` 后将盒子断电再通电，自动打断并重新传输镜像。确认回复不等于串口

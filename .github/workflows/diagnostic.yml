@@ -32,7 +32,7 @@ jobs:
             binutils-arm-linux-gnueabihf libc6-dev-armhf-cross bc bison flex \
             libssl-dev libelf-dev libncurses-dev device-tree-compiler \
             u-boot-tools cpio xz-utils pkg-config qemu-user qemu-system-arm \
-            shellcheck python3-venv
+            shellcheck python3-venv curl
           python3 -m venv .work/lint-venv
           .work/lint-venv/bin/pip install ruff==0.11.13
           .work/lint-venv/bin/pip install --require-hashes -r tools/requirements-serial.txt

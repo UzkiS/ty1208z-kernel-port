@@ -59,3 +59,8 @@ reported scope and do not overcome this startup blocker.
 All existing WID/control/key/operation sanitizers and full ARM module
 link/modpost/identity checks passed. This supersedes the earlier local module
 identity, remains compile-only and must match its exact kernel/config.
+
+The full remote diagnostic [run 38304430531](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38304430531)
+also passed on `fbc1e79`, including the actual startup rollback regression
+and fresh module link. It does not resolve the reproduced initialization
+blocker or provide hardware USB/radio evidence.

@@ -28,3 +28,13 @@ The job did not access the TY1208Z. No new USB, Wi-Fi, native OpenWrt,
 restart, storage or physical performance result is implied. Earlier
 `c25f83d` diagnostic run 38298432030 was cancelled by the `7bad089` push,
 after passing download/build/core checks; it is not a complete acceptance.
+
+## READY rollback accepted remotely
+
+The later [run 38304430531](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38304430531)
+completed successfully on `fbc1e792b2cf7adfabad70e41521760bead20f06`.
+It includes `cb2b5b8` and the actual RDA startup rollback harness, not just
+the earlier operation guards. The full diagnostic job and all independent
+profiles completed again. Wi-Fi hardware initialization remains blocked by
+the missing named-roaming/capability transport. This run predates the new
+TFTP CLI and cannot establish acceptance of that later tool.
