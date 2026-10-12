@@ -60,4 +60,9 @@ plain 512-byte protocol and negotiated 1468-byte blocks matched every byte
 and completion hash. Marker: `TFTP_LOCAL_ROUTER_SNAPSHOT_PASS`. These local
 transfer times are not board network-performance measurements.
 
-Remote CI and physical TFTP/normal OpenWrt acceptance remain separate.
+The complete diagnostic [run 38307787289](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38307787289)
+passed on `164fc1801e814aa33b9c7b24b284b5251aa7dab7`, including the real
+UDP/curl suite, UART PTY orchestration, core regression and all separate
+diagnostic profiles. The actual Actions job and every step were inspected;
+see [remote acceptance](diagnostic-ci-20261013.md). Physical TFTP and normal
+OpenWrt startup/throughput remain untested.

@@ -42,6 +42,15 @@ physical USB audit and sustained traffic acceptance still require a fresh
 startup and working bidirectional console. Short-command acceptance from the
 earlier physical reports remains valid within its recorded scope.
 
+After the user reported completing the requested computer-side TTL USB
+replug, the host still identified the same COM9 adapter. The previous empty
+listener was stopped and the port reopened. A bounded Ctrl+C/newline probe
+again received zero bytes; two host pings still received replies. The new
+empty capture is `console-recover-20261012T212132.896506Z.rx`. This does not
+identify the cause or establish console recovery. A fresh guarded listener
+was armed before requesting a board power cycle; native OpenWrt transfer
+must wait for an identified bootloader and successful bidirectional queries.
+
 ## Local evidence identities
 
 Raw logs and experimental runners remain in ignored local storage.

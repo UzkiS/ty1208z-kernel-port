@@ -38,3 +38,21 @@ the earlier operation guards. The full diagnostic job and all independent
 profiles completed again. Wi-Fi hardware initialization remains blocked by
 the missing named-roaming/capability transport. This run predates the new
 TFTP CLI and cannot establish acceptance of that later tool.
+
+## TFTP RAM transport accepted remotely
+
+The later [run 38307787289](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38307787289)
+completed successfully on `164fc1801e814aa33b9c7b24b284b5251aa7dab7`.
+The diagnostic job ran from 20:59:41 to 21:18:14 UTC on 2026-10-12;
+the actual job and every step were inspected and succeeded.
+
+This includes the real UDP/curl TFTP protocol tests in serial integration,
+the UART PTY size/CRC/environment-restoration gates, pinned core build and
+QEMU/time64 regression, all independent eMMC/Ethernet/USB/restart profiles,
+RDA module guards and artifact upload. The previously accepted READY rollback
+is included. The later directed-scan and bounded-SSID logging changes in
+`67d2a8b` and `8be80e0` are not included in this run.
+
+This is remote software acceptance. Physical TFTP, native OpenWrt startup,
+sustained Ethernet traffic and Wi-Fi remain unverified. Application UDP/NTP
+checks belong to their separate workflow and are not established by this run.
