@@ -180,6 +180,47 @@ class CaptureTests(unittest.TestCase):
         self.assertFalse(select.select([self.master], [], [], 0.1)[0])
         self.assertEqual(Path(str(self.prefix) + ".tx.jsonl").read_bytes(), b"")
 
+    def test_probe_accepts_full_ddr_sequence_when_bootrom_line_is_garbled(self):
+        process = self.launch(operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"\xff\x00Initializing DDR ... OK\r\r\n"
+                 b"Starting DDR training ... OK\r\r\nStarting fastboot ...\r\r\n"
+                 b"Fastboot 3.3.0-dirty (vendor)\r\nCPU: Hi3798Mv100 (CA)\r\nReserve Memory\r\n")
+        self.peer_read(b"\x03")
+        from bootloader_probe import BootloaderProbe
+
+        for command in BootloaderProbe.COMMANDS:
+            os.write(self.master, b"\r\nfastboot# ")
+            self.peer_read(command)
+        os.write(self.master, b"\r\nfastboot# ")
+        self.assertEqual(process.wait(timeout=5), 0)
+
+    def test_probe_partial_ddr_and_version_do_not_allow_interrupt(self):
+        process = self.launch("--duration", "0.4", operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"Starting DDR training ... OK\r\nStarting fastboot ...\r\n"
+                 b"Fastboot 3.3.0-dirty (vendor)\r\nCPU: Hi3798Mv100 (CA)\r\nReserve Memory\r\n")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+
+    def test_probe_ddr_sequence_still_requires_ca_identity(self):
+        process = self.launch(operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"Initializing DDR ... OK\r\nStarting DDR training ... OK\r\n"
+                 b"Starting fastboot ...\r\nFastboot 3.3.0-dirty (vendor)\r\n"
+                 b"CPU: Hi3798Mv200 (CA)\r\nReserve Memory\r\n")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+
+    def test_probe_ddr_restart_before_interrupt_transmits_nothing(self):
+        process = self.launch(operation="inspect-bootloader")
+        self.ready(process)
+        os.write(self.master, b"Initializing DDR ... OK\r\nStarting DDR training ... OK\r\n"
+                 b"Starting fastboot ...\r\nFastboot 3.3.0-dirty (vendor)\r\n"
+                 b"CPU: Hi3798Mv100 (CA)\r\nInitializing DDR ... OK\r\nReserve Memory\r\n")
+        self.assertEqual(process.wait(timeout=5), 1)
+        self.assertFalse(select.select([self.master], [], [], 0.1)[0])
+
     def test_probe_expiry_at_linux_login_transmits_nothing(self):
         process = self.launch("--duration", "0.4", operation="inspect-bootloader")
         self.ready(process)

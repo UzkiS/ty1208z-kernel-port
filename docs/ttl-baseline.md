@@ -57,7 +57,8 @@ Linux 下使用同一个脚本和依赖，将串口替换为实测的 `/dev/ttyU
 ## 引导器检查模式
 
 `capture` 仍为只接收。新增 `inspect-bootloader` 是独立、限时的诊断模式：
-看到本次 `Bootrom start`、已测量的 Fastboot 版本及 `Hi3798Mv100 (CA)` 后，
+看到本次 `Bootrom start` 或完整 DDR 初始化/训练/Starting fastboot 序列，
+并确认已测量的 Fastboot 版本及 `Hi3798Mv100 (CA)` 后，
 在内存分配表或 autoboot 提示处发送一次 Ctrl+C。只在收到行首的完整
 `fastboot# ` 提示后，依次发送以下固定查询，每条都等待新的提示符：
 

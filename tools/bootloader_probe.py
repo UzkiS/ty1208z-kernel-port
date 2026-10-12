@@ -38,6 +38,7 @@ class BootloaderProbe:
         self.completed_commands = 0
         self.sent_commands = 0
         self.interrupt_sent = False
+        self.fresh_marker = b"Bootrom start"
 
     def start(self):
         # Attach is used only after the user leaves an empty fastboot# prompt.
@@ -57,6 +58,7 @@ class BootloaderProbe:
             "attach": self.attach,
             "sent_commands": self.sent_commands,
             "completed_commands": self.completed_commands,
+            "fresh_marker": self.fresh_marker.decode("ascii"),
         }
 
     def check_timeout(self):
@@ -84,16 +86,31 @@ class BootloaderProbe:
                 self.stage = "await-prompt"
                 self.buffer = b"\r\nfastboot# "
         if self.stage == "await-boot-rom":
+            if b"Starting kernel ..." in self.buffer or b" login:" in self.buffer:
+                raise ProbeError("Fresh boot start was missed; Linux has started; nothing sent")
             marker = self.buffer.find(b"Bootrom start")
             if marker < 0:
-                return []
+                # The first Boot ROM line can be garbled at power-on while the
+                # following complete DDR/training/fastboot sequence is intact.
+                # Never accept a version, stale prompt or autoboot line alone.
+                sequence = re.search(
+                    rb"Initializing DDR \.\.\. OK[\r\n]+"
+                    rb"Starting DDR training \.\.\. OK[\r\n]+"
+                    rb"Starting fastboot \.\.\.", self.buffer)
+                if sequence is None:
+                    return []
+                marker = sequence.start()
+                self.fresh_marker = b"Initializing DDR ... OK"
             self.buffer = self.buffer[marker:]
             self.stage = "await-autoboot"
         if (
-            self.stage == "await-autoboot" and self.buffer.count(b"Bootrom start") > 1
+            self.stage == "await-autoboot" and (
+                self.buffer.count(b"Bootrom start") > 1
+                or self.buffer.count(b"Initializing DDR ... OK") > 1
+            )
         ) or (
             self.stage in {"await-prompt", "await-command-prompt"}
-            and b"Bootrom start" in self.buffer
+            and (b"Bootrom start" in self.buffer or b"Initializing DDR ... OK" in self.buffer)
         ):
             raise ProbeError("Device restarted during inspection; no further bytes will be sent")
         if self.stage == "await-autoboot":
