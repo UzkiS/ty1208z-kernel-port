@@ -44,8 +44,12 @@ pinned-source differential checks described in the [compile report](usb-host-com
   at 2040 in that isolated guest.
 
 Local QEMU, resolved config, manifest and layout logs remain under
-`artifacts/usb-host1/checks`. New CI build/profile checks are configured but
-have no completed remote result at this report's creation.
+`artifacts/usb-host1/checks`. Clean diagnostic CI passed on `3355c5b` in
+[run 38291376864](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38291376864),
+including the shared clock/PHY differential compile experiment, standalone
+host image, actual profile/config checks, QEMU observer/time64 and deliberate
+RAM-boot denial. The result supplies offline reproduction, not USB hardware
+acceptance.
 
 ## Required physical evidence
 
