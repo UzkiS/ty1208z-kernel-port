@@ -19,6 +19,7 @@ PROFILES = {
     "emmc-read1": b"6.12.112-ty1208z-emmc-read1",
     "ethernet-audit1": b"6.12.112-ty1208z-ethernet-audit1",
     "ethernet-clock-id1": b"6.12.112-ty1208z-ethernet-clock-id1",
+    "ethernet-net1": b"6.12.112-ty1208z-ethernet-net1",
 }
 
 
@@ -95,6 +96,11 @@ def run(args, serial_module):
                             b"ETH_CLOCK_ID_COMPLETE clock-restored no-phy-reset-writes no-dma"))
                         or b"ETH_CLOCK_ID_FAILED" in report):
                     raise TransferError("Temporary Ethernet clock/PHY-ID experiment did not pass")
+                if args.profile == "ethernet-net1" and not all(marker in report for marker in (
+                        b"ETH_NET_CLOCK_ENABLED crg51=0000000b inherited-phy",
+                        b"ETH_NET_PHY_VERIFIED id=20669823 inherited-no-reset",
+                        b"phy_id=0x20669823, phy_mode=mii")):
+                    raise TransferError("Inherited Ethernet driver/PHY binding did not pass")
                 result["report_complete"] = True
                 result["status"] = "diagnostic-captured"
             except (TransferError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:

@@ -8,8 +8,14 @@ mkdir -p /dev/pts /tmp
 mount -t devpts devpts /dev/pts
 mount -t tmpfs tmpfs /tmp
 echo
-echo 'TY1208Z diag1: Linux 6.12 offline candidate; hardware not validated.'
-echo 'Single core; storage and network drivers disabled; root is RAM only.'
+echo 'TY1208Z: Linux 6.12 RAM candidate; see the profile-specific hardware report.'
+case "$(uname -r)" in
+    *-ethernet-net1)
+        echo 'Single core; inherited-PHY Ethernet experiment; storage disabled.'
+        echo 'Network is down by default. ethernet-diag --dhcp requests a temporary lease.'
+        ;;
+    *) echo 'Single core; network drivers disabled; root is RAM only.' ;;
+esac
 uname -a
 cat /proc/cmdline
 head -n 5 /proc/meminfo

@@ -124,6 +124,59 @@ are separate. A successful PHY read still does not establish network traffic.
 The physical experiment passed with the exact clock restoration sequence
 and FESTAv220 ID. No reset, fixup, link or MAC data transfer ran.
 
+## Inherited-PHY datapath candidate
+
+`make ethernet-net` builds the distinct `ethernet-net1` RAM image. It reuses
+upstream FEMAC DMA mapping, FIFO queues, NAPI, PHY negotiation and bounded MDIO.
+The explicit `hisilicon,hi3798mv100-femac-inherited` compatible selects the
+MV100 adaptation. Port/global/MDIO resources do not overlap:
+`0xf9840000/0x400`, `0xf9841300/0x200` and `0xf9841100/8`; IRQ is SPI 71.
+DMA has an explicit 32-bit mask. The low-256-MiB RAM limit and low-16-MiB
+allocation reservation remain in force.
+
+The separate clock provider requires the five exact measured control values,
+enables only CRG51 bit 3, verifies `0xb` and waits 5 ms. It claims no clock
+frequency. MAC and MDIO share the prepared-clock reference count. Final
+unprepare restores `0x3` only if CRG51 is still exactly `0xb`; unexpected state
+is reported without overwriting another owner. PHY clock/reset/LDO/address/
+selection and OTP registers are not written.
+
+The dedicated FESTAv220 driver reads and verifies actual PHY ID `0x20669823`
+at address 1. Before connecting, the MAC requires that driver to be bound
+and defers otherwise, preventing generic PHY soft-reset fallback. It supplies
+no soft-reset, firmware or expanded-register fixup. Generic 10/100 negotiation
+and status callbacks may make ordinary volatile PHY configuration writes.
+This is an inherited-state experiment, not complete PHY cold-start support.
+Link may fail if inherited PHY firmware/state is insufficient; measure that
+before adding a vendor fixup or initialization sequence.
+
+MAC setup uses the SDK double software-reset pulse, little-endian controls,
+TX preamble limit and disabled bad-payload checksum drop. Pause offload stays
+disabled until negotiated behavior is implemented. The unestablished
+coalescing register `0x340` is untouched. The experiment uses RX-ready bit 0
+and TX-queue-ready bit 6. RX-ready pops a FIFO descriptor, so ISR/poll interrupt
+acknowledgment preserves it until the RX function consumes that packet.
+Receive lengths are checked before FCS subtraction and `skb_put`. Closing
+the new variant synchronizes IRQ and resets MAC before unmapping buffers;
+reopening reinitializes MAC controls after reset.
+
+Checked upstream replacements live in `tools/femac_patch.py`; new board files
+remain in `overlay/`. Actual clock/setup/reset/length helpers execute under
+ASan/UBSan, including 160 inherited-state bit mutations and all 4096 descriptor
+lengths. Profile checks reject changed resources/PHY/clock connections, reset
+properties, extra peripherals and storage/USB/modules/SMP/filter subsystems.
+Only this exact profile receives the RAM planner's NET exception; existing
+diagnostic gates remain. Compiled DT/config, image placement and QEMU time64
+are separate checks. QEMU does not emulate this MAC/PHY.
+
+The interface stays down by default. `ethernet-diag --dhcp` brings up only
+`eth0`, obtains a bounded temporary DHCP lease using a RAM-only hook, pings
+the advertised gateway and captures link/IRQ/TX/RX/error counters.
+`tools/ethernet_board_cli.py` verifies the exact kernel before this fixed
+command. Linux PTY tests cover wrong-kernel/bootloader refusal and false pass
+through command echo. Hardware binding and DHCP/ping are separate acceptance
+results; building does not establish working board Ethernet.
+
 Keep network experiments separate from the storage and plain diagnostic
 profiles. Use an MV100 compatible and an explicit upstream adaptation where
 needed; do not masquerade as a hi3516 board to skip SoC integration work.

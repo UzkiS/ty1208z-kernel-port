@@ -6,6 +6,7 @@ import hashlib
 import json
 from pathlib import Path
 import tarfile
+from femac_patch import replacements as femac_replacements, REPEATED_ANCHORS
 
 project = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
@@ -166,6 +167,41 @@ changes.update({
     ],
 })
 
+changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][0],
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +
+    'dtb-$(CONFIG_TY1208Z_ETHERNET_INHERITED) += hi3798mv100-ty1208z-ethernet-net.dtb\n')
+changes.update({
+    "drivers/clk/hisilicon/Kconfig": (
+        '# SPDX-License-Identifier: GPL-2.0-only\n',
+        '# SPDX-License-Identifier: GPL-2.0-only\n\n'
+        'config TY1208Z_ETHERNET_INHERITED\n'
+        '\tbool "TY1208Z inherited-PHY Ethernet RAM experiment"\n'
+        '\tdepends on ARCH_HI3798MV100 && HISI_FEMAC && !BLOCK && !MMC\n'
+        '\tdepends on !HI3798MV100_ETHERNET_AUDIT && !HI3798MV100_ETHERNET_CLOCK_ID\n'
+        '\thelp\n'
+        '\t  Enable the measured MAC clock bit, preserving PHY controls.\n'
+        '\t  No PHY reset/firmware or complete cold-start support.\n\n'),
+    "drivers/clk/hisilicon/Makefile": (
+        '# SPDX-License-Identifier: GPL-2.0\n',
+        '# SPDX-License-Identifier: GPL-2.0\n'
+        'obj-$(CONFIG_TY1208Z_ETHERNET_INHERITED) += clk-ty1208z-ethernet.o\n'),
+    "drivers/net/phy/Kconfig": (
+        'config FIXED_PHY\n',
+        'config FESTA_TY1208Z_PHY\n'
+        '\tbool "TY1208Z FESTAv220 inherited state"\n'
+        '\tdepends on TY1208Z_ETHERNET_INHERITED && PHYLIB\n'
+        '\thelp\n'
+        '\t  Explicit no-reset experiment using measured PHY 0x20669823.\n'
+        '\t  Uses generic 10/100 negotiation, no expanded-register fixup.\n\n'
+        'config FIXED_PHY\n'),
+    "drivers/net/phy/Makefile": (
+        '# SPDX-License-Identifier: GPL-2.0\n',
+        '# SPDX-License-Identifier: GPL-2.0\n'
+        'obj-$(CONFIG_FESTA_TY1208Z_PHY) += festa-ty1208z.o\n'),
+    "drivers/net/ethernet/hisilicon/hisi_femac.c": femac_replacements(),
+})
+
 diffs = []
 with tarfile.open(args.archive) as archive:
     for path, replacements in changes.items():
@@ -174,7 +210,8 @@ with tarfile.open(args.archive) as archive:
         if isinstance(replacements, tuple):
             replacements = [replacements]
         for old, new in replacements:
-            assert after.count(old) == 1, f"Patch anchor not unique: {path}"
+            count = REPEATED_ANCHORS.get(old, 1) if path.endswith("hisi_femac.c") else 1
+            assert after.count(old) == count, f"Patch anchor changed: {path}: {old!r}"
             after = after.replace(old, new)
         diffs.extend(difflib.unified_diff(before.splitlines(True), after.splitlines(True), f"a/{path}", f"b/{path}"))
 for source in sorted((project / "overlay").rglob("*")):

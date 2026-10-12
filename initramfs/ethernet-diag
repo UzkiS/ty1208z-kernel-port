@@ -1,0 +1,31 @@
+#!/bin/sh
+set -eu
+[ "$(uname -r)" = '6.12.112-ty1208z-ethernet-net1' ] || exit 1
+[ -d /sys/class/net/eth0 ] || { echo ETH_NET_NO_INTERFACE; exit 1; }
+snapshot() {
+    echo '=== Ethernet snapshot ==='
+    for field in operstate carrier speed duplex; do
+        printf '%s=' "$field"
+        cat "/sys/class/net/eth0/$field" 2>/dev/null || echo unavailable
+    done
+    for field in rx_packets tx_packets rx_bytes tx_bytes rx_errors tx_errors rx_dropped tx_dropped; do
+        printf '%s=' "$field"
+        cat "/sys/class/net/eth0/statistics/$field"
+    done
+    cat /proc/interrupts
+}
+case "${1:---snapshot}" in
+    --snapshot) snapshot ;;
+    --dhcp)
+        snapshot
+        ip link set eth0 up
+        sleep 3
+        udhcpc -i eth0 -s /bin/ethernet-dhcp -n -q -t 3 -T 3
+        [ -s /tmp/ethernet-gateway ] || { echo ETH_NET_NO_GATEWAY; exit 1; }
+        gateway=$(cat /tmp/ethernet-gateway)
+        ping -I eth0 -c 4 -W 2 "$gateway"
+        snapshot
+        echo 'ETH_NET_DHCP_PING_PASS'
+        ;;
+    *) exit 2 ;;
+esac

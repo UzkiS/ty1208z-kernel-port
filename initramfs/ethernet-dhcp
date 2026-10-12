@@ -1,0 +1,24 @@
+#!/bin/sh
+# udhcpc hook: this image's root and /tmp are RAM. No persistent filesystem.
+set -eu
+interface=${interface:-}
+ip=${ip:-}
+[ "$interface" = eth0 ] || exit 1
+case "$1" in
+    deconfig)
+        rm -f /tmp/ethernet-gateway
+        ip addr flush dev eth0
+        ;;
+    bound|renew)
+        [ -n "$ip" ] || exit 1
+        ip addr flush dev eth0
+        ip addr add "$ip/${subnet:-255.255.255.0}" dev eth0
+        if [ -n "${router:-}" ]; then
+            # Use only the first advertised router; no shell evaluation.
+            first_router=${router%% *}
+            ip route replace default via "$first_router" dev eth0
+            printf '%s\n' "$first_router" > /tmp/ethernet-gateway
+        fi
+        echo 'ETH_NET_DHCP_BOUND'
+        ;;
+esac

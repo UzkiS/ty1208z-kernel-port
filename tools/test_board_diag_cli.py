@@ -68,6 +68,10 @@ class DiagnosticTests(unittest.TestCase):
                         b"ETH_CLOCK_ID_STATE before=00000003 enabled=0000000b restored=00000003 changed=1 verified=1\r\n"
                         b"ETH_CLOCK_ID_PHY_ID=20669901 addr=1\r\n"
                         b"ETH_CLOCK_ID_COMPLETE clock-restored no-phy-reset-writes no-dma")
+                    network = b"No network driver" if mode == "missing-network" else (
+                        b"ETH_NET_CLOCK_ENABLED crg51=0000000b inherited-phy\r\n"
+                        b"ETH_NET_PHY_VERIFIED id=20669823 inherited-no-reset\r\n"
+                        b"phy_id=0x20669823, phy_mode=mii")
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
@@ -76,6 +80,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\n" + (samples if profile == "emmc-read1" else b""),
                                  b"\r\n" + (ethernet if profile == "ethernet-audit1" else b""),
                                  b"\r\n" + (clock_id if profile == "ethernet-clock-id1" else b""),
+                                 b"\r\n" + (network if profile == "ethernet-net1" else b""),
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -151,6 +156,12 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_clock_id_captures_restored_clock_and_phy_id(self):
         self.exercise("success", profile="ethernet-clock-id1")
+
+    def test_network_requires_bound_phy_and_mac(self):
+        self.exercise("missing-network", profile="ethernet-net1")
+
+    def test_network_binding_report_is_captured(self):
+        self.exercise("success", profile="ethernet-net1")
 
 
 if __name__ == "__main__":

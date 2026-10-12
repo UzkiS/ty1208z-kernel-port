@@ -35,6 +35,12 @@ OpenWrt 或新内核网口驱动验收结果。
 
 ## 源码与产物
 
+`make ethernet-net` 是独立的有线网口 RAM 实验入口：启用上游 FEMAC/MDIO、
+专用 MV100 初始化和保留状态的 FESTAv220 驱动，但关闭存储、USB、模块与 SMP。
+它有独立设备树、配置、BusyBox 网络工具、构建目录和 RAM 启动校验，不会改变
+默认诊断镜像或 OpenWrt 应用构建。完整 PHY 冷启动和实机收发按网口验收单独记录。
+
+
 - `config/sources.lock.json` 是下载版本、URL、哈希与已观察工具链的记录。
 - `openwrt/` 维护原生集成；引用板级及 BusyBox time64 补丁，不复制驱动源码。
 - `overlay/` 是新增 Linux 文件的唯一维护入口。

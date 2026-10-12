@@ -17,6 +17,7 @@ help:
 	@echo 'make emmc-read - build fixed four-sector read-only samples (no block device)'
 	@echo 'make ethernet-audit - inspect inherited clocks/PHY IDs without network or reset writes'
 	@echo 'make ethernet-clock-id - temporarily enable the measured MAC clock bit, read PHY ID, restore'
+	@echo 'make ethernet-net - build inherited-PHY Ethernet RAM candidate (storage disabled)'
 	@echo 'make openwrt-config - resolve the independent pinned native RAM target'
 	@echo 'make openwrt-toolchain - build the native target toolchain as a regular user'
 	@echo 'make openwrt-ram - build native OpenWrt RAM userspace/image (hardware untested)'
@@ -26,7 +27,7 @@ help:
 lint:
 	python3 tools/check_repository.py
 	python3 tools/fetch_wifi.py --check-lock
-	shellcheck tools/*.sh initramfs/init initramfs/diag
+	shellcheck tools/*.sh initramfs/init initramfs/diag initramfs/ethernet-diag initramfs/ethernet-dhcp
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
 
@@ -34,6 +35,7 @@ test-serial:
 	python3 tools/test_serial_cli.py
 	python3 tools/test_ymodem_sender.py
 	python3 tools/test_board_diag_cli.py
+	python3 tools/test_ethernet_board_cli.py
 
 build:
 	bash tools/build-diagnostic.sh $(if $(TASKBASE),"$(TASKBASE)")
@@ -70,6 +72,10 @@ ethernet-audit:
 
 ethernet-clock-id:
 	bash tools/build-ethernet-audit.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" clock-id
+
+.PHONY: ethernet-net
+ethernet-net:
+	bash tools/build-ethernet-net.sh $(if $(TASKBASE),"$(TASKBASE)")
 
 openwrt-config:
 	bash tools/build-openwrt-ram.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" config

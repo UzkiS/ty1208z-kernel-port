@@ -26,7 +26,7 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,10 @@
+@@ -1,4 +1,11 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
@@ -34,6 +34,7 @@
 +dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb
++dtb-$(CONFIG_TY1208Z_ETHERNET_INHERITED) += hi3798mv100-ty1208z-ethernet-net.dtb
  dtb-$(CONFIG_ARCH_HI3xxx) += \
  	hi3620-hi4511.dtb
  dtb-$(CONFIG_ARCH_HIP01) += \
@@ -243,6 +244,329 @@
  	/* Enable mci interrupt */
  	mci_writel(host, CTRL, SDMMC_CTRL_INT_ENABLE);
  
+--- a/drivers/clk/hisilicon/Kconfig
++++ b/drivers/clk/hisilicon/Kconfig
+@@ -1,4 +1,13 @@
+ # SPDX-License-Identifier: GPL-2.0-only
++
++config TY1208Z_ETHERNET_INHERITED
++	bool "TY1208Z inherited-PHY Ethernet RAM experiment"
++	depends on ARCH_HI3798MV100 && HISI_FEMAC && !BLOCK && !MMC
++	depends on !HI3798MV100_ETHERNET_AUDIT && !HI3798MV100_ETHERNET_CLOCK_ID
++	help
++	  Enable the measured MAC clock bit, preserving PHY controls.
++	  No PHY reset/firmware or complete cold-start support.
++
+ config COMMON_CLK_HI3516CV300
+ 	tristate "HI3516CV300 Clock Driver"
+ 	depends on ARCH_HISI || COMPILE_TEST
+--- a/drivers/clk/hisilicon/Makefile
++++ b/drivers/clk/hisilicon/Makefile
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
++obj-$(CONFIG_TY1208Z_ETHERNET_INHERITED) += clk-ty1208z-ethernet.o
+ #
+ # Hisilicon Clock specific Makefile
+ #
+--- a/drivers/net/phy/Kconfig
++++ b/drivers/net/phy/Kconfig
+@@ -53,6 +53,13 @@
+ 	help
+ 	  When LED class support is enabled, phylib can automatically
+ 	  probe LED setting from device tree.
++
++config FESTA_TY1208Z_PHY
++	bool "TY1208Z FESTAv220 inherited state"
++	depends on TY1208Z_ETHERNET_INHERITED && PHYLIB
++	help
++	  Explicit no-reset experiment using measured PHY 0x20669823.
++	  Uses generic 10/100 negotiation, no expanded-register fixup.
+ 
+ config FIXED_PHY
+ 	tristate "MDIO Bus/PHY emulation with fixed speed/link PHYs"
+--- a/drivers/net/phy/Makefile
++++ b/drivers/net/phy/Makefile
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
++obj-$(CONFIG_FESTA_TY1208Z_PHY) += festa-ty1208z.o
+ # Makefile for Linux PHY drivers
+ 
+ libphy-y			:= phy.o phy-c45.o phy-core.o phy_device.o \
+--- a/drivers/net/ethernet/hisilicon/hisi_femac.c
++++ b/drivers/net/ethernet/hisilicon/hisi_femac.c
+@@ -6,6 +6,7 @@
+  */
+ 
+ #include <linux/circ_buf.h>
++#include <linux/delay.h>
+ #include <linux/clk.h>
+ #include <linux/etherdevice.h>
+ #include <linux/interrupt.h>
+@@ -97,6 +98,8 @@
+ 	DELAYS_NUM,
+ };
+ 
++#include "hi3798mv100-femac.h"
++
+ struct hisi_femac_queue {
+ 	struct sk_buff **skb;
+ 	dma_addr_t *dma_phys;
+@@ -113,6 +116,8 @@
+ 	struct reset_control *phy_rst;
+ 	u32 phy_reset_delays[DELAYS_NUM];
+ 	u32 link_status;
++	bool mv100_inherited;
++	u32 irq_mask;
+ 
+ 	struct device *dev;
+ 	struct net_device *ndev;
+@@ -254,7 +259,6 @@
+ 	while (readl(priv->glb_base + GLB_IRQ_RAW) & IRQ_INT_RX_RDY) {
+ 		rx_pkt_info = readl(priv->port_base + IQFRM_DES);
+ 		len = rx_pkt_info & RX_FRAME_LEN_MASK;
+-		len -= ETH_FCS_LEN;
+ 
+ 		/* tell hardware we will deal with this packet */
+ 		writel(IRQ_INT_RX_RDY, priv->glb_base + GLB_IRQ_RAW);
+@@ -271,8 +275,7 @@
+ 		addr = rxq->dma_phys[pos];
+ 		dma_unmap_single(priv->dev, addr, MAX_FRAME_SIZE,
+ 				 DMA_FROM_DEVICE);
+-		skb_put(skb, len);
+-		if (unlikely(skb->len > MAX_FRAME_SIZE)) {
++		if (unlikely(!hi3798mv100_femac_valid_length(len))) {
+ 			netdev_err(dev, "rcv len err, len = %d\n", skb->len);
+ 			dev->stats.rx_errors++;
+ 			dev->stats.rx_length_errors++;
+@@ -280,6 +283,8 @@
+ 			goto next;
+ 		}
+ 
++		len -= ETH_FCS_LEN;
++		skb_put(skb, len);
+ 		skb->protocol = eth_type_trans(skb, dev);
+ 		napi_gro_receive(&priv->napi, skb);
+ 		dev->stats.rx_packets++;
+@@ -313,13 +318,13 @@
+ 			break;
+ 
+ 		ints = readl(priv->glb_base + GLB_IRQ_RAW);
+-		writel(ints & DEF_INT_MASK,
++		writel(ints & priv->irq_mask & ~IRQ_INT_RX_RDY,
+ 		       priv->glb_base + GLB_IRQ_RAW);
+-	} while (ints & DEF_INT_MASK);
++	} while (ints & priv->irq_mask);
+ 
+ 	if (work_done < budget) {
+ 		napi_complete_done(napi, work_done);
+-		hisi_femac_irq_enable(priv, DEF_INT_MASK &
++		hisi_femac_irq_enable(priv, priv->irq_mask &
+ 					(~IRQ_INT_TX_PER_PACKET));
+ 	}
+ 
+@@ -334,10 +339,13 @@
+ 
+ 	ints = readl(priv->glb_base + GLB_IRQ_RAW);
+ 
+-	if (likely(ints & DEF_INT_MASK)) {
+-		writel(ints & DEF_INT_MASK,
++	if (!(ints & priv->irq_mask))
++		return IRQ_NONE;
++
++	if (likely(ints & priv->irq_mask)) {
++		writel(ints & priv->irq_mask & ~IRQ_INT_RX_RDY,
+ 		       priv->glb_base + GLB_IRQ_RAW);
+-		hisi_femac_irq_disable(priv, DEF_INT_MASK);
++		hisi_femac_irq_disable(priv, priv->irq_mask);
+ 		napi_schedule(&priv->napi);
+ 	}
+ 
+@@ -444,6 +452,11 @@
+ {
+ 	u32 val;
+ 
++	if (priv->mv100_inherited) {
++		hi3798mv100_femac_reset(priv->glb_base);
++		return 0;
++	}
++
+ 	val = readl(priv->glb_base + GLB_SOFT_RESET);
+ 	val |= SOFT_RESET_ALL;
+ 	writel(val, priv->glb_base + GLB_SOFT_RESET);
+@@ -456,11 +469,15 @@
+ 	return 0;
+ }
+ 
++static void hisi_femac_port_init(struct hisi_femac_priv *priv);
++
+ static int hisi_femac_net_open(struct net_device *dev)
+ {
+ 	struct hisi_femac_priv *priv = netdev_priv(dev);
+ 
+ 	hisi_femac_port_reset(priv);
++	if (priv->mv100_inherited)
++		hisi_femac_port_init(priv);
+ 	hisi_femac_set_hw_mac_addr(priv, dev->dev_addr);
+ 	hisi_femac_rx_refill(priv);
+ 
+@@ -474,7 +491,7 @@
+ 		phy_start(dev->phydev);
+ 
+ 	writel(IRQ_ENA_PORT0_MASK, priv->glb_base + GLB_IRQ_RAW);
+-	hisi_femac_irq_enable(priv, IRQ_ENA_ALL | IRQ_ENA_PORT0 | DEF_INT_MASK);
++	hisi_femac_irq_enable(priv, IRQ_ENA_ALL | IRQ_ENA_PORT0 | priv->irq_mask);
+ 
+ 	return 0;
+ }
+@@ -491,6 +508,11 @@
+ 	netif_stop_queue(dev);
+ 	napi_disable(&priv->napi);
+ 
++	/* Stop MAC DMA before releasing buffers for this new variant. */
++	if (priv->mv100_inherited) {
++		synchronize_irq(dev->irq);
++		hisi_femac_port_reset(priv);
++	}
+ 	hisi_femac_free_skb_rings(priv);
+ 
+ 	return 0;
+@@ -507,7 +529,8 @@
+ 	val = readl(priv->port_base + ADDRQ_STAT);
+ 	val &= BIT_TX_READY;
+ 	if (!val) {
+-		hisi_femac_irq_enable(priv, IRQ_INT_TX_PER_PACKET);
++		hisi_femac_irq_enable(priv, priv->mv100_inherited ?
++				      IRQ_INT_TX_FIFO_EMPTY : IRQ_INT_TX_PER_PACKET);
+ 		dev->stats.tx_dropped++;
+ 		dev->stats.tx_fifo_errors++;
+ 		netif_stop_queue(dev);
+@@ -516,7 +539,8 @@
+ 
+ 	if (unlikely(!CIRC_SPACE(txq->head, txq->tail,
+ 				 txq->num))) {
+-		hisi_femac_irq_enable(priv, IRQ_INT_TX_PER_PACKET);
++		hisi_femac_irq_enable(priv, priv->mv100_inherited ?
++				      IRQ_INT_TX_FIFO_EMPTY : IRQ_INT_TX_PER_PACKET);
+ 		dev->stats.tx_dropped++;
+ 		dev->stats.tx_fifo_errors++;
+ 		netif_stop_queue(dev);
+@@ -757,12 +781,60 @@
+ 	val |= MAX_FRAME_SIZE;
+ 	writel(val, priv->port_base + MAC_SET);
+ 
+-	val = RX_COALESCED_TIMER |
+-		(RX_COALESCED_FRAMES << RX_COALESCED_FRAME_OFFSET);
+-	writel(val, priv->port_base + RX_COALESCE_SET);
++	if (priv->mv100_inherited) {
++		hi3798mv100_femac_setup(priv->port_base, priv->glb_base);
++	} else {
++		val = RX_COALESCED_TIMER |
++			(RX_COALESCED_FRAMES << RX_COALESCED_FRAME_OFFSET);
++		writel(val, priv->port_base + RX_COALESCE_SET);
++	}
+ 
+ 	val = (HW_RX_FIFO_DEPTH << RX_DEPTH_OFFSET) | HW_TX_FIFO_DEPTH;
+ 	writel(val, priv->port_base + QLEN_SET);
++}
++
++/* Explicit board experiment: no generic PHY reset fallback. */
++static int hisi_femac_mv100_phy_ready(struct device_node *node)
++{
++	struct device_node *phynode;
++	struct phy_device *phy;
++	int ret = 0;
++
++	phynode = of_parse_phandle(node, "phy-handle", 0);
++	if (!phynode)
++		return -EINVAL;
++	phy = of_phy_find_device(phynode);
++	of_node_put(phynode);
++	if (!phy)
++		return -EPROBE_DEFER;
++	if (phy->mdio.addr != 1 || phy->phy_id != 0x20669823)
++		ret = -ENODEV;
++	else if (!phy->drv || strcmp(phy->drv->name, "TY1208Z FESTAv220 inherited"))
++		ret = -EPROBE_DEFER;
++	put_device(&phy->mdio.dev);
++	return ret;
++}
++
++static int hisi_femac_mv100_resources(struct platform_device *pdev)
++{
++	static const resource_size_t addresses[] = { 0xf9840000, 0xf9841300 };
++	static const resource_size_t sizes[] = { 0x400, 0x200 };
++	struct resource *res;
++	unsigned int i;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic"))
++		return -ENODEV;
++	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++		if (!res || res->start != addresses[i] || resource_size(res) != sizes[i])
++			return -EINVAL;
++	}
++	if (platform_get_resource(pdev, IORESOURCE_MEM, ARRAY_SIZE(addresses)))
++		return -EINVAL;
++	if (of_property_read_bool(pdev->dev.of_node, "resets") ||
++	    of_property_read_bool(pdev->dev.of_node, PHY_RESET_DELAYS_PROPERTY))
++		return -EINVAL;
++	return 0;
+ }
+ 
+ static int hisi_femac_drv_probe(struct platform_device *pdev)
+@@ -784,6 +856,18 @@
+ 	priv = netdev_priv(ndev);
+ 	priv->dev = dev;
+ 	priv->ndev = ndev;
++	priv->mv100_inherited = of_device_is_compatible(node,
++				"hisilicon,hi3798mv100-femac-inherited");
++	priv->irq_mask = priv->mv100_inherited ?
++		(IRQ_INT_RX_RDY | IRQ_INT_TX_FIFO_EMPTY) : DEF_INT_MASK;
++	if (priv->mv100_inherited) {
++		ret = hisi_femac_mv100_resources(pdev);
++		if (ret)
++			goto out_free_netdev;
++		ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));
++		if (ret)
++			goto out_free_netdev;
++	}
+ 
+ 	priv->port_base = devm_platform_ioremap_resource(pdev, 0);
+ 	if (IS_ERR(priv->port_base)) {
+@@ -810,12 +894,19 @@
+ 		goto out_free_netdev;
+ 	}
+ 
+-	priv->mac_rst = devm_reset_control_get(dev, "mac");
+-	if (IS_ERR(priv->mac_rst)) {
+-		ret = PTR_ERR(priv->mac_rst);
+-		goto out_disable_clk;
+-	}
+-	hisi_femac_core_reset(priv);
++	if (priv->mv100_inherited) {
++		ret = hisi_femac_mv100_phy_ready(node);
++		if (ret)
++			goto out_disable_clk;
++		hisi_femac_port_reset(priv);
++	} else {
++		priv->mac_rst = devm_reset_control_get(dev, "mac");
++		if (IS_ERR(priv->mac_rst)) {
++			ret = PTR_ERR(priv->mac_rst);
++			goto out_disable_clk;
++		}
++		hisi_femac_core_reset(priv);
++	}
+ 
+ 	priv->phy_rst = devm_reset_control_get(dev, "phy");
+ 	if (IS_ERR(priv->phy_rst)) {
+@@ -945,6 +1036,7 @@
+ #endif
+ 
+ static const struct of_device_id hisi_femac_match[] = {
++	{.compatible = "hisilicon,hi3798mv100-femac-inherited",},
+ 	{.compatible = "hisilicon,hisi-femac-v1",},
+ 	{.compatible = "hisilicon,hisi-femac-v2",},
+ 	{.compatible = "hisilicon,hi3516cv300-femac",},
 --- /dev/null
 +++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-diagnostic.dts
 @@ -0,0 +1,90 @@
@@ -424,6 +748,46 @@
 +	};
 +};
 --- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-ethernet-net.dts
+@@ -0,0 +1,37 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-diagnostic.dts"
++
++/ {
++	model = "TY1208Z CA inherited-PHY Ethernet RAM experiment";
++};
++
++&{/soc} {
++	ethclk: clock-controller@f8a220cc {
++		compatible = "tianyi,ty1208z-inherited-ethernet-clock";
++		#clock-cells = <0>;
++		reg = <0xf8a220cc 4>, <0xf8a22120 4>, <0xf8a20008 4>,
++		      <0xf8a20118 4>, <0xf8a20844 4>;
++	};
++
++	mdio@f9841100 {
++		compatible = "hisilicon,hisi-femac-mdio";
++		reg = <0xf9841100 8>;
++		clocks = <&ethclk>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		phy1: ethernet-phy@1 {
++			compatible = "ethernet-phy-id2066.9823";
++			reg = <1>;
++		};
++	};
++
++	ethernet@f9840000 {
++		compatible = "hisilicon,hi3798mv100-femac-inherited";
++		reg = <0xf9840000 0x400>, <0xf9841300 0x200>;
++		interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&ethclk>;
++		phy-mode = "mii";
++		phy-handle = <&phy1>;
++	};
++};
+--- /dev/null
 +++ b/arch/arm/mach-hisi/hi3798mv100.c
 @@ -0,0 +1,16 @@
 +// SPDX-License-Identifier: GPL-2.0-only
@@ -442,6 +806,146 @@
 +	.map_io = debug_ll_io_init,
 +	.dt_compat = hi3798mv100_compat,
 +MACHINE_END
+--- /dev/null
++++ b/drivers/clk/hisilicon/clk-ty1208z-ethernet.c
+@@ -0,0 +1,98 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Measured TY1208Z inherited PHY state; no PHY reset or frequency claim. */
++#include <linux/clk-provider.h>
++#include <linux/delay.h>
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#include "ty1208z-ethernet-gate.h"
++
++struct ty1208z_ethernet_clock {
++	struct clk_hw hw;
++	struct device *dev;
++	void __iomem *control[5];
++};
++
++static int ty1208z_ethernet_prepare(struct clk_hw *hw)
++{
++	struct ty1208z_ethernet_clock *clock =
++		container_of(hw, struct ty1208z_ethernet_clock, hw);
++	int ret;
++
++	ret = ty1208z_ethernet_gate_enable(clock->control);
++	if (!ret)
++		dev_info(clock->dev, "ETH_NET_CLOCK_ENABLED crg51=0000000b inherited-phy\n");
++	return ret;
++}
++
++static void ty1208z_ethernet_unprepare(struct clk_hw *hw)
++{
++	struct ty1208z_ethernet_clock *clock =
++		container_of(hw, struct ty1208z_ethernet_clock, hw);
++
++	if (ty1208z_ethernet_gate_disable(clock->control[0]))
++		dev_err(clock->dev, "ETH_NET_CLOCK_RESTORE_FAILED\n");
++}
++
++static const struct clk_ops ty1208z_ethernet_clock_ops = {
++	.prepare = ty1208z_ethernet_prepare,
++	.unprepare = ty1208z_ethernet_unprepare,
++};
++
++static int ty1208z_ethernet_clock_probe(struct platform_device *pdev)
++{
++	static const resource_size_t addresses[] = {
++		0xf8a220cc, 0xf8a22120, 0xf8a20008, 0xf8a20118, 0xf8a20844,
++	};
++	struct device *dev = &pdev->dev;
++	struct ty1208z_ethernet_clock *clock;
++	struct clk_init_data init = {
++		.name = "ty1208z-inherited-ethernet",
++		.ops = &ty1208z_ethernet_clock_ops,
++	};
++	struct resource *res;
++	unsigned int i;
++	int ret;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic"))
++		return -ENODEV;
++	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++		if (!res || res->start != addresses[i] || resource_size(res) != 4)
++			return -EINVAL;
++	}
++	if (platform_get_resource(pdev, IORESOURCE_MEM, ARRAY_SIZE(addresses)))
++		return -EINVAL;
++	clock = devm_kzalloc(dev, sizeof(*clock), GFP_KERNEL);
++	if (!clock)
++		return -ENOMEM;
++	clock->dev = dev;
++	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
++		clock->control[i] = devm_platform_ioremap_resource(pdev, i);
++		if (IS_ERR(clock->control[i]))
++			return PTR_ERR(clock->control[i]);
++	}
++	clock->hw.init = &init;
++	ret = devm_clk_hw_register(dev, &clock->hw);
++	if (ret)
++		return ret;
++	return devm_of_clk_add_hw_provider(dev, of_clk_hw_simple_get, &clock->hw);
++}
++
++static const struct of_device_id ty1208z_ethernet_clock_match[] = {
++	{ .compatible = "tianyi,ty1208z-inherited-ethernet-clock" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ty1208z_ethernet_clock_match);
++
++static struct platform_driver ty1208z_ethernet_clock_driver = {
++	.probe = ty1208z_ethernet_clock_probe,
++	.driver = {
++		.name = "ty1208z-inherited-ethernet-clock",
++		.of_match_table = ty1208z_ethernet_clock_match,
++	},
++};
++module_platform_driver(ty1208z_ethernet_clock_driver);
++MODULE_LICENSE("GPL");
+--- /dev/null
++++ b/drivers/clk/hisilicon/ty1208z-ethernet-gate.h
+@@ -0,0 +1,36 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef TY1208Z_ETHERNET_GATE_H
++#define TY1208Z_ETHERNET_GATE_H
++
++#include <linux/delay.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++
++static inline int ty1208z_ethernet_gate_disable(void __iomem *crg)
++{
++	/* Never overwrite a control value changed by another owner. */
++	if (readl(crg) != 0xb)
++		return -EBUSY;
++	writel(3, crg);
++	return readl(crg) == 3 ? 0 : -EIO;
++}
++
++static inline int ty1208z_ethernet_gate_enable(void __iomem **control)
++{
++	static const u32 expected[] = { 3, 0x101, 0x0e000004, 0x03000001, 8 };
++	unsigned int i;
++
++	for (i = 0; i < 5; i++)
++		if (readl(control[i]) != expected[i])
++			return -ENODEV;
++	if (readl(control[0]) != 3)
++		return -EBUSY;
++	writel(0xb, control[0]);
++	if (readl(control[0]) != 0xb)
++		return -EIO;
++	/* MDCK settling delay from the pinned vendor clock path. */
++	mdelay(5);
++	return 0;
++}
++
++#endif
 --- /dev/null
 +++ b/drivers/clocksource/timer-hi3798mv100.c
 @@ -0,0 +1,145 @@
@@ -949,6 +1453,98 @@
 +}
 +
 +#endif
+--- /dev/null
++++ b/drivers/net/ethernet/hisilicon/hi3798mv100-femac.h
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef HI3798MV100_FEMAC_H
++#define HI3798MV100_FEMAC_H
++
++/* SDK hieth.c port setup; global base is physical MAC + 0x1300. */
++static inline void hi3798mv100_femac_setup(void __iomem *port, void __iomem *global)
++{
++	u32 value;
++
++	value = readl(global + 0x18);
++	writel(value | BIT(0) | BIT(1), global + 0x18);
++	value = readl(port + 0x218);
++	writel(value & ~GENMASK(25, 23), port + 0x218);
++	value = readl(port + 0x210);
++	writel(value & ~BIT(18), port + 0x210); /* No negotiated pause offload. */
++	value = readl(port + 0x380);
++	writel(value & ~BIT(14), port + 0x380); /* Software checks packet checksums. */
++}
++
++static inline void hi3798mv100_femac_reset(void __iomem *global)
++{
++	u32 value = readl(global + 0x8) & ~BIT(0);
++
++	/* Single wired port; vendor sequence pulses the global MAC reset twice. */
++	writel(value | BIT(0), global + 0x8);
++	usleep_range(1000, 10000);
++	writel(value, global + 0x8);
++	usleep_range(1000, 10000);
++	writel(value | BIT(0), global + 0x8);
++	usleep_range(1000, 10000);
++	writel(value, global + 0x8);
++	usleep_range(1000, 10000);
++}
++
++static inline bool hi3798mv100_femac_valid_length(u32 frame)
++{
++	/* Length includes the FCS. Check BEFORE subtraction and skb_put. */
++	return frame >= ETH_HLEN + ETH_FCS_LEN && frame <= MAX_FRAME_SIZE;
++}
++
++#endif
+--- /dev/null
++++ b/drivers/net/phy/festa-ty1208z.c
+@@ -0,0 +1,45 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Inherited-state experiment. No PHY firmware/reset/expanded-register writes. */
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/phy.h>
++
++static int ty1208z_festa_probe(struct phy_device *phy)
++{
++	int high, low;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic") ||
++	    phy->mdio.addr != 1 || phy->phy_id != 0x20669823)
++		return -ENODEV;
++	high = phy_read(phy, MII_PHYSID1);
++	if (high < 0)
++		return high;
++	low = phy_read(phy, MII_PHYSID2);
++	if (low < 0)
++		return low;
++	if (((u32)high << 16 | low) != 0x20669823)
++		return -ENODEV;
++	phydev_info(phy, "ETH_NET_PHY_VERIFIED id=20669823 inherited-no-reset\n");
++	return 0;
++}
++
++static struct phy_driver ty1208z_festa_driver[] = {
++	{
++		.phy_id = 0x20669823,
++		.phy_id_mask = 0xffffffff,
++		.name = "TY1208Z FESTAv220 inherited",
++		.probe = ty1208z_festa_probe,
++		.get_features = genphy_read_abilities,
++		.config_aneg = genphy_config_aneg,
++		.read_status = genphy_read_status,
++		/* Deliberately no soft_reset, suspend/resume or vendor fixup. */
++	},
++};
++module_phy_driver(ty1208z_festa_driver);
++MODULE_LICENSE("GPL");
++
++static const struct mdio_device_id ty1208z_festa_ids[] = {
++	{ 0x20669823, 0xffffffff },
++	{ }
++};
++MODULE_DEVICE_TABLE(mdio, ty1208z_festa_ids);
 --- /dev/null
 +++ b/drivers/soc/hisilicon/hi3798mv100-emmc-audit.c
 @@ -0,0 +1,67 @@

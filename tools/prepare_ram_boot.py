@@ -11,6 +11,7 @@ import zlib
 from inspect_images import parse_fdt
 from emmc_profiles import identification_profile
 from ethernet_profiles import ethernet_audit_profile, ethernet_clock_id_profile
+from ethernet_net_profile import ethernet_net_profile
 
 ADDRESS = 0x01FFFFC0
 DDR_START = 0x01000000
@@ -76,8 +77,11 @@ def prepare(artifacts, inspection):
     ident = identification_profile(tree, config)
     ethernet_audit_profile(tree, config)
     ethernet_clock_id_profile(tree, config)
+    network = ethernet_net_profile(tree, config)
     for name in ("BLOCK", "MMC", "MTD", "ATA", "SCSI", "NET", "USB_SUPPORT", "MODULES", "SMP"):
         if name == "MMC" and ident:
+            continue
+        if name == "NET" and network:
             continue
         if re.search(rf"^CONFIG_{name}=[ym]$", config, re.MULTILINE):
             raise ValueError(f"Unexpected diagnostic subsystem enabled: {name}")

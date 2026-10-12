@@ -1,0 +1,37 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA inherited-PHY Ethernet RAM experiment";
+};
+
+&{/soc} {
+	ethclk: clock-controller@f8a220cc {
+		compatible = "tianyi,ty1208z-inherited-ethernet-clock";
+		#clock-cells = <0>;
+		reg = <0xf8a220cc 4>, <0xf8a22120 4>, <0xf8a20008 4>,
+		      <0xf8a20118 4>, <0xf8a20844 4>;
+	};
+
+	mdio@f9841100 {
+		compatible = "hisilicon,hisi-femac-mdio";
+		reg = <0xf9841100 8>;
+		clocks = <&ethclk>;
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		phy1: ethernet-phy@1 {
+			compatible = "ethernet-phy-id2066.9823";
+			reg = <1>;
+		};
+	};
+
+	ethernet@f9840000 {
+		compatible = "hisilicon,hi3798mv100-femac-inherited";
+		reg = <0xf9840000 0x400>, <0xf9841300 0x200>;
+		interrupts = <GIC_SPI 71 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&ethclk>;
+		phy-mode = "mii";
+		phy-handle = <&phy1>;
+	};
+};
