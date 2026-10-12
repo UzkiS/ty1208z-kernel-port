@@ -914,6 +914,16 @@
  		&& (profile->ssid.SSID_len) && wiphy))
  		return 0;
  
+@@ -8196,6 +8144,9 @@
+ 
+ 	cfg->dongle_up = true;
+ up_exit:
++	/* A failed initialization must not leave cfg80211 callbacks enabled. */
++	if (err)
++		clear_bit(VIF_STATUS_READY, &ifp->vif->sme_state);
+ 	mutex_unlock(&cfg->usr_sync);
+ 
+ 	WLAND_DBG(CFG80211, TRACE, "Done(err:%d)\n", err);
 --- a/rdawlan/wland_cmds.c
 +++ b/rdawlan/wland_cmds.c
 @@ -130,6 +130,12 @@

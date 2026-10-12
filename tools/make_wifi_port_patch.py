@@ -375,6 +375,15 @@ def transform(files):
 \tif (err >= 0)
 \t\tcfg->conf->tx_power = requested_dbm;''')
     text = text[:start] + operation + text[end:]
+    start, _, end = function_spans(text, "wland_cfg80211_up")[0]
+    operation = text[start:end]
+    operation = replace(operation, '''up_exit:
+\tmutex_unlock(&cfg->usr_sync);''', '''up_exit:
+\t/* A failed initialization must not leave cfg80211 callbacks enabled. */
+\tif (err)
+\t\tclear_bit(VIF_STATUS_READY, &ifp->vif->sme_state);
+\tmutex_unlock(&cfg->usr_sync);''')
+    text = text[:start] + operation + text[end:]
     result["rdawlan/wland_cfg80211.c"] = text
     return result
 

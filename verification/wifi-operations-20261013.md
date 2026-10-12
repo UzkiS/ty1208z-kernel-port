@@ -1,5 +1,8 @@
 # RDA unsupported operations and AP-stop ordering, 2026-10-13
 
+The later [startup rollback report](wifi-startup-20261013.md) supersedes the
+module identity below and records the active initialization blocker.
+
 The locked driver contained named-iovar functions with their entire transport
 disabled by `#if 0`, but returned success. Key deletion also returned before
 its request, and primary-interface AP stop returned success without a command.
