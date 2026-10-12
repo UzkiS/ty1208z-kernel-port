@@ -46,8 +46,9 @@ The driver can still read calibration information. Persistent file-write
 helpers return `-EOPNOTSUPP`. Debugfs is disabled in this build.
 
 The existing diagnostic build and QEMU time64/RAM protocol regressions passed
-after this integration. Full module CI results are recorded separately in
-`STATUS.md` once the corresponding run finishes.
+after this integration. Clean GitHub CI also passed for code commit `8477701`,
+including the full module build and sanitizer checks:
+[run 38219145833](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38219145833).
 
 ## Remaining work
 

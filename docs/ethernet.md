@@ -1,0 +1,85 @@
+# Hi3798MV100 Ethernet source audit
+
+The existing Hinas uses `hieth` at `0xf9840000` and has demonstrated a
+100-Mbit/s full-duplex link. The runtime FDT identifies internal PHY address
+**1**, MII, GIC SPI 71 and a 0x4000-byte MAC resource. The reference SDK DTS
+uses PHY address 2; the runtime measurement takes precedence. A working
+Ethernet driver under Linux 6.12 has not yet been demonstrated.
+
+## Reuse boundary
+
+The pinned SDK's `drivers/net/ethernet/hieth/{hieth.h,mdio.h}` register layout
+matches substantial portions of Linux 6.12.112's
+`drivers/net/ethernet/hisilicon/hisi_femac.c` and
+`drivers/net/mdio/mdio-hisi-femac.c`:
+
+| Function | MV100 address/offset | Mainline representation |
+|---|---|---|
+| Port 0 | `0xf9840000` | First MAC resource |
+| Port mode/link/frame limit | `+0x200/+0x208/+0x210` | Same register fields |
+| Queue configuration/status | `+0x344/+0x36c` | Same depth and ready fields |
+| RX descriptor/address | `+0x354/+0x358` | Same FIFO interface |
+| TX address/length | `+0x360/+0x364` | Same FIFO interface |
+| Global control | `+0x1300` | Second MAC resource, relative offsets |
+| Forward/filter control | `+0x1310/+0x1314` | Same port-0 control fields |
+| IRQ status/enable/raw | `+0x1330/+0x1334/+0x1338` | Same port-0 interrupt fields |
+| MDIO control/read data | `+0x1100/+0x1104` | Separate MDIO resource |
+
+The MDIO ready flag is bit 15, write flag bit 13, PHY address bits 12:8,
+register bits 4:0 and write data bits 31:16. Mainline uses bounded polling
+before and after each operation. A read command writes the MDIO controller
+command register; it does not write a PHY register.
+
+Matching offsets justify reuse of the upstream datapath and MDIO protocol,
+but do not establish complete compatibility. Mainline also configures RX
+coalescing at +0x340; the pinned SDK driver does not define that register.
+SDK port initialization explicitly sets endian, TX preamble/IPG, pause and
+RX checksum controls. These behaviors require comparison before hardware use.
+The second MAC port must remain disabled until its wiring is established.
+
+## Clock, reset and internal PHY
+
+The SDK DTS supplies `PERI_CRG51_SF` to hieth, and the MV100 clock table uses
+offset 0xcc with mask/value 0x000b and reset bit 4. Its name and apparent reuse
+by another peripheral are insufficient to establish Ethernet clock ownership
+or frequency. Live register state and a complete clock-reference audit are
+needed before a new clock provider writes this field.
+
+The pinned SDK `phy.c` and `mach-hi3798mx/include/mach/platform.h` describe:
+
+- CRG internal PHY control at `0xf8a22120`: clock enable bit 0, reset bit 4.
+- Peripheral control at `0xf8a20008`: internal/external PHY selection bit 8.
+- Internal PHY address at `0xf8a20118`, low 5 bits.
+- Internal PHY LDO control at `0xf8a20844`; the MV100 fallback writes 0x68.
+- Reset order that gates the MAC clock before loading the PHY address, and
+  waits at least 15 ms after PHY reset before MDIO access.
+
+These are source facts, not newly measured board state. The first network
+candidate should inspect the inherited control state and identify the PHY
+before enabling MAC DMA, changing LDO/clock/reset or applying PHY fixups.
+Reading PHY IDs via MDIO requires a bounded, explicitly read-only PHY command
+path; attaching the generic PHY state machine can cause resets/writes and
+must not be described as a register-only audit.
+
+The vendor driver selects different volatile expanded-register fixup tables
+by actual PHY ID. No PHY ID has yet been established for this board. The
+SDK's OTP-derived trim routine explicitly excludes MV100 and must not be
+copied from MV200/MV300 support. No OTP/eFuse writes belong in this port.
+
+## Integration and acceptance
+
+Keep network experiments separate from the storage and plain diagnostic
+profiles. Use an MV100 compatible and an explicit upstream adaptation where
+needed; do not masquerade as a hi3516 board to skip SoC integration work.
+The production path should retain upstream DMA mapping, NAPI, PHY state and
+error handling, with a 32-bit DMA mask and the measured RAM reservations.
+
+Hardware acceptance must include PHY ID, IRQ progress, link negotiation,
+ARP/ping, DHCP, TX/RX counters, checksum behavior and sustained bidirectional
+traffic before routing/Passwall throughput testing. Tests must also cover
+link loss/reconnection and cold boot without depending on Hinas to initialize
+the PHY first. MAC addresses and identifying logs remain local.
+
+Source identities are pinned in `config/sources.lock.json` and
+`reference/reference-manifest.json`. This document records an offline audit;
+it is not a tested DT, driver, clock configuration or working network image.

@@ -24,6 +24,10 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 驱动时才另设包和版本锁定。其 `.ko` 仍需与目标内核 ABI 一致，这一依赖不会
 因为拆分仓库而消失。与现有 Hinas 用户空间的兼容验证也是独立阶段。
 
+原生 target 与 Passwall 集成边界见 [OpenWrt/Kwrt](openwrt.md)，网口主线复用与
+内部 PHY/时钟待验证条件见 [Ethernet](ethernet.md)。这两层目前只有来源审计和
+实施边界，没有可运行的 OpenWrt target 或新内核网口驱动验收结果。
+
 ## 源码与产物
 
 - `config/sources.lock.json` 是下载版本、URL、哈希与已观察工具链的记录。

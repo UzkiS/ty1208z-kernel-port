@@ -1,0 +1,86 @@
+{
+  "schema": 1,
+  "purpose": "Offline integration audit; not a build/feed lock or working target",
+  "repositories": [
+    {
+      "repository": "https://github.com/kiddin9/Kwrt",
+      "observed_branch": "25.12",
+      "commit": "d59e8be835f5a6ff9bfc2034ca14184c4b89b916",
+      "files": [
+        {
+          "path": "README.md",
+          "url": "https://raw.githubusercontent.com/kiddin9/Kwrt/d59e8be835f5a6ff9bfc2034ca14184c4b89b916/README.md",
+          "bytes": 1304,
+          "sha256": "9aba78b0b232068522605e00bb00c29cb23833e3486196a058f69c04ac06f86e"
+        },
+        {
+          "path": ".github/workflows/Openwrt-AutoBuild.yml",
+          "url": "https://raw.githubusercontent.com/kiddin9/Kwrt/d59e8be835f5a6ff9bfc2034ca14184c4b89b916/.github/workflows/Openwrt-AutoBuild.yml",
+          "bytes": 14336,
+          "sha256": "e6abd6d554ef62a7228960ba0854145956f417b1755ae4dddaba0b66a71a4ad6"
+        },
+        {
+          "path": "devices/common/settings.ini",
+          "url": "https://raw.githubusercontent.com/kiddin9/Kwrt/d59e8be835f5a6ff9bfc2034ca14184c4b89b916/devices/common/settings.ini",
+          "bytes": 304,
+          "sha256": "d067fb4eccf132635bcacea3842b9959f7c2030d9d6f2ec97c29de7b9d3f4cd4"
+        },
+        {
+          "path": "devices/common/.config",
+          "url": "https://raw.githubusercontent.com/kiddin9/Kwrt/d59e8be835f5a6ff9bfc2034ca14184c4b89b916/devices/common/.config",
+          "bytes": 2509,
+          "sha256": "d7805dc8260ee3a33a82c43ff443de0ed11f5c97e7513c70aec1e297defe251c"
+        },
+        {
+          "path": "devices/common/diy.sh",
+          "url": "https://raw.githubusercontent.com/kiddin9/Kwrt/d59e8be835f5a6ff9bfc2034ca14184c4b89b916/devices/common/diy.sh",
+          "bytes": 5184,
+          "sha256": "862be180425e3b3fbf1e8ca6c2849360be9825be2f03461a284b22e4750eb53c"
+        }
+      ]
+    },
+    {
+      "repository": "https://github.com/openwrt/openwrt",
+      "observed_branch": "openwrt-25.12",
+      "commit": "58efa9917d4cc53fceed173529a286187649e827",
+      "files": [
+        {
+          "path": "target/linux/generic/kernel-6.12",
+          "url": "https://raw.githubusercontent.com/openwrt/openwrt/58efa9917d4cc53fceed173529a286187649e827/target/linux/generic/kernel-6.12",
+          "bytes": 120,
+          "sha256": "70f543371454779a66dc7fffaf23ed16db055ca7824fc61c279c04e7d6e2f71b"
+        },
+        {
+          "path": "target/linux/armsr/Makefile",
+          "url": "https://raw.githubusercontent.com/openwrt/openwrt/58efa9917d4cc53fceed173529a286187649e827/target/linux/armsr/Makefile",
+          "bytes": 546,
+          "sha256": "ec0e1337aaebd5715db47f5b403f1f115135c106f2b746a2f91a716f4ec7bd9d"
+        },
+        {
+          "path": "target/linux/sunxi/Makefile",
+          "url": "https://raw.githubusercontent.com/openwrt/openwrt/58efa9917d4cc53fceed173529a286187649e827/target/linux/sunxi/Makefile",
+          "bytes": 660,
+          "sha256": "5af736d844f29fb219a5bddeb1920b042bf8f6b1dddb8e20fbb577253aa26cdc"
+        },
+        {
+          "path": "target/linux/sunxi/cortexa7/target.mk",
+          "url": "https://raw.githubusercontent.com/openwrt/openwrt/58efa9917d4cc53fceed173529a286187649e827/target/linux/sunxi/cortexa7/target.mk",
+          "bytes": 201,
+          "sha256": "cc22436b094de1dfb87c8c2235a93c15b0833cce4b496a09c67b72aaee770155"
+        },
+        {
+          "path": "include/target.mk",
+          "url": "https://raw.githubusercontent.com/openwrt/openwrt/58efa9917d4cc53fceed173529a286187649e827/include/target.mk",
+          "bytes": 12324,
+          "sha256": "a0640a41bbbed7ccd0f6e2dc159635441b87274c381d3312f35ba1bfad8a86eb"
+        },
+        {
+          "path": "feeds.conf.default",
+          "url": "https://raw.githubusercontent.com/openwrt/openwrt/58efa9917d4cc53fceed173529a286187649e827/feeds.conf.default",
+          "bytes": 352,
+          "sha256": "0843b89011b0264ca1a21140bbfa039436080134c6f84c76a7a1c936f8ce3db0"
+        }
+      ]
+    }
+  ]
+}

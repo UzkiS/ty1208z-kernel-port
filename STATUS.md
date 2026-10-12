@@ -14,18 +14,18 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Linux 6.12.112 candidate | Cross-compiled; board descriptor, UART/GIC DTB, single-core timer and embedded initramfs |
 | Structural checks | Passed: CRC, ARM uImage/zImage, appended DTB, static ARM ELF, required/disabled config |
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
-| GitHub CI | Passed for code commit `f5ef402`: clean diagnostic build, serial/RAM gates, QEMU time64, RDA USB object, eMMC register audit and restricted PIO card-identification build/tests; [run 38215283300](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38215283300). Full Wi-Fi module changes require their own CI run |
+| GitHub CI | Passed for code commit `8477701`: clean diagnostic build, serial/RAM gates, QEMU time64, RDA USB object/full module with sanitizer regressions, eMMC register audit and restricted PIO card-identification build/tests; [run 38219145833](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38219145833) |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
 | Serial CLI | Replacing the TTL adapter resolved console input; CLI attached to the stopped CA bootloader on COM9 and completed command/environment queries without another reboot; see [inspection record](verification/bootloader-inspection-20261012.md) |
 | Original Hinas TTL boot | Complete from Boot ROM to login; bootloader and allocation evidence recorded in [TTL report](verification/ttl-boot-20261012.md) |
 | Candidate boot on physical TY1208Z | Passed for the corrected candidate: Linux 6.12.112, PL011 input/output, initramfs shell, GIC timer interrupts and RAM-file time64; see [physical RAM boot](verification/ram-boot-20261012.md) |
 | CA authentication / RAM placement | Current CA bootloader accepted this ordinary unsigned uImage at the measured Hinas address; host/device CRC matched; bounded low-256-MiB diagnostic boot succeeded. This does not establish other loaders/images or persistent installation |
 | Hinas startup under new kernel | Not tested; eMMC driver and legacy modules need separate work |
-| Wired network / storage / USB / SMP | Not integrated into this minimal diagnostic image |
+| Wired network / storage / USB / SMP | Not integrated into the plain diagnostic image; [Ethernet source audit](docs/ethernet.md) identifies mainline datapath/MDIO reuse and unresolved MV100 PHY/clock integration |
 | eMMC register audit | Passed on hardware: separate RAM candidate, MMC/BLOCK disabled, DW revision `0x270a`, HCON `0x00e44c81`, inherited source 100 MHz; no card commands; [measurement](verification/emmc-audit-20261012.md) |
 | eMMC card identification | Independent restricted PIO/1-bit/25-MHz candidate built; real request-policy/queue-entry tests, image/resource gates and QEMU passed locally; hardware untested, no block devices or sector I/O; [scope](docs/emmc.md) |
-| Wi-Fi | RDA USB `1e04:8888`; compatible-descriptor source pinned; complete USB module linked locally against separate Linux 6.12 config, manufacturing eFuse-write entry points excluded, key/WID regression passed; chip revision, firmware and hardware operation remain unverified |
-| OpenWrt/Kwrt / Passwall | Planned; no working target or router image yet |
+| Wi-Fi | RDA USB `1e04:8888`; compatible-descriptor source pinned; complete USB module linked locally and in CI against separate Linux 6.12 config, manufacturing eFuse-write entry points excluded, key/WID sanitizer regression passed; [module report](verification/wifi-module-port-20261012.md); chip revision, firmware and hardware operation remain unverified |
+| OpenWrt/Kwrt / Passwall | [Pinned integration audit](docs/openwrt.md): Kwrt uses OpenWrt 25.12; audited upstream kernel matches 6.12.112; no existing TY1208Z target, complete feed lock, working native target or router image yet |
 | Whole-system Y2038 | Not established; diagnostic time64 passed, application-level testing remains |
 
 Known-successful CA bootloader SHA-256:
