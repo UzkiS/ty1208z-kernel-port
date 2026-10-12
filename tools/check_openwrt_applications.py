@@ -58,6 +58,14 @@ def check(source, built=False):
         rootfs = roots[0]
         if not (rootfs / "usr/bin/xray").is_file() or not (rootfs / "usr/share/passwall/app.sh").is_file():
             raise ValueError("Actual application rootfs is missing Xray or Passwall")
+        for item in lock.get("recipe_patches", []):
+            if "installed_path" not in item:
+                continue
+            installed = rootfs / item["installed_path"]
+            if not installed.resolve().is_relative_to(rootfs.resolve()):
+                raise ValueError("Installed patch path escapes rootfs")
+            if sha256(installed) != item["patched_sha256"]:
+                raise ValueError(f"Actual rootfs lacks the checked patch: {item['installed_path']}")
         manifests = list((source / "bin/targets/hi3798mv100/apps").glob("*.manifest"))
         if len(manifests) != 1:
             raise ValueError("Expected one built application package manifest")

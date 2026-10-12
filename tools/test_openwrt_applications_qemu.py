@@ -25,6 +25,8 @@ def test(source):
     initrd = unique(images.glob("*rootfs.cpio.gz"), "application initrd")
     output = images / "checks"
     output.mkdir(exist_ok=True)
+    # A failed rerun must not leave a stale successful provenance record.
+    (output / "applications-qemu.json").unlink(missing_ok=True)
     fixture = Path(__file__).with_name("openwrt-applications-guest.sh").read_bytes()
     encoded = base64.b64encode(fixture)
     # BusyBox ash's serial line editor truncates long input lines. Keep each
@@ -83,6 +85,7 @@ def test(source):
             b"CERTIFICATE_TIME64_PASS", b"DNS_TIME64_PASS", b"HTTPS_TIME64_PASS",
             b"PASSWALL_LUCI_AUTH_TIME64_PASS",
             b"LUCI_RPCD_TIME64_PASS", b"PASSWALL_XRAY_SOCKS_TIME64_PASS",
+            b"PASSWALL_XRAY_TLS_TIME64_PASS",
             b"NFT_EXPRESSIONS_AND_COUNTER_PASS", b"OPENWRT_APPLICATIONS_QEMU_PASS",
         )
         if (process.returncode != 0 or sent != len(commands)
@@ -107,7 +110,7 @@ def test(source):
             "limits": "No MV100 peripherals, hardware routing/TPROXY, performance or Wi-Fi acceptance",
         }
         (output / "applications-qemu.json").write_text(json.dumps(provenance, indent=2) + "\n")
-        print("OPENWRT_APPLICATIONS_QEMU_PASS: actual ARM DNS/TLS/LuCI/rpcd/Passwall SOCKS at 2040")
+        print("OPENWRT_APPLICATIONS_QEMU_PASS: actual ARM DNS/TLS/LuCI/rpcd/Passwall SOCKS and VLESS TLS at 2040")
         print("nft counters and TPROXY expressions passed; physical forwarding/TPROXY/Wi-Fi remain untested")
     finally:
         selector.close()

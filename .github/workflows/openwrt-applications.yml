@@ -25,7 +25,9 @@ permissions:
 
 concurrency:
   group: openwrt-applications-${{ github.ref }}
-  cancel-in-progress: true
+  # Preserve an expensive running native toolchain/application build. A newer
+  # pending run still replaces older pending runs for the same branch.
+  cancel-in-progress: false
 
 jobs:
   applications:

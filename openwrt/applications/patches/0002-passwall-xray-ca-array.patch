@@ -1,0 +1,15 @@
+--- a/luci-app-passwall/luasrc/passwall/util_xray.lua
++++ b/luci-app-passwall/luasrc/passwall/util_xray.lua
+@@ -187,10 +187,10 @@
+ 					pinnedPeerCertSha256 = (node.tls_pinSHA256 and node.tls_pinSHA256 ~= "") and api.sha256_sb_xray(node.tls_pinSHA256) or "",
+ 					verifyPeerCertByName = node.tls_CertByName or "",
+ 					echConfigList = (node.ech == "1") and node.ech_config or nil,
+-					certificates = (node.tls_certificate == "1" and node.tls_certificate_pem ~= "") and {
++					certificates = (node.tls_certificate == "1" and node.tls_certificate_pem ~= "") and {{
+ 						certificate = api.split(node.tls_certificate_pem:gsub("\\n", "\n"), "\n"),
+ 						usage = "verify"
+-					} or nil,
++					}} or nil,
+ 					cipherSuites = node.cipherSuites or nil
+ 				} or nil,
+ 				realitySettings = (node.stream_security == "reality") and {

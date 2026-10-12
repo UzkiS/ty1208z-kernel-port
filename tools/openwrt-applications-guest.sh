@@ -10,7 +10,9 @@ finish() {
         echo OPENWRT_APPLICATIONS_QEMU_PASS
     else
         echo "OPENWRT_APPLICATIONS_QEMU_FAIL status=$result"
-        cat /tmp/time64-test/*.log /tmp/etc/passwall/qemu.log 2>/dev/null || true
+        cat /tmp/time64-test/*.log /tmp/etc/passwall/*.log 2>/dev/null || true
+        cat /tmp/etc/passwall/vless-*.json 2>/dev/null || true
+        ps w
         cat /tmp/time64-test/luci.txt 2>/dev/null || true
         curl --noproxy '*' -v --max-time 5 http://127.0.0.1/cgi-bin/luci/ 2>&1 || true
         logread | tail -n 40
@@ -55,6 +57,17 @@ until ubus call system board > board.json 2>/dev/null && [ -S /dev/log ]; do
     [ "$attempts" -lt 30 ] || exit 1
     sleep 1
 done
+
+# Passwall's boot handler runs asynchronously after its configured delay and
+# clears TMP_PATH on restart. Let it finish before starting fixture instances.
+attempts=0
+until [ -f /var/lock/passwall_ready.lock ]; do
+    attempts=$((attempts+1))
+    [ "$attempts" -lt 120 ] || exit 1
+    sleep 1
+done
+/etc/init.d/passwall stop > passwall-stop.log 2>&1
+echo PASSWALL_BOOT_READY
 
 # A valid CA spans both dates. An old leaf certificate must expire in 2040.
 date -u -s @1791676800
@@ -185,6 +198,62 @@ until curl --noproxy '' -fsS --max-time 3 --socks5-hostname 127.0.0.1:18082 \
 done
 grep -qx TY1208Z_LOCAL_PAYLOAD_2040 proxy.txt
 echo PASSWALL_XRAY_SOCKS_TIME64_PASS
+
+# Exercise Xray's own TLS time checks, independently of curl's endpoint TLS.
+# Xray defaults to its embedded root bundle. Supply the fixture CA through
+# Passwall's real custom-CA option; keep hostname/date verification enabled.
+for server in valid expired; do
+    # Xray's server freedom default blocks loopback targets. Allow the isolated
+    # local fixture endpoint; this guest exposes no disks or host network.
+    if [ "$server" = valid ]; then listen_port=18445; else listen_port=18446; fi
+    cat > "vless-$server.json" <<EOF
+{"log":{"loglevel":"debug"},"inbounds":[{"listen":"127.0.0.1","port":$listen_port,
+"protocol":"vless","settings":{"clients":[{"id":"e38831d8-39ba-4ad8-a96d-3ef6988a7803"}],"decryption":"none"},
+"streamSettings":{"network":"tcp","security":"tls","tlsSettings":{"certificates":[{
+"certificateFile":"/tmp/time64-test/$server.pem","keyFile":"/tmp/time64-test/server.key"}]}}}],
+"outbounds":[{"protocol":"freedom","settings":{"finalRules":[{"action":"allow"}]}}]}
+EOF
+    xray run -test -c "vless-$server.json" > "vless-$server-test.log" 2>&1
+    xray run -c "vless-$server.json" > "vless-$server-server.log" 2>&1 &
+    node=qemu_vless_$server
+    if [ "$server" = valid ]; then socks_port=18083; else socks_port=18084; fi
+    uci set "passwall.$node=nodes"
+    uci set "passwall.$node.type=Xray"
+    uci set "passwall.$node.protocol=vless"
+    uci set "passwall.$node.address=127.0.0.1"
+    uci set "passwall.$node.port=$listen_port"
+    uci set "passwall.$node.uuid=e38831d8-39ba-4ad8-a96d-3ef6988a7803"
+    uci set "passwall.$node.encryption=none"
+    uci set "passwall.$node.transport=tcp"
+    uci set "passwall.$node.tls=1"
+    uci set "passwall.$node.tls_serverName=time64.test"
+    uci set "passwall.$node.tls_certificate=1"
+    uci set "passwall.$node.tls_certificate_pem=$(cat ca.pem)"
+    uci commit passwall
+    controller_status=0
+    sh /usr/share/passwall/app.sh run_socks "flag=vless_$server" "node=$node" bind=127.0.0.1 \
+        "socks_port=$socks_port" "config_file=vless-$server.json" "log_file=vless-$server.log" loglevel=debug \
+        > "vless-$server-controller.log" 2>&1 || controller_status=$?
+    case "$controller_status" in 0|1) ;; *) exit 1 ;; esac
+    test -s "/tmp/etc/passwall/vless-$server.json"
+    xray run -test -c "/tmp/etc/passwall/vless-$server.json" > "vless-$server-client-test.log" 2>&1
+    echo "PASSWALL_VLESS_CONFIG_READY server=$server status=$controller_status"
+done
+attempts=0
+until curl --noproxy '' -fsS --max-time 3 --socks5-hostname 127.0.0.1:18083 \
+        --cacert ca.pem https://time64.test:18443/ > vless.txt 2> vless-client.log; do
+    attempts=$((attempts+1))
+    [ "$attempts" -lt 20 ] || exit 1
+    sleep 1
+done
+grep -qx TY1208Z_LOCAL_PAYLOAD_2040 vless.txt
+if curl --noproxy '' -fsS --max-time 10 --socks5-hostname 127.0.0.1:18084 \
+        --cacert ca.pem https://time64.test:18443/ > vless-expired.txt 2> vless-expired-client.log; then
+    echo 'Xray accepted an expired TLS proxy certificate'
+    exit 1
+fi
+grep -qi 'certificate has expired' /tmp/etc/passwall/vless-expired.log
+echo PASSWALL_XRAY_TLS_TIME64_PASS
 
 # Confirm real kernel rules/counters and socket/TPROXY expression availability.
 nft add table inet time64

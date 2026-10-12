@@ -39,8 +39,9 @@ HTTPS_TIME64_PASS
 PASSWALL_LUCI_AUTH_TIME64_PASS
 LUCI_RPCD_TIME64_PASS
 PASSWALL_XRAY_SOCKS_TIME64_PASS
+PASSWALL_XRAY_TLS_TIME64_PASS
 NFT_EXPRESSIONS_AND_COUNTER_PASS
-Sun Jan  1 00:00:11 2040 user.notice time64: OPENWRT_APPLICATIONS_LOG_2040
+Sun Jan  1 00:00:14 2040 user.notice time64: OPENWRT_APPLICATIONS_LOG_2040
 OPENWRT_APPLICATIONS_QEMU_PASS
 ```
 
@@ -57,14 +58,20 @@ Passwall controller generates and starts Xray from a UCI node. HTTPS traffic
 passes through Xray SOCKS and the local upstream microsocks to uhttpd.
 nftables counts real traffic; socket/TPROXY expression insertion also passes.
 
+Xray's own TLS path also passes: two local VLESS TLS servers present valid
+and expired certificates. The real Passwall controller generates/starts both
+clients using the custom-CA option. The valid server transfers the HTTPS
+payload; the expired server is rejected and Xray logs `certificate has expired`.
+Hostname and date verification remain enabled, with no insecure override.
+
 ## Exact final local artifacts
 
 | Artifact | Bytes | SHA-256 |
 |---|---:|---|
 | Raw application zImage | 3390152 | `4f4c44b7d59b2691a51c56aed552c15cbe590e56f82827b8ec77bdbd721ae7c1` |
-| Separate rootfs cpio.gz | 20924863 | `49eec5fd6c4f647463370b3054fae6fa6263a260ce4e9eed68bd5bdb6b86075b` |
-| Installed package manifest | 4344 | `13cd0e2446847582f0fef4532587178f69cd928a469c990e8bd71c94142a7223` |
-| QEMU console | 24357 | `8ff31734c57f7e4c8628411451cf277da4b1b3a013c57025d897ac771e1c1fb0` |
+| Separate rootfs cpio.gz | 20925068 | `526cbe67000e957430746aa56300ac65705d4522120a4f01a4608d42e654d338` |
+| Installed package manifest | 4344 | `d29c82e50d81d5e8d2cca567bc79ec99b3edce7740bd4a5623d43cdfc173e539` |
+| QEMU console | 30890 | `f4799cbde78a5ad7f3b09c32339cafc592331b4294fb7a787addc414f2ddb994` |
 
 The machine-readable provenance is saved beside the local outputs as
 `checks/applications-qemu.json`. Binaries and raw logs remain excluded from Git.
@@ -84,6 +91,19 @@ mistaken for an HTTP readiness failure.
 An incremental curl configure changed the threaded-resolver option without
 updating the library binary. A scoped package clean/rebuild corrected the
 local artifact, and the guest now requires the selected runtime feature.
+
+Passwall's pinned Lua emitted custom CAs as an object rather than an array;
+Xray rejected the generated configuration. The checked two-line patch fixes
+that data shape, and a scoped Passwall package rebuild installs it into the
+tested rootfs. Xray defaults to an embedded CA bundle, so appending a test CA
+to the system store alone does not establish trust. The fixture uses the
+real custom-CA option. Its local VLESS server explicitly permits the fixture
+loopback destination; Xray's default freedom rules block that address.
+
+Passwall's delayed boot handler can clear runtime state after fixture clients
+start; the harness waits for its completion and stops that service first.
+The provenance file is removed at the start of each run, so a failed rerun
+cannot retain an earlier success report.
 
 This result covers the selected applications at 2040 in emulation. It does
 not establish MV100 Ethernet/USB/Wi-Fi, physical Passwall routing/TPROXY,

@@ -21,6 +21,12 @@ compiler already in the pinned packages feed; no moving Go download is added.
 Kernel modules are built against this application kernel, not copied from
 Hinas or the standalone diagnostic.
 
+A checked Passwall Lua patch emits custom TLS CAs as Xray's required
+`certificates` array. The pinned upstream emits an object and Xray rejects
+that configuration. Original/patched hashes are locked, and the built gate
+checks the actual installed Lua file. This preserves strict hostname and
+certificate expiry validation.
+
 ## Reproduce
 
 Use a regular Linux user and a Linux filesystem. Install the dependencies in
@@ -57,6 +63,13 @@ an HTTPS payload must pass through that SOCKS chain. The pinned controller
 ends with a conditional append and returns 1 for this loopback Xray node.
 The fixture permits that known status only alongside config validation and
 actual data flow. No controller or proxy stub is used.
+
+Two local VLESS TLS servers then test Xray's own certificate handling at
+2040. Passwall's custom-CA UCI option trusts the fixture CA; its real controller
+starts the clients. HTTPS content must pass through the valid TLS server;
+the expired proxy certificate must fail with Xray's certificate-expired log.
+The fixture waits for Passwall's asynchronous boot handler to finish before
+starting its instances, so a later service restart cannot erase their state.
 
 nftables must count actual loopback packets and accept socket/TPROXY rules.
 Inserting those expressions is not transparent-proxy forwarding acceptance.

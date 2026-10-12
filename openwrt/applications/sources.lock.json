@@ -52,6 +52,15 @@
       "original_sha256": "566b5dc33ff4d2117baeba32b34badf6ecec047fad2fd18a2bf5a112a7164e4b",
       "patched_sha256": "11d3bdc46651ed1c462b6fb0c3a284d533a506799e7fcc87915a65e6a0270aa6",
       "reason": "Xray 26.10.10 requires Go 1.27; use the versioned 1.27.1 compiler already in the pinned packages feed."
+    },
+    {
+      "feed": "passwall",
+      "path": "luci-app-passwall/luasrc/passwall/util_xray.lua",
+      "installed_path": "usr/lib/lua/luci/passwall/util_xray.lua",
+      "patch": "patches/0002-passwall-xray-ca-array.patch",
+      "original_sha256": "917dc88b50d9baffd44f51fd929aa73ed70e037cfbe024c4f7b4262f49fe632f",
+      "patched_sha256": "ffbe40293cc4917a782f42af507f956e7b0e2aad239df0a7ad7a9cde14842272",
+      "reason": "Xray TLS certificates require an array; preserve strict custom-CA hostname and expiry verification."
     }
   ]
 }
