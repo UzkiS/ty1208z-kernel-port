@@ -28,6 +28,7 @@ help:
 	@echo 'make restart - build isolated SP805 explicit restart RAM experiment'
 	@echo 'make openwrt-app-ram - validate applications with a 240-MiB usable budget and package separate RAM initrd'
 	@echo 'make openwrt-router - build isolated applications plus measured Ethernet for RAM validation'
+	@echo 'make usb-host-compile - compile optional host0 clock/PHY plus generic EHCI/OHCI, no boot image'
 
 lint:
 	python3 tools/check_repository.py
@@ -121,3 +122,7 @@ openwrt-app-ram:
 .PHONY: openwrt-router
 openwrt-router:
 	bash tools/build-openwrt-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" network
+
+.PHONY: usb-host-compile
+usb-host-compile:
+	bash tools/build-usb-host-compile.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"

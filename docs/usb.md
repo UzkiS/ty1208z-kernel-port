@@ -61,10 +61,44 @@ The built candidate and completed local checks are recorded in the
 
 ## Remaining milestones
 
-Measure inherited controls/revision/capabilities, then implement guarded host0
-clock/PHY ownership and validate EHCI/OHCI enumeration with storage disabled.
+Measure inherited controls/revision/capabilities, then prepare a distinct
+guarded RAM host0 profile and validate EHCI/OHCI enumeration with storage disabled.
 Check exact RDA revision, firmware source/license/hash, bounded control and
 bulk transfers, firmware startup, scan/association and AP support separately.
 The Hinas log warned that the high-speed RDA bulk endpoints `03/83` advertise
 64-byte maximum packets. Enumeration is insufficient to justify an override;
 review the source's transfer sizing and actual hardware behavior first.
+
+## Optional compile experiment
+
+`make usb-host-compile` separately compiles `clk-ty1208z-usb.o` and the
+mainline EHCI/OHCI core/platform objects. It produces no DTB, kernel image or
+RAM-boot permission. The option is absent from all existing diagnostic,
+native-network and router images. Its distinct board compatible has no DTS
+in this repository; current images cannot bind this provider.
+
+The new GPL-2.0-only implementation represents the pinned SDK's hardware
+register protocol as independent command tables and bounded read/modify/write
+operations. The test verifies the original file's locked hash, preserves its
+full Hisilicon/Apache-2.0 notice and executes its actual host0 functions in a
+temporary oracle; no SDK C implementation is vendored into the driver. For
+all 256 low-byte revisions and eight initial control states, the new helper
+must match every original write and delay through last-user shutdown. Actual
+helper/oracle code runs under ASan/UBSan. Invalid SYSID0 causes no writes;
+stuck reset/interface or missing required clock bits cause failure and the
+documented shutdown sequence before an HCD can start. This cannot establish
+PLL stability or the board's actual revision/capabilities.
+Shutdown readback failures are reported as errors rather than as a successful
+clock/PHY stop. The [compile report](../verification/usb-host-compile-20261013.md)
+records the actual objects and completed local checks.
+
+One common-clock-framework core exposes one provider output to both HCDs.
+Its sleepable prepare/unprepare callbacks use CCF ownership and serialization,
+rather than separate EHCI/OHCI reset sequences. Mainline platform HCDs take
+and release clocks around probe/removal; their default coherent DMA mask is
+32 bits. The clock provider performs no control writes during registration
+and has no shutdown callback that could reset a still-running companion.
+Last-user shutdown follows the SDK; it does **not** restore the inherited
+analog PHY tuning. PM, modules, network and storage are disabled for this
+compile experiment. Companion lifetime, probe-failure and system-shutdown
+behavior still require validation in the eventual real host profile.

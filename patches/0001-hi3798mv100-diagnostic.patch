@@ -284,7 +284,7 @@
  
 --- a/drivers/clk/hisilicon/Kconfig
 +++ b/drivers/clk/hisilicon/Kconfig
-@@ -1,4 +1,13 @@
+@@ -1,4 +1,23 @@
  # SPDX-License-Identifier: GPL-2.0-only
 +
 +config TY1208Z_ETHERNET_INHERITED
@@ -295,14 +295,25 @@
 +	  Enable the measured MAC clock bit, preserving PHY controls.
 +	  No PHY reset/firmware or complete cold-start support.
 +
++config TY1208Z_USB_HOST0_EXPERIMENT
++	bool "TY1208Z USB host0 clock/PHY compile experiment"
++	depends on ARCH_HI3798MV100 && USB_EHCI_HCD_PLATFORM=y
++	depends on USB_OHCI_HCD_PLATFORM=y && !BLOCK && !MMC && !MTD
++	depends on !NET && !MODULES && !PM && !SMP && !DEBUG_FS
++	help
++	  Optional shared host0 clock provider for an independent experiment.
++	  Not enabled by any RAM image. Requires a separate reviewed board
++	  identity/DT after hardware control and capability measurements.
++
  config COMMON_CLK_HI3516CV300
  	tristate "HI3516CV300 Clock Driver"
  	depends on ARCH_HISI || COMPILE_TEST
 --- a/drivers/clk/hisilicon/Makefile
 +++ b/drivers/clk/hisilicon/Makefile
-@@ -1,4 +1,5 @@
+@@ -1,4 +1,6 @@
  # SPDX-License-Identifier: GPL-2.0
 +obj-$(CONFIG_TY1208Z_ETHERNET_INHERITED) += clk-ty1208z-ethernet.o
++obj-$(CONFIG_TY1208Z_USB_HOST0_EXPERIMENT) += clk-ty1208z-usb.o
  #
  # Hisilicon Clock specific Makefile
  #
@@ -1033,6 +1044,115 @@
 +module_platform_driver(ty1208z_ethernet_clock_driver);
 +MODULE_LICENSE("GPL");
 --- /dev/null
++++ b/drivers/clk/hisilicon/clk-ty1208z-usb.c
+@@ -0,0 +1,106 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Optional, compile-only host0 clock/PHY experiment; no board DTS yet. */
++#include <linux/clk-provider.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#include "ty1208z-usb-host0.h"
++
++struct ty1208z_usb_clock {
++	struct clk_hw hw;
++	struct device *dev;
++	void __iomem *controls[5];
++};
++
++static int ty1208z_usb_prepare(struct clk_hw *hw)
++{
++	struct ty1208z_usb_clock *clock = container_of(hw, struct ty1208z_usb_clock, hw);
++	int ret = ty1208z_usb_host0_start(clock->controls);
++
++	if (ret)
++		dev_err(clock->dev, "USB_HOST0_PREPARE_FAILED error=%d\n", ret);
++	else
++		dev_info(clock->dev, "USB_HOST0_PREPARED sdk-host0-sequence\n");
++	return ret;
++}
++
++static void ty1208z_usb_unprepare(struct clk_hw *hw)
++{
++	struct ty1208z_usb_clock *clock = container_of(hw, struct ty1208z_usb_clock, hw);
++
++	if (ty1208z_usb_host0_stop(clock->controls))
++		dev_err(clock->dev, "USB_HOST0_SHUTDOWN_READBACK_FAILED\n");
++	else
++		dev_info(clock->dev, "USB_HOST0_STOPPED last-ccf-user\n");
++}
++
++/*
++ * One shared clock core, one provider output, two HCD consumers. The common
++ * clock framework serializes prepare/unprepare and counts both consumers:
++ * neither companion may reset the shared PHY while the other still owns it.
++ * These operations must not be in atomic enable/disable callbacks.
++ */
++static const struct clk_ops ty1208z_usb_ops = {
++	.prepare = ty1208z_usb_prepare,
++	.unprepare = ty1208z_usb_unprepare,
++};
++
++static int ty1208z_usb_clock_probe(struct platform_device *pdev)
++{
++	static const resource_size_t addresses[] = {
++		0xf8a220b8, 0xf8a220bc, 0xf8a20120, 0xf8a20124, 0xf8000ee0,
++	};
++	struct device *dev = &pdev->dev;
++	struct ty1208z_usb_clock *clock;
++	struct clk_init_data init = {
++		.name = "ty1208z-usb-host0",
++		.ops = &ty1208z_usb_ops,
++	};
++	struct resource *resource;
++	unsigned int i;
++	int ret;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-usb-host-experiment"))
++		return -ENODEV;
++	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
++		resource = platform_get_resource(pdev, IORESOURCE_MEM, i);
++		if (!resource || resource->start != addresses[i] || resource_size(resource) != 4)
++			return -EINVAL;
++	}
++	if (platform_get_resource(pdev, IORESOURCE_MEM, ARRAY_SIZE(addresses)))
++		return -EINVAL;
++	clock = devm_kzalloc(dev, sizeof(*clock), GFP_KERNEL);
++	if (!clock)
++		return -ENOMEM;
++	clock->dev = dev;
++	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
++		clock->controls[i] = devm_platform_ioremap_resource(pdev, i);
++		if (IS_ERR(clock->controls[i]))
++			return PTR_ERR(clock->controls[i]);
++	}
++	if (!ty1208z_usb_revision_valid(readl(clock->controls[4])))
++		return -ENODEV;
++	/* Registering the provider performs no control writes. */
++	clock->hw.init = &init;
++	ret = devm_clk_hw_register(dev, &clock->hw);
++	if (ret)
++		return ret;
++	return devm_of_clk_add_hw_provider(dev, of_clk_hw_simple_get, &clock->hw);
++}
++
++static const struct of_device_id ty1208z_usb_clock_match[] = {
++	{ .compatible = "tianyi,ty1208z-usb-host0-clock" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ty1208z_usb_clock_match);
++
++static struct platform_driver ty1208z_usb_clock_driver = {
++	.probe = ty1208z_usb_clock_probe,
++	.driver = {
++		.name = "ty1208z-usb-host0-clock",
++		.of_match_table = ty1208z_usb_clock_match,
++	},
++};
++builtin_platform_driver(ty1208z_usb_clock_driver);
++MODULE_LICENSE("GPL");
+--- /dev/null
 +++ b/drivers/clk/hisilicon/ty1208z-ethernet-gate.h
 @@ -0,0 +1,36 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
@@ -1070,6 +1190,138 @@
 +	return 0;
 +}
 +
++#endif
+--- /dev/null
++++ b/drivers/clk/hisilicon/ty1208z-usb-host0.h
+@@ -0,0 +1,129 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/*
++ * Independent implementation of the host0 register protocol documented by
++ * Hisilicon's 2014/2015 clk-hiusb2.c (Apache-2.0, Liu Hui).
++ * Register values/order are hardware protocol facts. No SDK C implementation
++ * is included here; the offline test executes the pinned original as oracle.
++ */
++#ifndef TY1208Z_USB_HOST0_H
++#define TY1208Z_USB_HOST0_H
++
++#include <linux/delay.h>
++#include <linux/errno.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/types.h>
++
++/* Five separately bounded mappings: CRG46, CRG47, USB0, USB1, SYSID0. */
++#define TY_USB_CONTROLLER_RESETS 0x00037000U
++#define TY_USB_CONTROLLER_CLOCKS 0x0000007fU
++#define TY_USB_PHY_RESETS 0x00000f00U
++#define TY_USB_PHY_POWER_RESETS 0x00000500U
++#define TY_USB_PHY_PORT_RESETS 0x00000a00U
++
++struct ty1208z_usb_phy_command {
++	u32 value;
++	unsigned int delay_us;
++};
++
++static inline void ty1208z_usb_phy_commands(void __iomem *port,
++			const struct ty1208z_usb_phy_command *commands,
++			unsigned int count)
++{
++	unsigned int i;
++
++	for (i = 0; i < count; i++) {
++		writel(commands[i].value, port);
++		if (commands[i].delay_us)
++			udelay(commands[i].delay_us);
++	}
++}
++
++/* The original SYSID0 low-byte revision decision does not require an OTP read. */
++static inline bool ty1208z_usb_revision_valid(u32 sysid0)
++{
++	return sysid0 != 0 && sysid0 != ~0U;
++}
++
++static inline int ty1208z_usb_host0_stop(void __iomem * const *controls)
++{
++	u32 value = readl(controls[1]);
++
++	writel(value | TY_USB_PHY_RESETS, controls[1]);
++	udelay(100);
++	/* Match host0 last-user shutdown; preserve all other clock/control bits. */
++	value = readl(controls[0]);
++	writel(value & ~0x71U, controls[0]);
++	udelay(200);
++	return (readl(controls[1]) & TY_USB_PHY_RESETS) == TY_USB_PHY_RESETS &&
++	       !(readl(controls[0]) & 0x71U) ? 0 : -EIO;
++}
++
++static inline int ty1208z_usb_host0_start(void __iomem * const *controls)
++{
++	static const struct ty1208z_usb_phy_command pll240[] = {
++		{ 0xa809, 0 }, { 0xe809, 0 }, { 0xa809, 300 },
++	};
++	static const struct ty1208z_usb_phy_command revision10[] = {
++		{ 0xa801, 0 }, { 0xe801, 0 }, { 0xa801, 300 },
++		{ 0xa604, 0 }, { 0xe604, 0 }, { 0xa604, 1000 },
++		{ 0xa01c, 0 }, { 0xe01c, 0 }, { 0xa01c, 0 },
++		{ 0xb01c, 0 }, { 0xf01c, 0 }, { 0xb01c, 100 },
++	};
++	static const struct ty1208z_usb_phy_command other_revision[] = {
++		{ 0xa73b, 0 }, { 0xe73b, 0 }, { 0xa73b, 500 },
++		{ 0xabc0, 0 }, { 0xebc0, 0 }, { 0xabc0, 500 },
++		{ 0xa73f, 0 }, { 0xe73f, 0 }, { 0xa73f, 1000 },
++		{ 0xabe0, 0 }, { 0xebe0, 0 }, { 0xabe0, 1000 },
++		{ 0xaa02, 0 }, { 0xea02, 0 }, { 0xaa02, 0 },
++		{ 0xba1e, 0 }, { 0xfa1e, 0 }, { 0xba1e, 500 },
++		{ 0xa801, 0 }, { 0xe801, 0 }, { 0xa801, 300 },
++	};
++	u32 revision = readl(controls[4]);
++	u32 value;
++
++	if (!ty1208z_usb_revision_valid(revision))
++		return -ENODEV;
++
++	value = readl(controls[0]);
++	writel(value | TY_USB_CONTROLLER_RESETS, controls[0]);
++	udelay(200);
++	value = readl(controls[1]);
++	writel(value | TY_USB_PHY_RESETS, controls[1]);
++	udelay(200);
++	value = readl(controls[2]);
++	writel((value | 8U) & ~0x201U, controls[2]);
++	udelay(100);
++	value = readl(controls[1]);
++	writel(value | 3U, controls[1]);
++	udelay(300);
++	ty1208z_usb_phy_commands(controls[3], pll240, ARRAY_SIZE(pll240));
++	value = readl(controls[1]);
++	writel(value & ~TY_USB_PHY_POWER_RESETS, controls[1]);
++	udelay(300);
++	if ((revision & 0xf0) == 0x10) {
++		udelay(2000);
++		ty1208z_usb_phy_commands(controls[3], revision10, ARRAY_SIZE(revision10));
++	} else {
++		ty1208z_usb_phy_commands(controls[3], other_revision,
++					ARRAY_SIZE(other_revision));
++	}
++	value = readl(controls[1]);
++	writel(value & ~TY_USB_PHY_PORT_RESETS, controls[1]);
++	udelay(2000);
++	value = readl(controls[0]);
++	writel((value & ~TY_USB_CONTROLLER_RESETS) | TY_USB_CONTROLLER_CLOCKS,
++	       controls[0]);
++	udelay(200);
++
++	/* Fail before a generic HCD can touch its registers or start DMA. */
++	if ((readl(controls[0]) & (TY_USB_CONTROLLER_RESETS | TY_USB_CONTROLLER_CLOCKS)) !=
++	    TY_USB_CONTROLLER_CLOCKS ||
++	    (readl(controls[1]) & (TY_USB_PHY_RESETS | 3U)) != 3U ||
++	    (readl(controls[2]) & 0x209U) != 8U) {
++		ty1208z_usb_host0_stop(controls);
++		return -EIO;
++	}
++	return 0;
++}
 +#endif
 --- /dev/null
 +++ b/drivers/clocksource/timer-hi3798mv100.c
