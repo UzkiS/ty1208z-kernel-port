@@ -2,6 +2,8 @@
 
 设备：用户称为 TY1208Z 高安版。2026-10-12 已从正在运行的 Hinas 完成只读
 SSH 采集；匿名化结果见 [基线记录](../verification/baseline-20261012.md)。
+同日通过 CLI 接收了原系统的 TTL 启动输出，见
+[引导记录](../verification/ttl-boot-20261012.md)。
 Linux 报告的布局、引导器可用内存与高安校验状态是不同证据，不能相互替代。
 
 ## 本机运行时事实
@@ -19,7 +21,7 @@ Linux 报告的布局、引导器可用内存与高安校验状态是不同证�
 | UART0 | 运行 FDT 给出 PL011 `0xf8b00000`、SPI 49、83.3 MHz 固定时钟；尚未以 TTL 验证新内核输出 |
 
 当前内核未暴露 `/proc/config.gz` 或对应 `/boot/config-*`。SSH 中的 dmesg
-从部分早期内核信息开始，不含 bootloader 输出，不能代替完整 TTL 启动日志。
+从部分早期内核信息开始，不含 bootloader 输出；后续 TTL 已补充引导阶段证据。
 
 运行 FDT 的 reservation map 有五项：
 
@@ -77,9 +79,26 @@ Linux 报告的布局、引导器可用内存与高安校验状态是不同证�
 | 通用包 fastboot，不能替换上述引导 | `3bded87f15c1ebd686f39c23570650ac2b53a97815b592a0130b06fe2ce954ae` |
 
 Hinas uImage CRC 正常，加载/入口 `0x02000000`，DTB 位于文件偏移 10853712、
-长 8935 字节。高安专用 fastboot 没有对应源码，刷入成功并不证明关闭了安全启动。
+长 8935 字节。高安专用 fastboot 没有对应源码。当前 TTL 中引导器报告
+`Secure boot is not enabled`，并实际接受现有 Hinas 的普通 legacy uImage；
+这仍不能替代新候选的加载验证。
 另一个 Android 备份包含 ADVCA 头和 RSA 错误字符串，但 XML 留有 M301H 来源，
 不能默认是当前机器的备份或据此判断当前验签状态。
+
+## 本机引导阶段事实
+
+当前引导器为 Fastboot `3.3.0-dirty`，2016-12-21 构建，CPU 标签为
+`Hi3798Mv100 (CA)`，DDR Size 为 1GB。日志明确提供 `Press Ctrl+C to stop autoboot`，
+但首轮没有发送任何字节，也没有进入命令行查看命令表。
+
+它从 eMMC 第 28672 块读取 40960 个 512 字节块，与 SSH 测得的内核分区对应。
+当前镜像头在 `0x01ffffc0`，数据长 10862583 字节，加载和入口均为 `0x02000000`，
+checksum 通过后启动 Linux 4.4。引导器打印 `Not hisilicon ADVCA image ...`。
+这证明现有镜像在当前引导路径可启动，候选的镜像包装、DTB 传递和加载命令仍待核对。
+
+引导器打印 11 项内存分配，详见引导记录；其 `Bound Addr: 0x8E62000` 的含义未确认。
+已有五项 FDT reservation 只覆盖其中部分分配。没有据此扩大 DTB RAM 或选择传输缓冲区。
+`Secure boot is not enabled` 是本次引导器报告，并非独立读取 OTP/eFuse 得出的结论。
 
 ## 第一个候选的取舍
 
@@ -95,7 +114,7 @@ PL011 配置同时提供现代驱动需要的 `uartclk` 和 `apb_pclk`；频率�
 ## 进入实机阶段所需记录
 
 1. 原 Hinas 正常启动的完整 TTL 日志；补足已取得 SSH 基线中的引导/早期信息。
-2. 当前 bootloader 身份、可用命令和已成功镜像的加载方式。
+2. 当前 bootloader 身份及现有镜像加载已有记录；仍需可用命令和 DTB 传递方式。
 3. 已测量分区布局对应的当前设备备份及恢复条件。
 4. 可用 RAM、bootloader/安全区域和候选/解压镜像可能重叠的位置。
 5. 已确认 RDA USB 身份对应的芯片版本、Wi-Fi 固件及电源/复位线索。

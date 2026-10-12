@@ -24,9 +24,12 @@ by this tool. Raw local logs are ignored by Git.
 ## Limits
 
 These checks do not validate the board's CA authentication, bootloader commands,
-safe RAM ranges or the Linux 6.12 candidate on hardware. A complete original
-boot log remains the next prerequisite. The tool currently has no transmit or
+safe RAM ranges or the Linux 6.12 candidate on hardware. The subsequently
+completed original boot log is recorded separately below. The tool has no transmit or
 interactive mode; future bootloader command support must be added explicitly.
 
-CI runs the PTY tests after installing the pinned serial dependency. Its actual
-result must be checked after this change is pushed.
+GitHub CI passed for code commit `a4adc78`, including the PTY tests, clean kernel
+build and QEMU time64 regression:
+[run 38199621273](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38199621273).
+Subsequent original-board output is documented separately in
+[the TTL boot record](ttl-boot-20261012.md).

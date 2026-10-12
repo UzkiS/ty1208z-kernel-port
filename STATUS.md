@@ -1,7 +1,7 @@
 # TY1208Z kernel port status
 
 Updated: 2026-10-12. Existing Hinas booted; a read-only SSH baseline was collected.
-No flashing, persistent boot changes or OTP writes were performed. Offline
+No flashing, persistent boot changes or OTP writes were performed by this project. Offline
 implementation and repository push are authorized.
 
 Target: modern Linux, native OpenWrt/Kwrt, Passwall, board Wi-Fi and verified
@@ -14,11 +14,12 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Linux 6.12.112 candidate | Cross-compiled; board descriptor, UART/GIC DTB, single-core timer and embedded initramfs |
 | Structural checks | Passed: CRC, ARM uImage/zImage, appended DTB, static ARM ELF, required/disabled config |
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
-| GitHub CI | Passed for code commit `0f9332f`: collector LF/CRLF regression, PowerShell syntax, clean kernel build and QEMU time64; [run 38188649931](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38188649931) |
+| GitHub CI | Passed for code commit `a4adc78`: serial PTY tests, collector LF/CRLF regression, PowerShell syntax, clean kernel build and QEMU time64; [run 38199621273](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38199621273) |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
-| Serial CLI | RX-only tool opens the local CH340 at 115200 8N1; six Linux PTY integration tests passed; complete early boot capture still pending |
+| Serial CLI | Six Linux PTY integration tests and CI passed; actual original-board boot captured at 115200 8N1, 106675 bytes, then port released |
+| Original Hinas TTL boot | Complete from Boot ROM to login; bootloader and allocation evidence recorded in [TTL report](verification/ttl-boot-20261012.md) |
 | Candidate boot on physical TY1208Z | Not attempted |
-| CA authentication / RAM placement | Unverified; DT memory range and load address require hardware confirmation |
+| CA authentication / RAM placement | Original boot reports secure boot disabled and accepts existing ordinary uImage; candidate authentication, usable RAM and placement remain unverified |
 | Hinas startup under new kernel | Not tested; eMMC driver and legacy modules need separate work |
 | Wired network / storage / USB / SMP | Not integrated into this minimal diagnostic image |
 | Wi-Fi | RDA USB `1e04:8888`, vendor interface FF/FF/FF, no bound driver; matching modern driver and exact chip revision remain unverified |
@@ -32,10 +33,11 @@ The candidate is an ordinary unsigned uImage, not ADVCA packaged or ready to
 flash. Header load/entry is copied from local Hinas, not a validated RAM map.
 Initial DTB memory is a 256 MiB placeholder with no verified secure reservations.
 
-Next physical step: capture normal boot over TTL, current bootloader capabilities
-and actual RAM/security constraints. SSH established the Linux-reported RAM and
-five FDT reservations, not a safe bootloader load map. Only then choose a real
-temporary-boot method and adjust candidate. RDA driver source/firmware assessment
+Original TTL boot now identifies Fastboot 3.3.0-dirty, 1GB DDR, the existing image
+load path and 11 boot-time allocations. Next physical step: inspect current
+bootloader commands and clarify RAM/DTB constraints. SSH and TTL still do not
+establish a safe candidate load map. Only then choose a real temporary-boot
+method and adjust candidate. RDA driver source/firmware assessment
 continues independently; the installed Realtek modules do not match this device.
 
 The first Windows collection reached its END marker but exited 127 because
