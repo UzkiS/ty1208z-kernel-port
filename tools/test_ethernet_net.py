@@ -192,6 +192,11 @@ if __name__ == "__main__":
     if args.artifacts:
         tree = parse_fdt((args.artifacts / "ty1208z-diagnostic.dtb").read_bytes())
         ethernet_net_profile(tree, (args.artifacts / "linux.config").read_text())
-        subprocess.run(["qemu-arm", str(args.artifacts / "busybox.armhf"), "--list"],
-                       stdout=subprocess.PIPE, check=True)
+        commands = subprocess.check_output(["qemu-arm", str(args.artifacts / "busybox.armhf"), "--list"]).decode().splitlines()
+        assert {"ip", "ping", "udhcpc", "timeout"} <= set(commands)
+        config = (args.artifacts / "busybox.config").read_text()
+        assert "CONFIG_FEATURE_FANCY_PING=y\n" in config
+        usage = subprocess.run(["qemu-arm", str(args.artifacts / "busybox.armhf"), "ping", "--help"],
+                               stdout=subprocess.PIPE, stderr=subprocess.STDOUT, check=False).stdout
+        assert b"-c CNT" in usage and b"-I IFACE" in usage, usage.decode()
     unittest.main(argv=[__file__], verbosity=2)

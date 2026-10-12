@@ -4,11 +4,12 @@
 def replacements():
     return [
         ('#include <linux/circ_buf.h>\n',
-         '#include <linux/circ_buf.h>\n#include <linux/delay.h>\n'),
+         '#include <linux/circ_buf.h>\n#include <linux/delay.h>\n#include <linux/timer.h>\n'),
         ('struct hisi_femac_queue {\n',
          '#include "hi3798mv100-femac.h"\n\nstruct hisi_femac_queue {\n'),
         ('\tu32 link_status;\n',
-         '\tu32 link_status;\n\tbool mv100_inherited;\n\tu32 irq_mask;\n'),
+         '\tu32 link_status;\n\tbool mv100_inherited;\n\tu32 irq_mask;\n'
+         '\tstruct timer_list tx_monitor;\n'),
         ('\t\tlen = rx_pkt_info & RX_FRAME_LEN_MASK;\n\t\tlen -= ETH_FCS_LEN;\n',
          '\t\tlen = rx_pkt_info & RX_FRAME_LEN_MASK;\n'),
         ('\t\tskb_put(skb, len);\n\t\tif (unlikely(skb->len > MAX_FRAME_SIZE)) {\n',
@@ -20,9 +21,22 @@ def replacements():
         # or after polling; it must remain set until hisi_femac_rx consumes it.
         ('writel(ints & DEF_INT_MASK,',
          'writel(ints & priv->irq_mask & ~IRQ_INT_RX_RDY,'),
-        ('} while (ints & DEF_INT_MASK);', '} while (ints & priv->irq_mask);'),
-        ('hisi_femac_irq_enable(priv, DEF_INT_MASK &',
-         'hisi_femac_irq_enable(priv, priv->irq_mask &'),
+        ('} while (ints & DEF_INT_MASK);',
+         '} while (ints & (priv->mv100_inherited ? IRQ_INT_RX_RDY : priv->irq_mask));'),
+        ('\tint ints, num;\n\n\tdo {\n',
+         '\tint ints, num;\n\n\t/* Zero-budget NAPI may reclaim TX only. */\n'
+         '\tif (unlikely(!budget)) {\n\t\thisi_femac_xmit_reclaim(dev);\n'
+         '\t\treturn 0;\n\t}\n\n\tdo {\n'),
+        ('\t\thisi_femac_irq_enable(priv, DEF_INT_MASK &\n'
+         '\t\t\t\t\t(~IRQ_INT_TX_PER_PACKET));',
+         '\t\thisi_femac_irq_enable(priv, priv->mv100_inherited ?\n'
+         '\t\t\t\t      IRQ_INT_RX_RDY : priv->irq_mask &\n'
+         '\t\t\t\t      (~IRQ_INT_TX_PER_PACKET));'),
+        ('\tstruct hisi_femac_priv *priv = netdev_priv(dev);\n\n'
+         '\tints = readl(priv->glb_base + GLB_IRQ_RAW);\n',
+         '\tstruct hisi_femac_priv *priv = netdev_priv(dev);\n\n'
+         '\tints = readl(priv->glb_base + (priv->mv100_inherited ?\n'
+         '\t\t\t\t       GLB_IRQ_STAT : GLB_IRQ_RAW));\n'),
         ('\tif (likely(ints & DEF_INT_MASK)) {\n',
          '\tif (!(ints & priv->irq_mask))\n\t\treturn IRQ_NONE;\n\n'
          '\tif (likely(ints & priv->irq_mask)) {\n'),
@@ -33,13 +47,21 @@ def replacements():
          '\t\thi3798mv100_femac_reset(priv->glb_base);\n\t\treturn 0;\n\t}\n\n'
          '\tval = readl(priv->glb_base + GLB_SOFT_RESET);'),
         ('static int hisi_femac_net_open(struct net_device *dev)\n',
-         'static void hisi_femac_port_init(struct hisi_femac_priv *priv);\n\n'
+         'static void hisi_femac_port_init(struct hisi_femac_priv *priv);\n\n' +
+         TX_MONITOR +
          'static int hisi_femac_net_open(struct net_device *dev)\n'),
         ('\thisi_femac_port_reset(priv);\n\thisi_femac_set_hw_mac_addr',
          '\thisi_femac_port_reset(priv);\n\tif (priv->mv100_inherited)\n'
          '\t\thisi_femac_port_init(priv);\n\thisi_femac_set_hw_mac_addr'),
         ('hisi_femac_irq_enable(priv, IRQ_ENA_ALL | IRQ_ENA_PORT0 | DEF_INT_MASK);',
-         'hisi_femac_irq_enable(priv, IRQ_ENA_ALL | IRQ_ENA_PORT0 | priv->irq_mask);'),
+         'hisi_femac_irq_enable(priv, IRQ_ENA_ALL | IRQ_ENA_PORT0 |\n'
+         '\t\t\t     (priv->mv100_inherited ? IRQ_INT_RX_RDY : priv->irq_mask));\n'
+         '\tif (priv->mv100_inherited)\n'
+         '\t\tmod_timer(&priv->tx_monitor, jiffies + msecs_to_jiffies(20));'),
+        ('\thisi_femac_irq_disable(priv, IRQ_ENA_PORT0);\n\n\tif (dev->phydev)',
+         '\thisi_femac_irq_disable(priv, IRQ_ENA_PORT0);\n'
+         '\tif (priv->mv100_inherited)\n\t\tdel_timer_sync(&priv->tx_monitor);\n\n'
+         '\tif (dev->phydev)'),
         ('\thisi_femac_free_skb_rings(priv);\n',
          '\t/* Stop MAC DMA before releasing buffers for this new variant. */\n'
          '\tif (priv->mv100_inherited) {\n\t\tsynchronize_irq(dev->irq);\n'
@@ -63,6 +85,7 @@ def replacements():
          '\tpriv->irq_mask = priv->mv100_inherited ?\n'
          '\t\t(IRQ_INT_RX_RDY | IRQ_INT_TX_FIFO_EMPTY) : DEF_INT_MASK;\n'
          '\tif (priv->mv100_inherited) {\n'
+         '\t\ttimer_setup(&priv->tx_monitor, hisi_femac_mv100_tx_monitor, 0);\n'
          '\t\tret = hisi_femac_mv100_resources(pdev);\n'
          '\t\tif (ret)\n\t\t\tgoto out_free_netdev;\n'
          '\t\tret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(32));\n'
@@ -90,6 +113,23 @@ REPEATED_ANCHORS = {
     "writel(ints & DEF_INT_MASK,": 2,
     "hisi_femac_irq_enable(priv, IRQ_INT_TX_PER_PACKET);": 2,
 }
+
+TX_MONITOR = '''/* The SDK uses a periodic monitor to reclaim transmit buffers.
+ * TX-ready is a credit notification, not a per-packet completion interrupt.
+ * Schedule NAPI so all reclamation retains the upstream locking/DMA path.
+ */
+static void hisi_femac_mv100_tx_monitor(struct timer_list *timer)
+{
+	struct hisi_femac_priv *priv = from_timer(priv, timer, tx_monitor);
+
+	if (!netif_running(priv->ndev))
+		return;
+	if (READ_ONCE(priv->tx_fifo_used_cnt))
+		napi_schedule(&priv->napi);
+	mod_timer(&priv->tx_monitor, jiffies + msecs_to_jiffies(20));
+}
+
+'''
 
 HELPERS = '''/* Explicit board experiment: no generic PHY reset fallback. */
 static int hisi_femac_mv100_phy_ready(struct device_node *node)

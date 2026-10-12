@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "PTY integration needs Linux")
 class EthernetTests(unittest.TestCase):
-    def exercise(self, mode):
+    def exercise(self, mode, operation="dhcp-ping"):
         with tempfile.TemporaryDirectory() as directory:
             prefix = Path(directory) / "ethernet"
             master, slave = os.openpty()
@@ -46,18 +46,24 @@ class EthernetTests(unittest.TestCase):
                     os.write(master, b"uname -r\r\n" + kernel + b"\r\n# ")
                     if mode == "wrong-kernel":
                         return
-                    self.assertEqual(receive(), b"ethernet-diag --dhcp; echo TY1208Z_ETHERNET_COMPLETE\r")
+                    from ethernet_board_cli import RESUME_PING, INTERFACE_CYCLE
+                    command = {"dhcp-ping": b"ethernet-diag --dhcp; echo TY1208Z_ETHERNET_COMPLETE",
+                               "lease-ping": RESUME_PING, "interface-cycle": INTERFACE_CYCLE}[operation]
+                    self.assertEqual(receive(), command + b"\r")
                     # An echoed substring cannot count as a successful script.
-                    report = (b"ETH_NET_DHCP_BOUND\r\n4 packets transmitted, 4 received\r\n"
-                              b"ETH_NET_DHCP_PING_PASS\r\n" if mode == "success" else
+                    marker = {"dhcp-ping": b"ETH_NET_DHCP_PING_PASS", "lease-ping": b"ETH_NET_LEASE_PING_PASS",
+                              "interface-cycle": b"ETH_NET_INTERFACE_CYCLE_PASS"}[operation]
+                    report = (b"ETH_NET_DHCP_BOUND\r\n4 packets transmitted, 4 received\r\n" +
+                              marker + b"\r\n" if mode == "success" else
                               b"echo ETH_NET_DHCP_PING_PASS\r\nETH_NET_NO_GATEWAY\r\n")
                     os.write(master, report + b"TY1208Z_ETHERNET_COMPLETE\r\n# ")
                 except BaseException as exc:
                     errors.append(exc)
 
+            flags = {"dhcp-ping": [], "lease-ping": ["--resume-ping"], "interface-cycle": ["--cycle-interface"]}[operation]
             process = subprocess.Popen([
                 sys.executable, "-u", str(ROOT / "tools/ethernet_board_cli.py"),
-                "--port", os.ttyname(slave), "--output", str(prefix)],
+                "--port", os.ttyname(slave), "--output", str(prefix), *flags],
                 stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             thread = threading.Thread(target=peer, daemon=True)
             thread.start()
@@ -70,6 +76,7 @@ class EthernetTests(unittest.TestCase):
                 self.assertFalse(select.select([master], [], [], 0.05)[0])
                 self.assertEqual(process.returncode, 0 if mode == "success" else 1, output.decode())
                 result = json.loads(prefix.with_suffix(".json").read_text())
+                self.assertEqual(result["operation"], operation)
                 self.assertEqual(result["dhcp_ping_pass"], mode == "success")
                 self.assertEqual(len(commands), 1 if mode == "bootloader" else 2 if mode == "wrong-kernel" else 3)
             finally:
@@ -91,6 +98,15 @@ class EthernetTests(unittest.TestCase):
 
     def test_real_marker_captures_success(self):
         self.exercise("success")
+
+    def test_initial_image_resume_is_bounded_and_captured(self):
+        self.exercise("success", "lease-ping")
+
+    def test_cycle_gates_initial_image_identity(self):
+        self.exercise("wrong-kernel", "interface-cycle")
+
+    def test_interface_cycles_have_their_own_marker(self):
+        self.exercise("success", "interface-cycle")
 
 
 if __name__ == "__main__":

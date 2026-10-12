@@ -19,6 +19,7 @@ export KBUILD_BUILD_HOST=offline
 export KBUILD_BUILD_VERSION=1
 test -f "$diagnostic/.config" || { echo 'Run make build first.' >&2; exit 1; }
 python3 "$project/tools/test_ethernet_net.py"
+python3 "$project/tools/test_femac_datapath.py" --linux "$linuxsrc"
 mkdir -p "$kout" "$bout" "$rootfs"/{bin,sbin,dev,proc,sys,tmp,etc} "$artifacts/checks"
 make -C "$bbsource" O="$bout" CROSS_COMPILE="$cross" allnoconfig
 python3 "$project/tools/merge_fragment.py" "$bout/.config" "$project/config/busybox-diagnostic.fragment"

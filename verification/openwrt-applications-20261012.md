@@ -2,7 +2,11 @@
 
 Date: 2026-10-12. No board transfer, storage writes or hardware operation.
 The final local application build and runtime gates passed. Clean application
-CI is configured but has not yet completed.
+CI passed for the basic application flow at `5ded606`:
+[run 38243600371](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38243600371).
+That revision predates the custom-CA array fix and added Xray VLESS TLS
+validation below. CI for the newer TLS validation is running separately;
+the final local gates, not the older CI, establish that added runtime result.
 
 ## Inputs and actual build
 

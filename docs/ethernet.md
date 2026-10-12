@@ -160,6 +160,22 @@ Receive lengths are checked before FCS subtraction and `skb_put`. Closing
 the new variant synchronizes IRQ and resets MAC before unmapping buffers;
 reopening reinitializes MAC controls after reset.
 
+TX-ready is armed only when the transmit queue runs out of credits, rather
+than as a continuously enabled completion interrupt. The MV100 ISR reads
+enabled interrupt status, so a masked TX-ready flag cannot claim another
+device's shared IRQ. NAPI repeats only for pending RX on this variant; a
+sticky TX-only flag cannot spin without consuming RX budget. A 20-ms monitor
+schedules the upstream NAPI TX-reclaim path while outstanding buffers exist,
+including one-way traffic with no reply packets. Close synchronously deletes
+the monitor before disabling NAPI. Zero-budget NAPI only reclaims TX.
+
+`tools/test_femac_datapath.py` compiles and executes the actual patched RX,
+NAPI, ISR and monitor functions with FIFO/skb seams under ASan/UBSan. It
+checks every descriptor length, pending-RX preservation, a persistent TX-ready
+flag, masked shared IRQs, packets arriving between polls, budget exhaustion,
+zero-budget TX-only work and monitor behavior. The pre-fix source at `f60474c`
+reproduced an unbounded TX-only NAPI loop; the corrected source passes.
+
 Checked upstream replacements live in `tools/femac_patch.py`; new board files
 remain in `overlay/`. Actual clock/setup/reset/length helpers execute under
 ASan/UBSan, including 160 inherited-state bit mutations and all 4096 descriptor

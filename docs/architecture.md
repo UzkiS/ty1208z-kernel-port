@@ -30,8 +30,9 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 
 原生 target 与 Passwall 集成边界见 [OpenWrt/Kwrt](openwrt.md)，网口主线复用与
 内部 PHY/时钟待验证条件见 [Ethernet](ethernet.md)。原生 RAM target 已通过配置解析、
-OpenWrt 通用补丁叠加、完整原生 GCC/musl 镜像构建及核心用户空间 QEMU time64；尚无实机
-OpenWrt 或新内核网口驱动验收结果。
+OpenWrt 通用补丁叠加、完整原生 GCC/musl 镜像构建及核心用户空间 QEMU time64。
+新内核的基本网口收发已有[实机验收](../verification/ethernet-net-20261012.md)，
+原生 OpenWrt 实机网络和持续传输仍待验证。
 
 ## 源码与产物
 

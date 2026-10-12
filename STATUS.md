@@ -14,7 +14,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Linux 6.12.112 candidate | Cross-compiled; board descriptor, UART/GIC DTB, single-core timer and embedded initramfs |
 | Structural checks | Passed: CRC, ARM uImage/zImage, appended DTB, static ARM ELF, required/disabled config |
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
-| GitHub CI | Diagnostic CI passed on `6776f78`, including clock/PHY-ID, [run 38251347555](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38251347555). Native OpenWrt CI passed on `5ded606`, [run 38243600333](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38243600333). Applications CI on `5ded606` remains running; application CI on `6776f78` waits behind it. New Ethernet datapath acceptance is recorded separately |
+| GitHub CI | Diagnostic CI passed on `f60474c`, [run 38255399194](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38255399194); this predates the added TX-level/NAPI fix. Native OpenWrt CI passed on `5ded606`, [run 38243600333](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38243600333). Basic applications CI passed on `5ded606`, [run 38243600371](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38243600371), before the added Xray VLESS TLS validation. Newer application/native runs remain separate from those passed revisions |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
 | Serial CLI | Replacing the TTL adapter resolved console input; CLI attached to the stopped CA bootloader on COM9 and completed command/environment queries without another reboot; see [inspection record](verification/bootloader-inspection-20261012.md) |
 | Original Hinas TTL boot | Complete from Boot ROM to login; bootloader and allocation evidence recorded in [TTL report](verification/ttl-boot-20261012.md) |
@@ -27,7 +27,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | eMMC fixed sector reads | Passed physically: exactly four PIO CMD17 user-area reads; Hinas kernel header CRC matches local original, root-partition ext4 magic/block size pass. No block interface, mounts, writes or card-setting changes; [hardware report](verification/emmc-reads-20261012.md) |
 | Ethernet inherited-state audit | Passed physically: CRG51 `0x3`, internal PHY clock/reset `0x101`, address 1. MDIO/MAC access skipped because the SDK clock gate requires `0xb`; no PHY ID or working network yet. UART/timer/time64 pass; [hardware report](verification/ethernet-audit-20261012.md) |
 | Temporary Ethernet clock / PHY-ID | Passed physically: CRG51 `0x3 -> 0xb -> 0x3`, restoration verified; PHY ID `0x20669823` at address 1 matches FESTAv220. No PHY reset/register, DMA or storage writes. UART/timer/time64 and offline gates pass; [hardware report](verification/ethernet-clock-id-20261012.md) |
-| Ethernet inherited-PHY datapath | Separate `ethernet-net1` built locally with upstream FEMAC/MDIO, 32-bit DMA, exact-state clock provider and no-reset FESTAv220 driver. DT/config/placement, MMIO sanitizer, descriptor-length and serial identity checks plus QEMU time64 pass. Interface down by default; physical binding/DHCP/ping and complete cold-start support remain pending; [candidate](verification/ethernet-net-offline-20261012.md) |
+| Ethernet inherited-PHY datapath | Passed physically after TX-level/NAPI correction: exact FESTAv220 binding, 100 Mbps full duplex, DHCP/gateway replies, 20/20 DF MTU pings and three software down/up cycles; final RX/TX errors/drops zero. Actual patched datapath functions pass ASan/UBSan. [Hardware report](verification/ethernet-net-20261012.md) distinguishes the booted image from the later fancy-ping [tooling rebuild](verification/ethernet-net-offline-20261012.md). Sustained TCP, cable reconnection and complete cold-start support remain pending |
 | Wi-Fi | RDA USB `1e04:8888`; compatible-descriptor source pinned; complete USB module linked locally and in CI against separate Linux 6.12 config, manufacturing eFuse-write entry points excluded, key/WID sanitizer regression passed; [initial module report](verification/wifi-module-port-20261012.md); later control-response fixes and local sanitizer checks in [control report](verification/wifi-control-20261012.md); chip revision, firmware and hardware operation remain unverified |
 | OpenWrt/Kwrt / Passwall | [Independent native RAM target](docs/openwrt.md) built with GCC 14.3/musl 1.2.5 and passed core time64 QEMU/CI. Separate pinned [application target](docs/openwrt-applications.md) now builds real Passwall/Xray/LuCI and passes ARM QEMU at 2040 for DNS/TLS, authenticated Passwall UI, real SOCKS data flow and nft counters/socket/TPROXY expressions; [result](verification/openwrt-applications-20261012.md). Application CI, physical OpenWrt, hardware routing/TPROXY/performance, Wi-Fi and Kwrt customization remain pending |
 | Whole-system Y2038 | Not established; core and selected application emulation passed. NTP, persistent filesystems, other protocols and physical whole-system behavior remain unverified |
@@ -49,9 +49,10 @@ reuses the original load address, stays below all observed high allocations,
 and has a verified decompression footprint ending below 16 MiB. The first boot
 reached /init but lacked a console because of an incorrect UART periphid
 override. Removing the override made PL011 bind; serial diagnostic capture
-then verified timer/uptime progress and the time64 probe. The next board work
-is storage and wired-network support with separate validation, followed by
-Hinas compatibility and the OpenWrt/Kwrt target.
+then verified timer/uptime progress and the time64 probe. Restricted eMMC
+reads and basic wired Ethernet now have separate physical acceptance. The
+next work is native OpenWrt Ethernet integration and sustained traffic, USB/
+Wi-Fi, broader storage support and Hinas compatibility.
 
 The actual CI result above covers the RAM boot tooling, corrected diagnostic
 DTB, independent RDA USB audit and separate eMMC register audit. It reproduces the software checks; physical
