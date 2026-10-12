@@ -14,7 +14,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Linux 6.12.112 candidate | Cross-compiled; board descriptor, UART/GIC DTB, single-core timer and embedded initramfs |
 | Structural checks | Passed: CRC, ARM uImage/zImage, appended DTB, static ARM ELF, required/disabled config |
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
-| GitHub CI | Passed for code commit `7b99fe6`; [run 38141542884](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38141542884) |
+| GitHub CI | Passed for code commit `0f9332f`: collector LF/CRLF regression, PowerShell syntax, clean kernel build and QEMU time64; [run 38188649931](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38188649931) |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
 | Candidate boot on physical TY1208Z | Not attempted |
 | CA authentication / RAM placement | Unverified; DT memory range and load address require hardware confirmation |
