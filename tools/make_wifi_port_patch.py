@@ -18,7 +18,8 @@ def replace(text, old, new, count=1):
 
 def function_spans(text, name):
     """Locate locked C definitions, counting braces outside strings/comments."""
-    pattern = re.compile(r"^(?:static\s+)?(?:inline\s+)?(?:int|s32|u8|u64|void|bool)\s+"
+    pattern = re.compile(r"^(?:static\s+)?(?:__maybe_unused\s+)?(?:inline\s+)?"
+                         r"(?:int|s32|u8|u16|u64|void|bool|struct\s+file\s*\*)\s*"
                          + re.escape(name) + r"\s*\([^;]*?\)\s*\{", re.M)
     spans = []
     for match in pattern.finditer(text):
@@ -549,6 +550,91 @@ scan_failed:
     text = replace_definition(text, "wland_parse_network_info")
     text = scan_result_handler(text)
     result["rdawlan/wland_cfg80211.c"] = text
+    return strict_scope(result)
+
+
+def strict_scope(files):
+    """Use shared public declarations and local linkage for audited file helpers."""
+    result = dict(files)
+    result["rdawlan/wland_nvram.c"] = replace(result["rdawlan/wland_nvram.c"],
+                                              '#include "wland_defs.h"',
+                                              '#include "wland_defs.h"\n#include "wland_port_nvram.h"')
+    text = result["rdawlan/wland_dev.h"]
+    for declaration in (
+            "extern int wland_get_mac_address(char *buf);\n",
+            "extern int wland_set_mac_address(char *buf);\n",
+            "extern int wland_nvram_read(const char *filename, char *data, int size, int offset);\n",
+            "extern int wland_file_write(char *filename, char *data , int size, int offset, u32 mode1, u32 mode2);\n"):
+        text = replace(text, declaration, "")
+    result["rdawlan/wland_dev.h"] = replace(text, "/* read/store mac address by file */",
+                                           '#include "wland_port_nvram.h"\n\n/* read/store mac address by file */')
+    text = replace(result["rdawlan/wland_utils.h"], "extern u8 wland_get_type(u8 * header);\n", "")
+    result["rdawlan/wland_utils.h"] = replace(text, "extern u16  wland_get_beacon_period(u8 *data);\n",
+                                             "extern u16  wland_get_beacon_period(u8 *data);\n"
+                                             "extern u8 wland_get_type(u8 *header);\n")
+    local = {
+        "wland_nvram.c": ("wland_nvram_write",),
+        "wland_utils.c": ("wland_get_n_cap_info", "wland_get_assoc_resp_cap_info",
+                          "wland_get_asoc_status", "wland_get_asoc_id"),
+        "wland_p2p.c": ("wland_p2p_run_escan",),
+        "wland_fwsmgr.c": ("wland_fws_macdesc_cleanup", "wland_fws_macdesc_deinit"),
+        "wland_wid.c": ("wland_chip_repower",),
+        "wland_trap.c": ("wland_open_image", "wland_get_image_block", "wland_close_image"),
+        "wland_linux.c": ("wland_netdev_start_xmit",),
+        "wland_cfg80211.c": ("wland_wait_for_scancmp_event", "wland_wait_event_scancmp_wakeup",
+                             "wland_set_mcs", "wland_cfg80211_parse_ap_settings"),
+        "wland_android.c": ("wland_android_set_roam_mode",),
+        "wland_rf.c": ("wland_is_old_efuse", "wland_read_efuse", "wland_efuse_canbe_overwrite",
+                       "wland_buf_equals", "wland_get_rx_result", "wland_rf_phy_reg_read", "wland_md",
+                       "wland_check_next_mode", "wland_start_rf_test", "wland_stop_rx_test",
+                       "wland_set_sdio_pin_level", "wland_set_reg_for_one_channel",
+                       "wland_dev_set_rssi_snr_config", "wland_dev_get_rssi_snr", "wland_set_data_rate",
+                       "wland_set_rate", "wland_set_tbtt_cnt"),
+        "wland_rx.c": ("wland_recv_indicatepkts_pkt_loss_cnt", "wland_recv_indicatepkt",
+                       "wland_recv_indicatepkts_in_order", "wland_check_indicate_seq"),
+    }
+    optional = {"wland_nvram_write", "wland_get_n_cap_info", "wland_get_assoc_resp_cap_info",
+                "wland_get_asoc_status", "wland_get_asoc_id", "wland_open_image",
+                "wland_get_image_block", "wland_close_image", "wland_android_set_roam_mode"}
+    for filename, names in local.items():
+        relative = "rdawlan/" + filename
+        text = result[relative]
+        for name in names:
+            # Cross-file callers must retain a public, declared interface.
+            for other, contents in result.items():
+                if other != relative and re.search(r"\b" + re.escape(name) + r"\b", contents):
+                    raise ValueError(f"Local helper acquired an external reference: {name}: {other}")
+            spans = function_spans(text, name)
+            if len(spans) != 1:
+                raise ValueError(f"Changed local helper definition: {name}")
+            start = spans[0][0]
+            qualifier = "static "
+            if filename == "wland_rf.c" or name in optional:
+                qualifier += "__maybe_unused "
+            text = text[:start] + qualifier + text[start:]
+        result[relative] = text
+    for filename in ("wland_android.c", "wland_rf.c"):
+        relative = "rdawlan/" + filename
+        result[relative] = replace(result[relative],
+                                  "#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 10, 0)\n"
+                                  "#define is_compat_task()\t\t0\n#endif\n", "")
+    for filename, names in {
+            "wland_android.c": ("wland_cfg80211_set_country_code", "wland_cfg80211_set_wps_p2p_ie",
+                                "wland_android_okc_enable", "wland_android_set_pmk",
+                                "wland_android_get_p2p_dev_addr", "wland_android_get_band",
+                                "wland_android_set_suspendmode", "wland_android_set_suspendopt",
+                                "wland_android_get_rssi", "wland_android_get_link_speed"),
+            "wland_cfg80211.c": ("wland_send_key_to_chip",),
+    }.items():
+        relative = "rdawlan/" + filename
+        text = result[relative]
+        for name in names:
+            spans = function_spans(text, name)
+            if len(spans) != 1 or not text[spans[0][0]:].startswith("static "):
+                raise ValueError(f"Changed optional static helper: {name}")
+            start = spans[0][0] + len("static ")
+            text = text[:start] + "__maybe_unused " + text[start:]
+        result[relative] = text
     return result
 
 

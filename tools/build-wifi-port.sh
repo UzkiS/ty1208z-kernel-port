@@ -30,6 +30,7 @@ cp -a "$pristine/." "$port/"
 rm -f -- "$port/rdawlan/wland_port_key.h"
 rm -f -- "$port/rdawlan/wland_port_key_validate.h"
 rm -f -- "$port/rdawlan/wland_port_scan.h"
+rm -f -- "$port/rdawlan/wland_port_nvram.h"
 patch --forward --batch -d "$port" -p1 < "$project/patches/0003-rda-usb-api-audit.patch"
 patch --forward --batch -d "$port" -p1 < "$project/patches/0004-rda-linux-6.12-port.patch"
 python3 "$project/tools/test_wifi_port.py" --source "$port"
@@ -39,14 +40,7 @@ python3 "$project/tools/test_wifi_operations.py" --source "$port" --linux "$linu
 python3 "$project/tools/test_wifi_startup.py" --source "$port"
 python3 "$project/tools/test_wifi_scan.py" --source "$port"
 python3 "$project/tools/test_wifi_scan_results.py" --source "$port" --linux "$linuxsrc"
-cat > "$port/rdawlan/Kbuild" <<'KBUILD'
-obj-m += rdawfmac.o
-rdawfmac-y := wland_p2p.o wland_dbg.o wland_d11.o wland_nvram.o wland_utils.o \
-    wland_trap.o wland_bus.o wland_cmds.o wland_fwsmgr.o wland_wid.o wland_fweh.o \
-    wland_linux.o wland_cfg80211.o wland_android.o wland_rx.o wland_rf.o \
-    wland_amsdu.o wland_usb.o
-ccflags-y += -I$(src)/../include -DCONFIG_RDAWFMAC_USB -DWLAND_LINUX_SUPPORT
-KBUILD
+cp "$project/wifi/Kbuild" "$port/rdawlan/Kbuild"
 cp "$diagnostic/.config" "$kout/.config"
 cp "$diagnostic/initramfs.cpio" "$kout/initramfs.cpio"
 python3 "$project/tools/merge_fragment.py" "$kout/.config" "$project/config/linux-wifi-port.fragment"

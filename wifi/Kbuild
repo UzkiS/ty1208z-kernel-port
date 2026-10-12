@@ -1,0 +1,6 @@
+obj-m += rdawfmac.o
+rdawfmac-y := wland_p2p.o wland_dbg.o wland_d11.o wland_nvram.o wland_utils.o \
+	wland_trap.o wland_bus.o wland_cmds.o wland_fwsmgr.o wland_wid.o wland_fweh.o \
+	wland_linux.o wland_cfg80211.o wland_android.o wland_rx.o wland_rf.o \
+	wland_amsdu.o wland_usb.o
+ccflags-y += -I$(src)/../include -DCONFIG_RDAWFMAC_USB -DWLAND_LINUX_SUPPORT
