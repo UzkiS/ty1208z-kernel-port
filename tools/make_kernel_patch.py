@@ -122,6 +122,18 @@ changes.update({
          '\tif (host->drv_data && host->drv_data->force_pio)\n'
          '\t\tgoto no_dma;\n\n'
          '\t/*\n\t* Check tansfer mode'),
+        ('\t * receive ready and error such as transmit, receive timeout, crc error\n'
+         '\t */\n'
+         '\tmci_writel(host, INTMASK, SDMMC_INT_CMD_DONE | SDMMC_INT_DATA_OVER |\n'
+         '\t\t   SDMMC_INT_TXDR | SDMMC_INT_RXDR |\n'
+         '\t\t   DW_MCI_ERROR_FLAGS);\n',
+         '\t * receive ready and error such as transmit, receive timeout, crc error\n'
+         '\t */\n'
+         '\t/* Restricted PIO enables FIFO interrupts only for actual data. */\n'
+         '\tmci_writel(host, INTMASK, SDMMC_INT_CMD_DONE | SDMMC_INT_DATA_OVER |\n'
+         '\t\t   DW_MCI_ERROR_FLAGS |\n'
+         '\t\t   ((host->drv_data && host->drv_data->force_pio) ? 0 :\n'
+         '\t\t    (SDMMC_INT_TXDR | SDMMC_INT_RXDR)));\n'),
     ],
 })
 

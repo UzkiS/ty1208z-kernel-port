@@ -191,6 +191,20 @@
  
  	/*
  	* Check tansfer mode from HCON[17:16]
+@@ -3549,9 +3571,11 @@
+ 	 * Enable interrupts for command done, data over, data empty,
+ 	 * receive ready and error such as transmit, receive timeout, crc error
+ 	 */
++	/* Restricted PIO enables FIFO interrupts only for actual data. */
+ 	mci_writel(host, INTMASK, SDMMC_INT_CMD_DONE | SDMMC_INT_DATA_OVER |
+-		   SDMMC_INT_TXDR | SDMMC_INT_RXDR |
+-		   DW_MCI_ERROR_FLAGS);
++		   DW_MCI_ERROR_FLAGS |
++		   ((host->drv_data && host->drv_data->force_pio) ? 0 :
++		    (SDMMC_INT_TXDR | SDMMC_INT_RXDR)));
+ 	/* Enable mci interrupt */
+ 	mci_writel(host, CTRL, SDMMC_CTRL_INT_ENABLE);
+ 
 --- /dev/null
 +++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-diagnostic.dts
 @@ -0,0 +1,90 @@
@@ -507,7 +521,7 @@
 +#endif
 --- /dev/null
 +++ b/drivers/mmc/host/dw_mmc-hi3798mv100-ident.c
-@@ -0,0 +1,134 @@
+@@ -0,0 +1,162 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Restricted RAM diagnostic, not the production MV100 storage driver. */
 +#include <linux/io.h>
@@ -527,6 +541,30 @@
 +	    mci_readl(host, VERID) != 0x5342270a ||
 +	    mci_readl(host, HCON) != 0x00e44c81)
 +		return -ENODEV;
++
++	/* PIO bypasses dw_mci_idmac_init(), including its inherited-IRQ cleanup.
++	 * Quiesce the measured 32-bit IDMAC before request_irq enables the GIC line.
++	 * This changes only controller state, not card settings or storage contents.
++	 */
++	dev_info(host->dev,
++		 "EMMC_IDENT_INHERITED CTRL=%08x BMOD=%08x IDINTEN=%08x IDSTS=%08x RINTSTS=%08x\n",
++		 mci_readl(host, CTRL), mci_readl(host, BMOD),
++		 mci_readl(host, IDINTEN), mci_readl(host, IDSTS),
++		 mci_readl(host, RINTSTS));
++	mci_writel(host, INTMASK, 0);
++	mci_writel(host, IDINTEN, 0);
++	mci_writel(host, BMOD, mci_readl(host, BMOD) & ~SDMMC_IDMAC_ENABLE);
++	mci_writel(host, CTRL, mci_readl(host, CTRL) &
++		   ~(SDMMC_CTRL_INT_ENABLE | SDMMC_CTRL_DMA_ENABLE |
++		     SDMMC_CTRL_USE_IDMAC));
++	mci_writel(host, IDSTS, SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI |
++		   SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU |
++		   SDMMC_IDMAC_INT_FBE | SDMMC_IDMAC_INT_RI | SDMMC_IDMAC_INT_TI);
++	mci_writel(host, RINTSTS, 0xffffffff);
++	dev_info(host->dev,
++		 "EMMC_IDENT_PIO_QUIESCED CTRL=%08x BMOD=%08x IDINTEN=%08x IDSTS=%08x\n",
++		 mci_readl(host, CTRL), mci_readl(host, BMOD),
++		 mci_readl(host, IDINTEN), mci_readl(host, IDSTS));
 +
 +	dev_info(host->dev, "EMMC_IDENT_GUARD_PASS source=100000000 PIO-only\n");
 +	return 0;
@@ -555,7 +593,11 @@
 +
 +	if (ret)
 +		dev_info_ratelimited(host->dev,
-+			"EMMC_IDENT_BLOCKED CMD%u error=%d\n", mrq->cmd->opcode, ret);
++			"EMMC_IDENT_BLOCKED CMD%u arg=%08x error=%d\n",
++			mrq->cmd->opcode, mrq->cmd->arg, ret);
++	else if (mrq->cmd->opcode == MMC_SEND_OP_COND)
++		dev_info_ratelimited(host->dev, "EMMC_IDENT_CMD1 arg=%08x\n",
++				     mrq->cmd->arg);
 +	return ret;
 +}
 +
@@ -644,7 +686,7 @@
 +MODULE_LICENSE("GPL");
 --- /dev/null
 +++ b/drivers/mmc/host/hi3798mv100-ident-policy.h
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,54 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +#ifndef HI3798MV100_IDENT_POLICY_H
 +#define HI3798MV100_IDENT_POLICY_H
@@ -681,8 +723,11 @@
 +	case MMC_ALL_SEND_CID:
 +		return cmd->arg == 0 ? 0 : -EPERM;
 +	case MMC_SEND_OP_COND:
-+		/* OCR query/voltage selection and sector-addressing bit only. */
-+		return cmd->arg & ~0x40ff8000U ? -EPERM : 0;
++		/* Core repeats a busy OCR query using the card's advertised OCR.
++		 * Dual-voltage eMMC includes bit 7, even with the host kept at 3.3 V.
++		 * This is CMD1 negotiation, not an I/O-voltage switch or card setting.
++		 */
++		return cmd->arg & ~0x40ff8080U ? -EPERM : 0;
 +	case MMC_SET_RELATIVE_ADDR:
 +	case MMC_SEND_CSD:
 +	case MMC_SEND_CID:

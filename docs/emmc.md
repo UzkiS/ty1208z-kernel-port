@@ -41,7 +41,7 @@ QEMU 不模拟这些 MV100 寄存器。
 FIFOTH=`0x207f0080`、CRG40=`0x00040103`。低 16 位版本为 DW `0x270a`，
 HCON 的 FIFO 接口为 32 位；当前源频率为 100 MHz，CLKDIV=1 对应 50 MHz 卡时钟，
 CTYPE 表示继承的 8 位总线。具体镜像、日志身份和限制见
-[实机审计记录](../verification/emmc-audit-20261012.md)。尚未在新内核枚举卡或读取扇区。
+[实机审计记录](../verification/emmc-audit-20261012.md)。卡识别结果见下文；扇区尚未读取。
 
 `make emmc-ident` 已建立独立的卡识别候选，输出 `artifacts/emmc-ident1/`。
 它复用主线 DesignWare，先继承实测 CRG/pinmux 状态，限制为 PIO、单线、
@@ -74,3 +74,14 @@ HPI 参数也被拒绝。PIO hook 位于 DMA 分配/初始化之前；slot 限�
 诊断输出只读取 sysfs 中已解码的非唯一字段和容量，不主动输出 CID/serial。
 CLI 使用 `--profile emmc-ident1`，要求型号 `008G30`、容量 7818182656 字节、
 PIO/guard/完整报告/time64 标记都存在；缺少任一项不得报告实机通过。
+
+首个识别候选已实机尝试：镜像 CRC 和引导通过，日志到 DW 版本 `270a` 后停止，
+未完成卡识别或进入 shell。后续候选在注册中断前清理继承的 DMA/中断状态，
+并将强制 PIO 的 FIFO 中断延后到数据请求；后续实机已越过卡点并进入 shell，
+测得遗留 DMA 中断使能 `0x103`、状态 `0x102` 已清零。卡枚举接着被 CMD1 的
+OCR 白名单拦截；第三候选补上主线忙查询重试使用的双电压 OCR bit 7，并执行
+实际主线回调的回归，构建及 QEMU 通过。第三候选已实机识别 `008G30`，EXT_CSD rev 8，
+15269888 个扇区、7818182656 字节，与 Hinas 基线一致；实测 CMD1 重试参数为
+`0x40ff8080`，确认需要 bit 7。PIO 单线、25 MHz、legacy timing，BLOCK 关闭，
+CLI 卡识别验收通过。CMD6 设置仍全部拒绝，扇区读写及 Hinas 启动尚未验证。日志身份和范围见
+[识别测试记录](../verification/emmc-identification-20261012.md)。

@@ -19,6 +19,7 @@ if [ ! -f "$diagnostic/.config" ] || [ ! -f "$diagnostic/initramfs.cpio" ]; then
     exit 1
 fi
 python3 "$project/tools/test_emmc_ident.py" --linuxsrc "$linuxsrc"
+python3 "$project/tools/test_emmc_handoff.py" --linuxsrc "$linuxsrc"
 mkdir -p "$kout" "$artifacts/checks"
 cp "$diagnostic/.config" "$kout/.config"
 cp "$diagnostic/initramfs.cpio" "$kout/initramfs.cpio"

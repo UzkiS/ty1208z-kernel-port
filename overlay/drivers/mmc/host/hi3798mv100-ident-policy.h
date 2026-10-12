@@ -34,8 +34,11 @@ static inline int hi3798mv100_ident_request(struct mmc_request *mrq)
 	case MMC_ALL_SEND_CID:
 		return cmd->arg == 0 ? 0 : -EPERM;
 	case MMC_SEND_OP_COND:
-		/* OCR query/voltage selection and sector-addressing bit only. */
-		return cmd->arg & ~0x40ff8000U ? -EPERM : 0;
+		/* Core repeats a busy OCR query using the card's advertised OCR.
+		 * Dual-voltage eMMC includes bit 7, even with the host kept at 3.3 V.
+		 * This is CMD1 negotiation, not an I/O-voltage switch or card setting.
+		 */
+		return cmd->arg & ~0x40ff8080U ? -EPERM : 0;
 	case MMC_SET_RELATIVE_ADDR:
 	case MMC_SEND_CSD:
 	case MMC_SEND_CID:

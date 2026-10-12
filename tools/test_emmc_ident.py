@@ -23,6 +23,11 @@ assert slot.index("init_slot(slot)") < slot.index("mmc_add_host(mmc)")
 assert slot.index("mmc->max_blk_count = 512;") < slot.index("init_slot(slot)")
 probe = driver.split("int dw_mci_probe(", 1)[1].split("EXPORT_SYMBOL(dw_mci_probe)", 1)[0]
 assert probe.index("drv_data->init(host)") < probe.index("dw_mci_ctrl_reset(host")
+assert "Restricted PIO enables FIFO interrupts only for actual data" in probe
+assert "((host->drv_data && host->drv_data->force_pio) ? 0 :" in probe
+core = (source / "drivers/mmc/core/mmc_ops.c").read_text()
+ocr_callback = "static int __mmc_send_op_cond_cb(" + core.split(
+    "static int __mmc_send_op_cond_cb(", 1)[1].split("\nint mmc_send_op_cond", 1)[0]
 
 harness = r'''
 #include <assert.h>
@@ -53,6 +58,17 @@ static void dw_mci_queue_request(struct dw_mci *host, struct dw_mci_slot *slot,
 static int validate(struct dw_mci *host, struct mmc_request *mrq) {
     (void)host; return hi3798mv100_ident_request(mrq);
 }
+struct mmc_op_cond_busy_data { struct mmc_host *host; u32 ocr; struct mmc_command *cmd; };
+static int mmc_host_is_spi(struct mmc_host *host) { (void)host; return 0; }
+int mmc_wait_for_cmd(struct mmc_host *host, struct mmc_command *cmd, int retries) {
+    (void)host; (void)retries;
+    struct mmc_request mrq = { .cmd = cmd };
+    assert(hi3798mv100_ident_request(&mrq) == 0);
+    /* Dual-voltage card: busy query first, then ready on the repeated OCR. */
+    cmd->resp[0] = cmd->arg ? 0xc0ff8080 : 0x40ff8080;
+    return 0;
+}
+/* OCR_CALLBACK */
 /* PATCHED_REQUEST */
 static void check(struct mmc_request *mrq, int expected) {
     static const struct dw_mci_drv_data data = { .validate_request = validate };
@@ -103,6 +119,11 @@ int main(void) {
     cmd.data = NULL;
     cmd.opcode = MMC_SEND_OP_COND;
     cmd.arg = 0x40ff8000; check(&mrq, 0);
+    cmd.arg = 0x40ff8080; check(&mrq, 0);
+    for (unsigned int bit = 0; bit < 32; bit++) {
+        cmd.arg = 1U << bit;
+        check(&mrq, cmd.arg & ~0x40ff8080U ? -EPERM : 0);
+    }
     cmd.arg = 0x80000000; check(&mrq, -EPERM);
     cmd.opcode = MMC_GO_IDLE_STATE;
     cmd.arg = 0xf0f0f0f0; check(&mrq, -EPERM); /* pre-idle/boot variants */
@@ -119,9 +140,16 @@ int main(void) {
     queued = completed = presence_checked = 0;
     dw_mci_request(&mmc, &mrq);
     assert(queued == 1 && completed == 0 && presence_checked == 1);
+    struct mmc_command query = { .opcode = MMC_SEND_OP_COND };
+    struct mmc_op_cond_busy_data query_data = { .host = &mmc, .cmd = &query };
+    bool busy = false;
+    assert(__mmc_send_op_cond_cb(&query_data, &busy) == 0 && busy);
+    assert(query.arg == 0x40ff8080);
+    assert(__mmc_send_op_cond_cb(&query_data, &busy) == 0 && !busy);
     puts("EMMC_IDENT_POLICY_PASS: real policy/queue entry, 64 opcodes, malformed/sidecar requests");
+    puts("EMMC_OCR_CORE_PASS: actual core busy callback repeats dual-voltage OCR safely");
 }
-'''.replace("/* PATCHED_REQUEST */", request)
+'''.replace("/* PATCHED_REQUEST */", request).replace("/* OCR_CALLBACK */", ocr_callback)
 
 with tempfile.TemporaryDirectory() as directory:
     temp = Path(directory)

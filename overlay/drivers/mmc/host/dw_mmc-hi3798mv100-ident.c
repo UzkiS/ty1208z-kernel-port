@@ -18,6 +18,30 @@ static int mv100_ident_init(struct dw_mci *host)
 	    mci_readl(host, HCON) != 0x00e44c81)
 		return -ENODEV;
 
+	/* PIO bypasses dw_mci_idmac_init(), including its inherited-IRQ cleanup.
+	 * Quiesce the measured 32-bit IDMAC before request_irq enables the GIC line.
+	 * This changes only controller state, not card settings or storage contents.
+	 */
+	dev_info(host->dev,
+		 "EMMC_IDENT_INHERITED CTRL=%08x BMOD=%08x IDINTEN=%08x IDSTS=%08x RINTSTS=%08x\n",
+		 mci_readl(host, CTRL), mci_readl(host, BMOD),
+		 mci_readl(host, IDINTEN), mci_readl(host, IDSTS),
+		 mci_readl(host, RINTSTS));
+	mci_writel(host, INTMASK, 0);
+	mci_writel(host, IDINTEN, 0);
+	mci_writel(host, BMOD, mci_readl(host, BMOD) & ~SDMMC_IDMAC_ENABLE);
+	mci_writel(host, CTRL, mci_readl(host, CTRL) &
+		   ~(SDMMC_CTRL_INT_ENABLE | SDMMC_CTRL_DMA_ENABLE |
+		     SDMMC_CTRL_USE_IDMAC));
+	mci_writel(host, IDSTS, SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI |
+		   SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU |
+		   SDMMC_IDMAC_INT_FBE | SDMMC_IDMAC_INT_RI | SDMMC_IDMAC_INT_TI);
+	mci_writel(host, RINTSTS, 0xffffffff);
+	dev_info(host->dev,
+		 "EMMC_IDENT_PIO_QUIESCED CTRL=%08x BMOD=%08x IDINTEN=%08x IDSTS=%08x\n",
+		 mci_readl(host, CTRL), mci_readl(host, BMOD),
+		 mci_readl(host, IDINTEN), mci_readl(host, IDSTS));
+
 	dev_info(host->dev, "EMMC_IDENT_GUARD_PASS source=100000000 PIO-only\n");
 	return 0;
 }
@@ -45,7 +69,11 @@ static int mv100_ident_validate(struct dw_mci *host, struct mmc_request *mrq)
 
 	if (ret)
 		dev_info_ratelimited(host->dev,
-			"EMMC_IDENT_BLOCKED CMD%u error=%d\n", mrq->cmd->opcode, ret);
+			"EMMC_IDENT_BLOCKED CMD%u arg=%08x error=%d\n",
+			mrq->cmd->opcode, mrq->cmd->arg, ret);
+	else if (mrq->cmd->opcode == MMC_SEND_OP_COND)
+		dev_info_ratelimited(host->dev, "EMMC_IDENT_CMD1 arg=%08x\n",
+				     mrq->cmd->arg);
 	return ret;
 }
 

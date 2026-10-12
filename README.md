@@ -71,7 +71,8 @@ RDA USB `1e04:8888` 无驱动绑定；下一步先按 [TTL 记录步骤](docs/tt
 TTL 记录直接使用仓库中的 Python CLI，不依赖 HiTool。安装锁定的串口依赖后，
 `make test-serial` 可在 Linux 伪终端验证接收工具，不连接盒子。
 eMMC 的 [独立寄存器审计](docs/emmc.md) 已实机通过；`make emmc-audit` 不启用
-MMC/BLOCK，`make emmc-ident` 另行构建受限 PIO 卡识别候选，尚待实测。
+MMC/BLOCK，`make emmc-ident` 的受限 PIO 卡识别已实机通过，型号和容量与 Hinas 一致；
+尚未读取扇区或启动原 Hinas，见 [卡识别记录](verification/emmc-identification-20261012.md)。
 `make wifi-usb-audit` 独立编译 RDA USB 对象；`make wifi-port` 已完成完整模块的
 本地编译链接及制造入口/密钥回归，尚未加载到盒子或证明联网。
 
