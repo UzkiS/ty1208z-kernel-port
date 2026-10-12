@@ -24,6 +24,7 @@ help:
 	@echo 'make openwrt-app-config - resolve pinned Passwall/Xray/LuCI in an isolated tree'
 	@echo 'make openwrt-applications - build and emulate applications (no board image)'
 	@echo 'make openwrt-net - build independent native Ethernet RAM candidate with traffic tools'
+	@echo 'make usb-audit - build standalone read-only host0 control/capability RAM audit'
 
 lint:
 	python3 tools/check_repository.py
@@ -100,3 +101,7 @@ openwrt-net-config:
 
 openwrt-net:
 	bash tools/build-openwrt-ethernet.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" build
+
+.PHONY: usb-audit
+usb-audit:
+	bash tools/build-usb-audit.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"

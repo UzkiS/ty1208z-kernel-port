@@ -408,6 +408,27 @@
       "git_blob_sha1": "0d3cce0bfa53a47079ac380cacfe54bec94b8ff2",
       "sha256": "06f05a8dcc0126ec3f97c2f0d4000d9b0af358530c584ca62f55ce77a786662d",
       "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/include/dt-bindings/clock/hi3798mv100-clock.h"
+    },
+    {
+      "path": "drivers/hisilicon/soc/cputable.c",
+      "bytes": 2493,
+      "git_blob_sha1": "6201905dbdcf4ebe1ebc43248930be23dd6b17a3",
+      "sha256": "78c6c880d2672c9ad993c521cce59af4e0c270b2ac44d5765a754eedcc405d49",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/soc/cputable.c"
+    },
+    {
+      "path": "drivers/hisilicon/soc/hi3798mv100/cpu-hi3798mv100.c",
+      "bytes": 1871,
+      "git_blob_sha1": "2d1b904553de61b236057fbb6ce79fe0232201f1",
+      "sha256": "563303b3d1df151c6cffb0fdac94707cb7102e81844cf1503633f70d078e89a5",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/hisilicon/soc/hi3798mv100/cpu-hi3798mv100.c"
+    },
+    {
+      "path": "include/linux/hikapi.h",
+      "bytes": 3513,
+      "git_blob_sha1": "410b9eab545853efded3da56fd553d24421f97f7",
+      "sha256": "5ba1242239a5cf37459a7955d18568361faa3da657fd3dd66a8d76ec9cf946a9",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/include/linux/hikapi.h"
     }
   ]
 }

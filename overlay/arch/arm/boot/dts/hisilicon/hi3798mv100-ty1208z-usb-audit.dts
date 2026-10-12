@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA read-only USB host0 register audit";
+};
+
+&{/soc} {
+	usb-audit@f9890000 {
+		compatible = "tianyi,ty1208z-usb-register-audit";
+		reg = <0xf8a220b8 4>, <0xf8a220bc 4>,
+		      <0xf8a20120 4>, <0xf8a20124 4>, <0xf8000ee0 4>,
+		      <0xf9890000 0x10000>, <0xf9880000 0x10000>;
+	};
+};

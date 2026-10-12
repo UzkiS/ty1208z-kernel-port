@@ -9,6 +9,7 @@ from inspect_images import inspect_image, parse_fdt
 from emmc_profiles import identification_profile
 from ethernet_profiles import ethernet_audit_profile, ethernet_clock_id_profile
 from ethernet_net_profile import ethernet_net_profile
+from usb_audit_profile import usb_audit_profile
 
 artifacts = Path(sys.argv[1]).resolve()
 evidence = artifacts / "checks"
@@ -39,6 +40,7 @@ identification_profile(tree, config)
 ethernet_audit_profile(tree, config)
 ethernet_clock_id_profile(tree, config)
 ethernet_net_profile(tree, config)
+usb_audit_profile(tree, config)
 assert (artifacts / "zImage-appended-dtb").read_bytes() == raw + dtb
 assert (artifacts / "uImage-UNTESTED.bin").read_bytes()[64:] == raw + dtb
 assert len(image["device_trees"]) == 1

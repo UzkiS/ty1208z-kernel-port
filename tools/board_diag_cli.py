@@ -20,6 +20,7 @@ PROFILES = {
     "ethernet-audit1": b"6.12.112-ty1208z-ethernet-audit1",
     "ethernet-clock-id1": b"6.12.112-ty1208z-ethernet-clock-id1",
     "ethernet-net1": b"6.12.112-ty1208z-ethernet-net1",
+    "usb-audit1": b"6.12.112-ty1208z-usb-audit1",
 }
 
 
@@ -101,6 +102,10 @@ def run(args, serial_module):
                         b"ETH_NET_PHY_VERIFIED id=20669823 inherited-no-reset",
                         b"phy_id=0x20669823, phy_mode=mii")):
                     raise TransferError("Inherited Ethernet driver/PHY binding did not pass")
+                if args.profile == "usb-audit1" and not all(marker in report for marker in (
+                        b"USB_AUDIT CRG46=", b"USB_AUDIT USB0=",
+                        b"USB_AUDIT_READ_ONLY_COMPLETE no-clock-reset-writes no-device-transactions")):
+                    raise TransferError("Read-only USB host0 register audit is incomplete")
                 result["report_complete"] = True
                 result["status"] = "diagnostic-captured"
             except (TransferError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:

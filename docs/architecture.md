@@ -17,6 +17,9 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 继承状态符合条件时通过 MDIO 读取 PHY ID；关闭 NET、debugfs 和存储，不进入普通诊断。
 `make ethernet-clock-id` 单独验证暂时启用已实测的 MAC 时钟位、读取 PHY ID 并恢复；
 它有自己的设备树、配置、身份和验收，不属于只读寄存器观察，也不启动网口 DMA。
+`make usb-audit` 单独只读观察 host0 时钟/PHY 控制和 SYSID0；仅在继承状态符合
+来源条件时读取 EHCI/OHCI capability，不启用 USB 栈、不进行设备事务或控制写入。
+它有独立配置、产物和验收，见 [USB](usb.md)。
 `make wifi-usb-audit` 使用单独的内核输出目录和配置，不改变诊断镜像；目前只编译
 `wland_usb.o`，不链接模块、不加载固件。来源锁与适配范围见 [Wi-Fi 说明](wifi.md)。
 `make wifi-port` 另行编译完整模块并执行制造入口/密钥回归；同样不改变诊断镜像，

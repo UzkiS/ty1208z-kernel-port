@@ -72,6 +72,10 @@ class DiagnosticTests(unittest.TestCase):
                         b"ETH_NET_CLOCK_ENABLED crg51=0000000b inherited-phy\r\n"
                         b"ETH_NET_PHY_VERIFIED id=20669823 inherited-no-reset\r\n"
                         b"phy_id=0x20669823, phy_mode=mii")
+                    usb = b"No USB audit" if mode == "missing-usb" else (
+                        b"USB_AUDIT CRG46=0000007f CRG47=00000003\r\n"
+                        b"USB_AUDIT USB0=00000008 USB1=0000b01c SYSID0=37980110\r\n"
+                        b"USB_AUDIT_READ_ONLY_COMPLETE no-clock-reset-writes no-device-transactions")
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
@@ -81,6 +85,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\n" + (ethernet if profile == "ethernet-audit1" else b""),
                                  b"\r\n" + (clock_id if profile == "ethernet-clock-id1" else b""),
                                  b"\r\n" + (network if profile == "ethernet-net1" else b""),
+                                 b"\r\n" + (usb if profile == "usb-audit1" else b""),
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -162,6 +167,12 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_network_binding_report_is_captured(self):
         self.exercise("success", profile="ethernet-net1")
+
+    def test_usb_audit_requires_control_state_and_completion(self):
+        self.exercise("missing-usb", profile="usb-audit1")
+
+    def test_usb_read_only_report_is_captured(self):
+        self.exercise("success", profile="usb-audit1")
 
 
 if __name__ == "__main__":

@@ -95,6 +95,10 @@ jobs:
         run: |
           make ethernet-net > logs/ethernet-net.log 2>&1 || { tail -n 100 logs/ethernet-net.log; exit 1; }
           tail -n 20 logs/ethernet-net.log
+      - name: Build read-only USB host0 register audit and run MMIO/profile/QEMU checks
+        run: |
+          make usb-audit > logs/usb-audit.log 2>&1 || { tail -n 100 logs/usb-audit.log; exit 1; }
+          tail -n 20 logs/usb-audit.log
       - name: Upload UNTESTED diagnostics and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -108,6 +112,7 @@ jobs:
             artifacts/ethernet-audit1/
             artifacts/ethernet-clock-id1/
             artifacts/ethernet-net1/
+            artifacts/usb-audit1/
             artifacts/wifi-port/
             logs/
           retention-days: 14

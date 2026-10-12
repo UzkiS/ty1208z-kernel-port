@@ -86,6 +86,7 @@ def _ethernet_profile(tree, config, board, release):
                   "DEBUG_FS", "IPV6", "NETFILTER", "WIRELESS", "WLAN",
                   "HI3798MV100_ETHERNET_AUDIT", "HI3798MV100_ETHERNET_CLOCK_ID",
                   "HI3798MV100_EMMC_AUDIT", "MMC_DW_HI3798MV100_IDENT"}
+    prohibited.add("HI3798MV100_USB_AUDIT")
     if active.keys() & prohibited:
         raise ValueError("Prohibited subsystem in Ethernet network profile: " +
                          ", ".join(sorted(active.keys() & prohibited)))

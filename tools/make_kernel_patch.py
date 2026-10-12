@@ -80,6 +80,30 @@ changes = {
         'obj-$(CONFIG_ARM_TIMER_SP804)'),
 }
 changes.update({
+    "drivers/soc/hisilicon/Kconfig": (
+        changes["drivers/soc/hisilicon/Kconfig"][0],
+        changes["drivers/soc/hisilicon/Kconfig"][1].replace(
+            'config KUNPENG_HCCS\n',
+            'config HI3798MV100_USB_AUDIT\n'
+            '\tbool "Read-only TY1208Z USB host0 register audit"\n'
+            '\tdepends on ARCH_HI3798MV100 && !USB_SUPPORT && !BLOCK && !NET\n'
+            '\tdepends on !MMC && !MODULES && !SMP && !DEBUG_FS\n'
+            '\thelp\n'
+            '\t  Observe host0 clock/PHY controls and SYSID0 only. Read fixed\n'
+            '\t  EHCI/OHCI capability words only when inherited controls permit.\n'
+            '\t  No clock/reset writes, USB transactions or firmware loading.\n\n'
+            'config KUNPENG_HCCS\n')),
+    "drivers/soc/hisilicon/Makefile": (
+        changes["drivers/soc/hisilicon/Makefile"][0],
+        changes["drivers/soc/hisilicon/Makefile"][1] +
+        'obj-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-usb-audit.o\n'),
+})
+changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][0],
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +
+    'dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb\n')
+
+changes.update({
     "drivers/mmc/core/mmc.c": [
         ('static struct attribute *mmc_std_attrs[] = {\n',
          '#include "ty1208z-ident.h"\n\n'
