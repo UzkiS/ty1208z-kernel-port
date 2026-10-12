@@ -7,7 +7,7 @@
 |---|---|---|---|
 | Linux 板级支持 | `overlay/`、内核配置、Linux 补丁生成器 | 固定 Linux 源码、交叉工具链、板级事实 | 编译、内存临时启动、逐项外设测试 |
 | 诊断环境 | `initramfs/`、BusyBox 配置、time64 probe | ARM 用户空间、现代内核系统调用 | QEMU 启动、shell、2040 年读写 |
-| Wi-Fi，可选 | 独立来源锁、USB API 补丁和 `make wifi-usb-audit` | 真实芯片 ID、独立配置下的目标内核、相应驱动/固件 | 当前只编译 USB 对象；完整模块、扫描、联网、AP 分别验收 |
+| Wi-Fi，可选 | 独立来源锁、API 补丁、`wifi/overlay/`、`make wifi-usb-audit`/`make wifi-port` | 真实芯片 ID、独立配置下的目标内核、相应驱动/固件 | USB 对象和完整模块已本地编译；扫描、联网、AP 分别验收 |
 | OpenWrt/Kwrt 集成 | 目前为实施计划；尚未建立 target | 已验证内核版本/配置、匹配模块与用户空间 | 网络、防火墙、Passwall、DNS、性能与重启 |
 
 Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线配置。
@@ -15,6 +15,8 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 关闭 MMC，后者通过受限 PIO 请求识别卡且关闭块设备。两者均不进入普通 diag1。
 `make wifi-usb-audit` 使用单独的内核输出目录和配置，不改变诊断镜像；目前只编译
 `wland_usb.o`，不链接模块、不加载固件。来源锁与适配范围见 [Wi-Fi 说明](wifi.md)。
+`make wifi-port` 另行编译完整模块并执行制造入口/密钥回归；同样不改变诊断镜像，
+不加载模块，不下载固件。无线新增 header 在 `wifi/overlay/`，与 Linux 板级文件分开。
 之后 OpenWrt/Kwrt 集成应引用固定版本的内核补丁，不能修改上层服务时暗中
 改变板级驱动。Wi-Fi 可关闭而不影响有线网络；未来可以在目标配置中选择它。
 

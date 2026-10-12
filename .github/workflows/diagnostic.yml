@@ -74,6 +74,11 @@ jobs:
         run: |
           make emmc-ident > logs/emmc-ident.log 2>&1 || { tail -n 100 logs/emmc-ident.log; exit 1; }
           tail -n 20 logs/emmc-ident.log
+      - name: Link optional RDA USB module and test manufacturing/key guards
+        run: |
+          make wifi-port > logs/wifi-port.log 2>&1 || { tail -n 100 logs/wifi-port.log; exit 1; }
+          tail -n 20 logs/wifi-port.log
+          git diff --exit-code -- patches/0003-rda-usb-api-audit.patch patches/0004-rda-linux-6.12-port.patch
       - name: Upload UNTESTED diagnostics and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -83,6 +88,7 @@ jobs:
             artifacts/diag1/
             artifacts/emmc-audit1/
             artifacts/emmc-ident1/
+            artifacts/wifi-port/
             logs/
           retention-days: 14
           if-no-files-found: warn

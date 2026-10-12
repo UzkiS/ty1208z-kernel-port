@@ -1,0 +1,2005 @@
+--- a/rdawlan/wland_android.c
++++ b/rdawlan/wland_android.c
+@@ -382,287 +382,9 @@
+ 
+ int wland_android_priv_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
+ {
+-#define PRIVATE_COMMAND_MAX_LEN	8192
+-	int ret = 0, bytes_written = 0;
+-	char *command = NULL;
+-	struct android_wifi_priv_cmd priv_cmd;
+-
+-	WLAND_DBG(DEFAULT, TRACE, "Enter\n");
+-
+-#if 0
+-	net_os_wake_lock(net);
+-#endif
+-	if (!ifr->ifr_data) {
+-		ret = -EINVAL;
+-		goto exit;
+-	}
+-
+-#ifdef CONFIG_COMPAT
+-	if (is_compat_task()) {
+-		compat_android_wifi_priv_cmd compat_priv_cmd;
+-		if (copy_from_user(&compat_priv_cmd, ifr->ifr_data,
+-			sizeof(compat_android_wifi_priv_cmd))) {
+-			ret = -EFAULT;
+-			goto exit;
+-
+-		}
+-		priv_cmd.buf = compat_ptr(compat_priv_cmd.buf);
+-		priv_cmd.used_len = compat_priv_cmd.used_len;
+-		priv_cmd.total_len = compat_priv_cmd.total_len;
+-	} else
+-#endif /* CONFIG_COMPAT */
+-	{
+-		if (copy_from_user(&priv_cmd, ifr->ifr_data,
+-				sizeof(struct android_wifi_priv_cmd))) {
+-			ret = -EFAULT;
+-			goto exit;
+-		}
+-	}
+-
+-	if (priv_cmd.total_len > PRIVATE_COMMAND_MAX_LEN) {
+-		WLAND_ERR("too long priavte command. %d\n", priv_cmd.total_len);
+-		ret = -EINVAL;
+-		priv_cmd.total_len = PRIVATE_COMMAND_MAX_LEN;
+-	}
+-	command = memdup_user(priv_cmd.buf, priv_cmd.total_len);
+-	if (IS_ERR(command)) {
+-		WLAND_ERR("failed to allocate or write memory\n");
+-		ret= PTR_ERR(command);
+-		command = NULL;
+-		goto exit;
+-	}
+-
+-	WLAND_DBG(DEFAULT, INFO, "Android private cmd \"%s\" on %s\n", command,
+-		ifr->ifr_name);
+-
+-	if (strncasecmp(command, CMD_START, strlen(CMD_START)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular Start command\n");
+-#if 0
+-		bytes_written = wl_android_wifi_on(net);
+-#endif
+-	} else if (strncasecmp(command, CMD_SETFWPATH, strlen(CMD_SETFWPATH)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular Set_fwpath command\n");
+-	} else if (strncasecmp(command, CMD_STOP, strlen(CMD_STOP)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular Stop command\n");
+-#if 0
+-		bytes_written = wl_android_wifi_off(net);
+-#endif
+-	} else if (strncasecmp(command, CMD_SCAN_ACTIVE,
+-			strlen(CMD_SCAN_ACTIVE)) == 0) {
+-		/*
+-		 * TBD: SCAN-ACTIVE
+-		 */
+-		 WLAND_DBG(DEFAULT, INFO, "Received regular SCAN_ACTIVE command\n");
+-	} else if (strncasecmp(command, CMD_SCAN_PASSIVE,
+-			strlen(CMD_SCAN_PASSIVE)) == 0) {
+-		/*
+-		 * TBD: SCAN-PASSIVE
+-		 */
+-		  WLAND_DBG(DEFAULT, INFO, "Received regular SCAN_PASSIVE command\n");
+-	} else if (strncasecmp(command, CMD_RSSI, strlen(CMD_RSSI)) == 0) {
+-		bytes_written =
+-			wland_android_get_rssi(net, command, priv_cmd.total_len);
+-		WLAND_DBG(DEFAULT, INFO, "Received regular RSSI command\n");
+-	} else if (strncasecmp(command, CMD_LINKSPEED, strlen(CMD_LINKSPEED)) == 0) {
+-		bytes_written =
+-			wland_android_get_link_speed(net, command, priv_cmd.total_len);
+-		WLAND_DBG(DEFAULT, INFO, "Received regular LINKSPEED command\n");
+-	}
+-#ifdef PKT_FILTER_SUPPORT
+-	else if (strncasecmp(command, CMD_RXFILTER_START,
+-			strlen(CMD_RXFILTER_START)) == 0) {
+-		bytes_written = net_os_enable_packet_filter(net, 1);
+-	} else if (strncasecmp(command, CMD_RXFILTER_STOP,
+-			strlen(CMD_RXFILTER_STOP)) == 0) {
+-		bytes_written = net_os_enable_packet_filter(net, 0);
+-	} else if (strncasecmp(command, CMD_RXFILTER_ADD,
+-			strlen(CMD_RXFILTER_ADD)) == 0) {
+-		int filter_num = *(command + strlen(CMD_RXFILTER_ADD) + 1) - '0';
+-		bytes_written = net_os_rxfilter_add_remove(net, true, filter_num);
+-	} else if (strncasecmp(command, CMD_RXFILTER_REMOVE,
+-			strlen(CMD_RXFILTER_REMOVE)) == 0) {
+-		int filter_num = *(command + strlen(CMD_RXFILTER_REMOVE) + 1) - '0';
+-		bytes_written = net_os_rxfilter_add_remove(net, FALSE, filter_num);
+-	}
+-#endif /* PKT_FILTER_SUPPORT */
+-	else if (strncasecmp(command, CMD_BTCOEXSCAN_START,
+-			strlen(CMD_BTCOEXSCAN_START)) == 0) {
+-		/*
+-		 * TBD: BTCOEXSCAN-START
+-		 */
+-		 WLAND_DBG(DEFAULT, INFO, "Received regular BTCOEXSCAN_START command\n");
+-	} else if (strncasecmp(command, CMD_BTCOEXSCAN_STOP,
+-			strlen(CMD_BTCOEXSCAN_STOP)) == 0) {
+-		/*
+-		 * TBD: BTCOEXSCAN-STOP
+-		 */
+-		  WLAND_DBG(DEFAULT, INFO, "Received regular BTCOEXSCAN_STOP command\n");
+-	} else if (strncasecmp(command, CMD_BTCOEXMODE,
+-			strlen(CMD_BTCOEXMODE)) == 0) {
+-			WLAND_DBG(DEFAULT, INFO, "Received regular BTCOEXMODE command\n");
+-#ifdef WLAND_CFG80211_SUPPORT
+-#if 0
+-		bytes_written = wl_cfg80211_set_btcoex_dhcp(net, command);
+-#endif
+-#else
+-#ifdef PKT_FILTER_SUPPORT
+-		uint mode = *(command + strlen(CMD_BTCOEXMODE) + 1) - '0';
+-
+-		if (mode == 1)
+-			net_os_enable_packet_filter(net, 0);	/* DHCP starts */
+-		else
+-			net_os_enable_packet_filter(net, 1);	/* DHCP ends */
+-#endif /* PKT_FILTER_SUPPORT */
+-#endif /* WLAND_CFG80211_SUPPORT */
+-	} else if (strncasecmp(command, CMD_SETSUSPENDOPT,
+-			strlen(CMD_SETSUSPENDOPT)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular SETSUSPENDOPT command\n");
+-		bytes_written =
+-			wland_android_set_suspendopt(net, command, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_SETSUSPENDMODE,
+-			strlen(CMD_SETSUSPENDMODE)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular SETSUSPENDMODE command\n");
+-		bytes_written =
+-			wland_android_set_suspendmode(net, command, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_SETBAND, strlen(CMD_SETBAND)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular SETBAND command\n");
+-#if 0
+-		uint band = *(command + strlen(CMD_SETBAND) + 1) - '0';
+-
+-		bytes_written = wldev_set_band(net, band);
+-#endif
+-	} else if (strncasecmp(command, CMD_GETBAND, strlen(CMD_GETBAND)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular GETBAND command\n");
+-		bytes_written =
+-			wland_android_get_band(net, command, priv_cmd.total_len);
+-	}
+-#ifdef WLAND_CFG80211_SUPPORT
+-	/*
+-	 * CUSTOMER_SET_COUNTRY feature is define for only GGSM model
+-	 */
+-	else if (strncasecmp(command, CMD_COUNTRY, strlen(CMD_COUNTRY)) == 0) {
+-		char *country_code = command + strlen(CMD_COUNTRY) + 1;
+-		WLAND_DBG(CFG80211, INFO, "Received regular COUNTRY command\n");
+-		bytes_written = wland_cfg80211_set_country_code(net, country_code);
+-	}
+-#endif /* WLAND_CFG80211_SUPPORT */
+-#if defined(PNO_SUPPORT)
+-	else if (strncasecmp(command, CMD_PNOSSIDCLR_SET,
+-			strlen(CMD_PNOSSIDCLR_SET)) == 0) {
+-		bytes_written = dhd_dev_pno_reset(net);
+-	} else if (strncasecmp(command, CMD_PNOSETUP_SET,
+-			strlen(CMD_PNOSETUP_SET)) == 0) {
+-		bytes_written =
+-			wland_android_set_pno_setup(net, command,
+-			priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_PNOENABLE_SET,
+-			strlen(CMD_PNOENABLE_SET)) == 0) {
+-		uint pfn_enabled =
+-			*(command + strlen(CMD_PNOENABLE_SET) + 1) - '0';
+-		bytes_written = dhd_dev_pno_enable(net, pfn_enabled);
+-	}
+-#endif /* PNO_SUPPORT */
+-	else if (strncasecmp(command, CMD_P2P_DEV_ADDR,
+-			strlen(CMD_P2P_DEV_ADDR)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular P2P_DEV_ADDR command\n");
+-		bytes_written =
+-			wland_android_get_p2p_dev_addr(net, command,
+-			priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_P2P_SET_NOA,
+-			strlen(CMD_P2P_SET_NOA)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular P2P_SET_NOA command\n");
+-#if 0
+-		int skip = strlen(CMD_P2P_SET_NOA) + 1;
+-
+-		bytes_written =
+-			wl_cfg80211_set_p2p_noa(net, command + skip,
+-			priv_cmd.total_len - skip);
+-#endif
+-	} else if (strncasecmp(command, CMD_P2P_GET_NOA,
+-			strlen(CMD_P2P_GET_NOA)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular P2P_GET_NOA command\n");
+-#if 0
+-		bytes_written =
+-			wl_cfg80211_get_p2p_noa(net, command,
+-			priv_cmd.total_len);
+-#endif
+-	} else if (strncasecmp(command, CMD_P2P_SET_PS,
+-			strlen(CMD_P2P_SET_PS)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular P2P_SET_PS command\n");
+-#if 0
+-		int skip = strlen(CMD_P2P_SET_PS) + 1;
+-
+-		bytes_written =
+-			wl_cfg80211_set_p2p_ps(net, command + skip,
+-			priv_cmd.total_len - skip);
+-#endif
+-	}
+-#ifdef WLAND_CFG80211_SUPPORT
+-	else if (strncasecmp(command, CMD_SET_AP_WPS_P2P_IE,
+-			strlen(CMD_SET_AP_WPS_P2P_IE)) == 0) {
+-#if 1
+-		int skip = strlen(CMD_SET_AP_WPS_P2P_IE) + 3;
+-		WLAND_DBG(DEFAULT, INFO, "Received regular SET_AP_WPS_P2P_IE command\n");
+-
+-		bytes_written =
+-			wland_cfg80211_set_wps_p2p_ie(net, command + skip,
+-			priv_cmd.total_len - skip, *(command + skip - 2) - '0');
+-#endif
+-	}
+-#endif /* WLAND_CFG80211_SUPPORT */
+-	else if (strncasecmp(command, CMD_OKC_SET_PMK,
+-			strlen(CMD_OKC_SET_PMK)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular OKC_SET_PMK command\n");
+-		bytes_written =
+-			wland_android_set_pmk(net, command, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_OKC_ENABLE,
+-			strlen(CMD_OKC_ENABLE)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular OKC_ENABLE command\n");
+-		bytes_written =
+-			wland_android_okc_enable(net, command, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_SETROAMMODE,
+-			strlen(CMD_SETROAMMODE)) == 0) {
+-		WLAND_DBG(DEFAULT, INFO, "Received regular SETROAMMODE command\n");
+-		bytes_written =
+-			wland_android_set_roam_mode(net, command,
+-			priv_cmd.total_len);
+-	} else {
+-		WLAND_DBG(DEFAULT, DEBUG,
+-			"Unknown PRIVATE command %s - ignored\n", command);
+-		snprintf(command, 3, "OK");
+-		bytes_written = strlen("OK");
+-	}
+-
+-	if (bytes_written >= 0) {
+-		if ((bytes_written == 0) && (priv_cmd.total_len > 0))
+-			command[0] = '\0';
+-		if (bytes_written >= priv_cmd.total_len) {
+-			WLAND_ERR("bytes_written = %d\n", bytes_written);
+-			bytes_written = priv_cmd.total_len;
+-		} else {
+-			bytes_written++;
+-		}
+-		priv_cmd.used_len = bytes_written;
+-		if (copy_to_user(priv_cmd.buf, command, bytes_written)) {
+-			WLAND_ERR("failed to copy data to user buffer\n");
+-			ret = -EFAULT;
+-		}
+-	} else {
+-		ret = bytes_written;
+-	}
+-
+-exit:
+-#if 0
+-	net_os_wake_unlock(net);
+-#endif
+-	WLAND_DBG(DEFAULT, TRACE, "Done(\"%s\",on:%s,ret:%d)\n", command,
+-		ifr->ifr_name, ret);
+-
+-	if (command)
+-		kfree(command);
+-
+-	return ret;
+-}
++	return -EOPNOTSUPP;
++}
++
+ 
+ #ifdef WLAND_RSSIAVG_SUPPORT
+ void wland_free_rssi_cache(struct wland_rssi_cache_ctrl *rssi_cache_ctrl)
+--- a/rdawlan/wland_bus.c
++++ b/rdawlan/wland_bus.c
+@@ -33,7 +33,7 @@
+ #include <linux/module.h>
+ #include <linux/debugfs.h>
+ #include <linux/vmalloc.h>
+-#include <asm/unaligned.h>
++#include <linux/unaligned.h>
+ #include <net/cfg80211.h>
+ #include <net/rtnetlink.h>
+ 
+@@ -109,7 +109,7 @@
+ 	ret = wland_read_mac_from_nvram(mac_addr);
+ 	if (ret) {
+ 		WLAND_ERR("nvram:get a random ether address\n");
+-		random_ether_addr(mac_addr);
++		eth_random_addr(mac_addr);
+ 		if (ret == -EINVAL)
+ 			wland_write_mac_to_nvram(mac_addr);
+ 	} else {
+@@ -127,7 +127,7 @@
+ 	} else if (wland_get_mac_address(mac_addr) != ETH_ALEN) {
+ 		WLAND_DBG(DEFAULT, INFO, "no mac addr in file\n");
+ 		drvr->bus_if->up_data_mac = 1;
+-		random_ether_addr(mac_addr);
++		eth_random_addr(mac_addr);
+ 		mac_addr[0] &= 0xfe; /* clear multicast bit */
+ 		mac_addr[0] |= 0x02; /* set local assignment bit (IEEE802) */
+ 		if (wland_set_mac_address(mac_addr) < 0) {
+@@ -142,7 +142,7 @@
+ 	if (wland_get_mac_address(mac_addr) != ETH_ALEN) {
+ 		WLAND_DBG(DEFAULT, INFO, "no mac addr in file\n");
+ 		drvr->bus_if->up_data_mac = 1;
+-		random_ether_addr(mac_addr);
++		eth_random_addr(mac_addr);
+ 		mac_addr[0] &= 0xfe; /* clear multicast bit */
+ 		mac_addr[0] |= 0x02; /* set local assignment bit (IEEE802) */
+ 		if (wland_set_mac_address(mac_addr) < 0) {
+@@ -155,7 +155,7 @@
+ #elif defined(WLAND_MACADDR_DYNAMIC)
+ 	if (wland_get_mac_address(mac_addr) != ETH_ALEN) {
+ 		WLAND_DBG(DEFAULT, INFO, "no mac addr in file\n");;
+-		random_ether_addr(mac_addr);
++		eth_random_addr(mac_addr);
+ 		mac_addr[0] &= 0xfe; /* clear multicast bit */
+ 		mac_addr[0] |= 0x02; /* set local assignment bit (IEEE802) */
+ 		if (wland_set_mac_address(mac_addr) < 0) {
+--- a/rdawlan/wland_cfg80211.c
++++ b/rdawlan/wland_cfg80211.c
+@@ -41,6 +41,8 @@
+ #include "wland_p2p.h"
+ #include "wland_amsdu.h"
+ #include "wland_cfg80211.h"
++#include <linux/math64.h>
++#include "wland_port_key.h"
+ #include "wland_android.h"
+ #include "wland_rx.h"
+ #include "wland_usb.h"
+@@ -2023,11 +2025,14 @@
+ }
+ 
+ static s32 wland_cfg80211_config_default_key(struct wiphy *wiphy,
+-	struct net_device *ndev, u8 key_idx, bool unicast, bool multicast)
++	struct net_device *ndev, int link_id, u8 key_idx, bool unicast, bool multicast)
+ {
+ 	u32 index, wsec;
+ 	s32 err = 0;
+ 	struct wland_if *ifp = netdev_priv(ndev);
++
++	if (link_id > 0)
++		return -EOPNOTSUPP;
+ 
+ 	WLAND_DBG(CFG80211, TRACE, "key index (%d), Enter\n", key_idx);
+ 
+@@ -2080,18 +2085,11 @@
+ 
+ 		WLAND_DBG(CFG80211, TRACE, "Setting the key index %d\n", key_idx);
+ 		ptkey.ken_len = params->key_len;
+-		memcpy(ptkey.key, params->key, 16);
+-
+-		if ((ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_STATION ||
+-			ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_P2P_CLIENT) &&
+-			params->key_len > 16) {
+-			WLAND_DBG(CFG80211, TRACE, "sta params->key_len > 16\n");
+-			memcpy(ptkey.key + 16, params->key + 24, 8);
+-			memcpy(ptkey.key + 24, params->key + 16, 8);
+-		} else {
+-			WLAND_DBG(CFG80211, TRACE, "ap params->key_len > 16\n");
+-			memcpy(ptkey.key + 16, params->key + 16, 16);
+-		}
++		err = wland_port_copy_key(ptkey.key, params->key, params->key_len,
++			ifp->vif->wdev.iftype == NL80211_IFTYPE_STATION ||
++			ifp->vif->wdev.iftype == NL80211_IFTYPE_P2P_CLIENT);
++		if (err)
++			return err;
+ 		if (ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_STATION ||
+ 			ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_P2P_CLIENT) {
+ 			wland_netdev_wait_pend8021x(ndev);
+@@ -2100,7 +2098,7 @@
+ 			MIN(sizeof(ptkey), params->key_len+ETH_ALEN+1));
+ 		if (err < 0) {
+ 			WLAND_ERR("Set WID_ADD_PTK error (%d)\n", err);
+-			return 0;
++			return err;
+ 		}
+ 
+ 	}
+@@ -2121,20 +2119,18 @@
+ 
+ 	memset(&gtkey, 0, sizeof(gtkey));
+ 	memcpy(gtkey.ea, profile->bssid, ETH_ALEN);
+-	memcpy(gtkey.keyRSC, params->seq, params->seq_len);
++	if (params->seq_len < 0 || params->seq_len > sizeof(gtkey.keyRSC) ||
++	    (params->seq_len && !params->seq))
++		return -EINVAL;
++	if (params->seq_len)
++		memcpy(gtkey.keyRSC, params->seq, params->seq_len);
+ 	gtkey.key_idx = key_idx;
+ 	gtkey.ken_len = params->key_len;
+-	memcpy(gtkey.key, params->key, 16);
+-	if ((ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_STATION ||
+-		ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_P2P_CLIENT) &&
+-		params->key_len > 16) {
+-		WLAND_DBG(CFG80211, TRACE, "sta params->key_len > 16\n");
+-		memcpy(gtkey.key + 16, params->key + 24, 8);
+-		memcpy(gtkey.key + 24, params->key + 16, 8);
+-	} else {
+-		WLAND_DBG(CFG80211, TRACE, "ap params->key_len > 16\n");
+-		memcpy(gtkey.key + 16, params->key + 16, 16);
+-	}
++	err = wland_port_copy_key(gtkey.key, params->key, params->key_len,
++		ifp->vif->wdev.iftype == NL80211_IFTYPE_STATION ||
++		ifp->vif->wdev.iftype == NL80211_IFTYPE_P2P_CLIENT);
++	if (err)
++		return err;
+ 
+ 	switch(ifp->ndev->ieee80211_ptr->iftype) {
+ 	case NL80211_IFTYPE_AP:
+@@ -2166,7 +2162,7 @@
+ 
+ 	if (err < 0) {
+ 		WLAND_ERR("Set WID_ADD_RX_GTK error (%d)\n", err);
+-		return 0;
++		return err;
+ 	}
+ 
+ 	WLAND_DBG(CFG80211, TRACE, "Done.\n");
+@@ -2198,7 +2194,7 @@
+ #endif /* STRUCT_REF */
+ 
+ static s32 wland_cfg80211_add_key(struct wiphy *wiphy, struct net_device *ndev,
+-	u8 key_idx, bool pairwise, const u8 * mac_addr,
++	int link_id, u8 key_idx, bool pairwise, const u8 * mac_addr,
+ 	struct key_params *params)
+ {
+ 	struct wland_if *ifp = netdev_priv(ndev);
+@@ -2209,6 +2205,9 @@
+ 	s32 val, wsec;
+ 	u8 keybuf[8] = { 0 };
+ #endif
++	if (link_id > 0)
++		return -EOPNOTSUPP;
++
+ 	WLAND_DBG(CFG80211, DEBUG, "key index (%d),Enter\n", key_idx);
+ 	WLAND_DBG(CFG80211, INFO,
+ 		"Add Key(%pM):\n"
+@@ -2246,11 +2245,14 @@
+ }
+ 
+ static s32 wland_cfg80211_del_key(struct wiphy *wiphy, struct net_device *ndev,
+-	u8 key_idx, bool pairwise, const u8 * mac_addr)
++	int link_id, u8 key_idx, bool pairwise, const u8 * mac_addr)
+ {
+ 	struct wland_if *ifp = netdev_priv(ndev);
+ 	struct wland_wsec_key key;
+ 	s32 err = 0;
++
++	if (link_id > 0)
++		return -EOPNOTSUPP;
+ 
+ 	WLAND_DBG(CFG80211, TRACE, "Enter\n");
+ 
+@@ -2285,7 +2287,7 @@
+ }
+ 
+ static s32 wland_cfg80211_get_key(struct wiphy *wiphy, struct net_device *ndev,
+-	u8 key_idx, bool pairwise, const u8 * mac_addr, void *cookie,
++	int link_id, u8 key_idx, bool pairwise, const u8 * mac_addr, void *cookie,
+ 	void (*callback) (void *cookie, struct key_params * params))
+ {
+ 	struct key_params params;
+@@ -2294,6 +2296,9 @@
+ 	struct wland_cfg80211_security *sec;
+ 	s32 wsec = 0;
+ 	s32 err = 0;
++
++	if (link_id > 0)
++		return -EOPNOTSUPP;
+ 
+ 	WLAND_DBG(CFG80211, INFO, "ifd:%d, key index (%d),Enter\n", ifp->bssidx, key_idx);
+ 
+@@ -2347,8 +2352,11 @@
+ }
+ 
+ static s32 wland_cfg80211_config_default_mgmt_key(struct wiphy *wiphy,
+-	struct net_device *ndev, u8 key_idx)
+-{
++	struct net_device *ndev, int link_id, u8 key_idx)
++{
++	if (link_id > 0)
++		return -EOPNOTSUPP;
++
+ 	WLAND_DBG(CFG80211, TRACE, "Not supported\n");
+ 
+ 	return -EOPNOTSUPP;
+@@ -2857,16 +2865,9 @@
+ 
+ static u64 wland_get_systime_us(void)
+ {
+-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+-	struct timespec ts;
+-	get_monotonic_boottime(&ts);
+-	return ((u64)ts.tv_sec*1000000) + ts.tv_nsec / 1000;
+-#else
+-	struct timeval tv;
+-	do_gettimeofday(&tv);
+-	return ((u64)tv.tv_sec*1000000) + tv.tv_usec;
+-#endif
+-}
++	return div_u64(ktime_get_boottime_ns(), NSEC_PER_USEC);
++}
++
+ 
+ static s32 wland_inform_single_bss(struct wland_cfg80211_info *cfg,
+ 	struct wland_bss_info_le *bi)
+@@ -5533,10 +5534,13 @@
+ 	return err;
+ }
+ 
+-static int wland_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev)
++static int wland_cfg80211_stop_ap(struct wiphy *wiphy, struct net_device *ndev, unsigned int link_id)
+ {
+ 	struct wland_if *ifp = netdev_priv(ndev);
+ 	s32 err = 0;
++
++	if (link_id > 0)
++		return -EOPNOTSUPP;
+ 
+ 	WLAND_DBG(CFG80211, INFO, "Enter:id:%d, type:%d\n", ifp->bssidx, ifp->vif->wdev.iftype);
+ 
+@@ -5554,8 +5558,9 @@
+ }
+ 
+ static s32 wland_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *ndev,
+-	struct cfg80211_beacon_data *info)
+-{
++	struct cfg80211_ap_update *update)
++{
++	struct cfg80211_beacon_data *info = &update->beacon;
+ 	s32 err = 0;
+ 	struct wland_if *ifp = netdev_priv(ndev);
+ 	struct wland_tlv *rsn_ie;
+@@ -5750,31 +5755,15 @@
+ }
+ //#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) */
+ 
+-static void wland_cfg80211_mgmt_frame_register(struct wiphy *wiphy,
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+-	struct wireless_dev *wdev,
+-#else /*LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) */
+-	struct net_device *dev,
+-#endif /*LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) */
+-	u16 frame_type, bool reg)
+-{
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
++static void wland_cfg80211_update_mgmt_frame_registrations(struct wiphy *wiphy,
++	struct wireless_dev *wdev, struct mgmt_frame_regs *update)
++{
+ 	struct wland_cfg80211_vif *vif =
+ 		container_of(wdev, struct wland_cfg80211_vif, wdev);
+-#else /*LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) */
+-	struct wland_cfg80211_vif *vif = ndev_to_vif(dev);
+-#endif /*LINUX_VERSION_CODE >= KERNEL_VERSION(3, 10, 0) */
+-	u16 mgmt_type = (frame_type & IEEE80211_FCTL_STYPE) >> 4;
+-
+-	WLAND_DBG(CFG80211, TRACE,
+-		"(frame_type: 0x%04x,reg:%x,mgmt_type:0x%x),Enter\n",
+-		frame_type, reg, mgmt_type);
+-
+-	if (reg)
+-		vif->mgmt_rx_reg |= BIT(mgmt_type);
+-	else
+-		vif->mgmt_rx_reg &= ~BIT(mgmt_type);
+-}
++
++	vif->mgmt_rx_reg = update->interface_stypes;
++}
++
+ 
+ static s32 wland_cfg80211_change_bss(struct wiphy *wiphy, struct net_device *dev,
+ 	struct bss_parameters *params)
+@@ -6273,7 +6262,7 @@
+ 	.sched_scan_start = wland_cfg80211_sched_scan_start,
+ 	.sched_scan_stop = wland_cfg80211_sched_scan_stop,
+ #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) */
+-	.mgmt_frame_register = wland_cfg80211_mgmt_frame_register,
++	.update_mgmt_frame_registrations = wland_cfg80211_update_mgmt_frame_registrations,
+ 	.change_bss = wland_cfg80211_change_bss,
+ 	.mgmt_tx = wland_cfg80211_mgmt_tx,
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 5, 0)
+@@ -6954,18 +6943,18 @@
+ 		conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
+ 
+ #else
+-	if ((ifp->bssidx == 0) && (profile->bssid)
++	if ((ifp->bssidx == 0) && is_valid_ether_addr(profile->bssid)
+ 		&& (profile->ssid.SSID_len) && wiphy) {
+ 		struct cfg80211_bss * bss_internal =
+ 			cfg80211_get_bss(wiphy, NULL, profile->bssid,
+ 				profile->ssid.SSID, profile->ssid.SSID_len,
+-				WLAN_CAPABILITY_ESS, WLAN_CAPABILITY_ESS);
+-
+-		cfg80211_put_bss(wiphy, bss_internal);
++				IEEE80211_BSS_TYPE_ESS, IEEE80211_PRIVACY_ANY);
++
++		/* cfg80211_roamed consumes the acquired BSS reference. */
+ 
+ 		if (bss_internal) {
+ 			struct cfg80211_roam_info roam_info = {
+-				.bss = bss_internal,
++				.links[0].bss = bss_internal,
+ 				.req_ie = conn_info->req_ie,
+ 				.req_ie_len = conn_info->req_ie_len,
+ 				.resp_ie = conn_info->resp_ie,
+@@ -7026,7 +7015,7 @@
+ 	bool find = false;
+ 	int ret = 0;
+ 
+-	if (!((ifp->bssidx == 0) && (profile->bssid)
++	if (!((ifp->bssidx == 0) && is_valid_ether_addr(profile->bssid)
+ 		&& (profile->ssid.SSID_len) && wiphy))
+ 		return 0;
+ 
+--- a/rdawlan/wland_cmds.c
++++ b/rdawlan/wland_cmds.c
+@@ -130,6 +130,12 @@
+  */
+ s32 wland_push_wid(u8 *buf, u16 WID, const void *data, u16 data_len, bool is_query)
+ {
++	/* No manufacturing eFuse writes, including internal batched requests. */
++	if (!is_query && (WID == WID_SET_EFUSE_ONE_PAGE ||
++			  WID == WID_EFUSE_XTAL_CAL_VAL ||
++			  WID == WID_EFUSE_PHY_TXPOW_VAL))
++		return -EPERM;
++
+ 	u8* offset = buf;
+ 	enum wid_type type = wland_get_wid_type(WID);
+ 	u16 wid_length = wland_get_wid_size(type, data_len);
+@@ -314,6 +320,11 @@
+ 	struct wland_proto *prot = drvr->prot;
+ 	u8 *wid_msg = prot->buf;
+ 
++	if (rw && (wid == WID_SET_EFUSE_ONE_PAGE ||
++		   wid == WID_EFUSE_XTAL_CAL_VAL ||
++		   wid == WID_EFUSE_PHY_TXPOW_VAL))
++		return -EPERM;
++
+ 	if (drvr->bus_if->state != WLAND_BUS_DATA) {
+ 		WLAND_ERR("bus is down. we have nothing to do.\n");
+ 		return -EINVAL;
+@@ -2385,8 +2396,8 @@
+ s32 wland_set_power_config(struct wland_if *ifp)
+ {
+ #ifdef WLAND_FIRMWARE_PATH
+-	struct kstat config_stat;
+-	mm_segment_t fs;
++	struct file *config_file;
++	loff_t config_length;
+ 	char filename[256];
+ #elif defined WLAND_DOWNLOAD_FIRMWARE_FROM_HEX
+ 	/*no need value*/
+@@ -2430,16 +2441,15 @@
+ 	};
+ #endif
+ #ifdef WLAND_FIRMWARE_PATH
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+-	snprintf(filename, 256, "%s/%s", WLAND_FIRMWARE_PATH, WIFI_POWER_SAVR_FILE_NAME);
+-	ret = vfs_stat(filename, &config_stat);
+-	if (ret) {
+-		WLAND_ERR("can not get config file status :%d\n",ret);
+-		return ret;
+-	} else {
+-		config_size = (int)config_stat.size;
+-	}
++	snprintf(filename, sizeof(filename), "%s/%s", WLAND_FIRMWARE_PATH, WIFI_POWER_SAVR_FILE_NAME);
++	config_file = filp_open(filename, O_RDONLY, 0);
++	if (IS_ERR(config_file))
++		return PTR_ERR(config_file);
++	config_length = i_size_read(file_inode(config_file));
++	filp_close(config_file, NULL);
++	if (config_length <= 0 || config_length > 65536)
++		return -EINVAL;
++	config_size = config_length;
+ 	buf = kzalloc(config_size+1, GFP_KERNEL);
+ 	if(!buf) {
+ 		WLAND_ERR("no more space!\n");
+@@ -2452,7 +2462,7 @@
+ 		WLAND_DBG(DEFAULT, WARNING, "read power save config file failed!\n");
+ 		goto out;
+ 	}
+-	buf[config_size+1] = '\0';
++	buf[config_size] = '\0';
+ 
+ #elif defined WLAND_DOWNLOAD_FIRMWARE_FROM_HEX
+ 	config_size = POWER_CONFIG_HEX_SIZE;
+@@ -2483,7 +2493,7 @@
+ 			return -1;
+ 		}
+ 		memcpy(buf, config_firmware->data, config_size);
+-		buf[config_size+1] = '\0';
++		buf[config_size] = '\0';
+ 		buf_end = buf + config_size;
+ 		release_firmware(config_firmware);
+ 	}
+--- a/rdawlan/wland_fwsmgr.c
++++ b/rdawlan/wland_fwsmgr.c
+@@ -40,7 +40,7 @@
+ 	struct wland_mac_descriptor *desc)
+ {
+ 	if (desc == &fws->desc.other)
+-		strlcpy(desc->name, "MAC-OTHER", sizeof(desc->name));
++		strscpy(desc->name, "MAC-OTHER", sizeof(desc->name));
+ 	else if (desc->mac_handle)
+ 		scnprintf(desc->name, sizeof(desc->name), "MAC-%d:%d",
+ 			desc->mac_handle, desc->interface_id);
+--- a/rdawlan/wland_linux.c
++++ b/rdawlan/wland_linux.c
+@@ -187,7 +187,7 @@
+ 	} else {
+ 		WLAND_DBG(DEFAULT, TRACE, "MAC address updated to %pM\n",
+ 			ifp->mac_addr);
+-		memcpy(ifp->ndev->dev_addr, ifp->mac_addr, ETH_ALEN);
++		eth_hw_addr_set(ifp->ndev, ifp->mac_addr);
+ 	}
+ }
+ 
+@@ -787,9 +787,9 @@
+ 	struct wland_if *ifp = netdev_priv(ndev);
+ 	struct wland_private *drvr = ifp->drvr;
+ 
+-	strlcpy(info->driver, KBUILD_MODNAME, sizeof(info->driver));
++	strscpy(info->driver, KBUILD_MODNAME, sizeof(info->driver));
+ 	snprintf(info->version, sizeof(info->version), "%d", drvr->drv_version);
+-	strlcpy(info->bus_info, dev_name(drvr->bus_if->dev),
++	strscpy(info->bus_info, dev_name(drvr->bus_if->dev),
+ 		sizeof(info->bus_info));
+ }
+ 
+@@ -1082,11 +1082,11 @@
+ 	 * linux wireless extensions
+ 	 */
+ 	if (cmd == SIOCDEVPRIVATE + 1) {
+-		ret = wland_android_priv_cmd(ndev, ifr, cmd);
++		ret = -EOPNOTSUPP;
+ 		//dhd_check_hang(net, &dhd->pub, ret);
+ 		return ret;
+ 	} else if (cmd == SIOCDEVPRIVATE + 5) {
+-		ret = wland_rf_test_cmd(ndev, ifr, cmd);
++		ret = -EOPNOTSUPP;
+ 		//dhd_check_hang(net, &dhd->pub, ret);
+ 		return ret;
+ 	} else if (cmd == SIOCGIWNICKN)
+@@ -1183,7 +1183,7 @@
+ 	return ret;
+ }
+ 
+-static void wland_netdev_tx_timeout(struct net_device *dev)
++static void wland_netdev_tx_timeout(struct net_device *dev, unsigned int txqueue)
+ {
+ 	WLAND_DBG(DEFAULT, TRACE, "Enter\n");
+ 
+@@ -1278,7 +1278,7 @@
+ 	/*
+ 	 * set the mac address
+ 	 */
+-	memcpy(ndev->dev_addr, ifp->mac_addr, ETH_ALEN);
++	eth_hw_addr_set(ndev, ifp->mac_addr);
+ 
+ 	WLAND_DBG(DEFAULT, TRACE, "Enter,(%s:idx:%d,ifidx:0x%x)\n", ndev->name,
+ 		ifp->bssidx, ifp->ifidx);
+@@ -1353,7 +1353,7 @@
+ 	 * * For Android PRIV CMD handling map it to primary I/F
+ 	 */
+ 	if (cmd == SIOCDEVPRIVATE + 1) {
+-		ret = wland_android_priv_cmd(ndev, ifr, cmd);
++		ret = -EOPNOTSUPP;
+ 	} else {
+ 		WLAND_ERR("IOCTL req 0x%x on p2p0 I/F. Ignoring. \n", cmd);
+ 		ret = -1;
+@@ -1395,7 +1395,7 @@
+ 	/*
+ 	 * set the mac address
+ 	 */
+-	memcpy(ndev->dev_addr, ifp->mac_addr, ETH_ALEN);
++	eth_hw_addr_set(ndev, ifp->mac_addr);
+ 
+ 	WLAND_DBG(DEFAULT, TRACE, "Enter(idx:%d,mac:%pM)\n", ifp->bssidx,
+ 		ifp->mac_addr);
+@@ -1688,16 +1688,18 @@
+ char rdawlan_firmware_path[MOD_PARAM_PATHLEN]="sta";
+ unsigned char WifiMac[6] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00};
+ int n_WifiMac = 0;
+-static u8 wifi_in_test_mode = 0;
++/* Test mode deliberately has no mutable state. */
+ 
+ u8 wland_check_test_mode(void)
+ {
+-	return wifi_in_test_mode;
+-}
++	return 0;
++}
++
+ void wland_set_test_mode(u8 mode)
+ {
+-	wifi_in_test_mode = mode;
+-}
++	/* Manufacturing/test firmware is unavailable in this port. */
++}
++
+ 
+ module_param(amsdu_operation, uint, S_IRUGO|S_IWUSR);
+ module_param_string(firmware_path, rdawlan_firmware_path, MOD_PARAM_PATHLEN, 0660);
+--- a/rdawlan/wland_nvram.c
++++ b/rdawlan/wland_nvram.c
+@@ -32,80 +32,35 @@
+ 
+ int wland_nvram_read(const char *filename, char *data, int size, int offset)
+ {
+-	struct file *filp;
+-	mm_segment_t fs;
+-	char *buf;
+-	int ret = -1;
+-
+-	filp = filp_open(filename, O_RDONLY, 0666);
+-	if (IS_ERR(filp)) {
+-		WLAND_DBG(DEFAULT, WARNING, "[nvram_read] : failed to open %s!\n",filename);
+-		return ret;
+-	}
+-	buf = (char *)kzalloc(size+1, GFP_KERNEL);
+-	if (!buf)
+-		return -1;
+-
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+-	filp->f_pos = offset;
+-	ret = vfs_read(filp, buf, size, &(filp->f_pos));
+-	set_fs(fs);
+-
+-	buf[size] = '\0';
+-	memcpy(data, buf, size);
+-
+-	WLAND_DBG(DEFAULT, WARNING, "mac addr is %s\n", data);
+-
+-	filp_close(filp, NULL);
++	struct file *file;
++	loff_t position = offset;
++	ssize_t ret;
++
++	if (size < 0 || offset < 0)
++		return -EINVAL;
++	file = filp_open(filename, O_RDONLY, 0);
++	if (IS_ERR(file))
++		return PTR_ERR(file);
++	ret = kernel_read(file, data, size, &position);
++	filp_close(file, NULL);
+ 	return ret;
+ }
+ 
++
+ int wland_nvram_write(char *filename, char *data , int size, int offset)
+ {
+-	struct file *filp;
+-	mm_segment_t fs;
+-	int ret = -1;
+-
+-	filp = filp_open(filename, O_CREAT | O_RDWR, 0666);
+-	if(IS_ERR(filp)) {
+-		WLAND_ERR("[nvram_write] : failed to open!\n");
+-		return ret;
+-	}
+-
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+-	filp->f_pos = offset;
+-	ret = vfs_write(filp, data, size,&filp->f_pos);
+-	WLAND_DBG(DEFAULT, TRACE,
+-		"mac addr is %pM, ret is %d\n", data, ret);
+-	set_fs(fs);
+-	filp_close(filp,NULL);
+-	return ret;
+-}
++	/* Persistent configuration belongs to userspace. */
++	return -EOPNOTSUPP;
++}
++
+ 
+ int wland_file_write(char *filename, char *data , int size, int offset,
+ 	u32 mode1, u32 mode2)
+ {
+-	struct file *filp;
+-	mm_segment_t fs;
+-	int ret = -1;
+-
+-	filp = filp_open(filename, mode1, mode2);
+-	if(IS_ERR(filp)) {
+-		WLAND_ERR("failed to open!\n");
+-		return ret;
+-	}
+-
+-	fs = get_fs();
+-	set_fs(KERNEL_DS);
+-	filp->f_pos = offset;
+-	ret = vfs_write(filp, data, size,&filp->f_pos);
+-
+-	set_fs(fs);
+-	filp_close(filp,NULL);
+-	return ret;
+-}
++	/* Persistent configuration belongs to userspace. */
++	return -EOPNOTSUPP;
++}
++
+ 
+ int wland_get_mac_address(char *mac)
+ {
+--- a/rdawlan/wland_rf.c
++++ b/rdawlan/wland_rf.c
+@@ -121,56 +121,7 @@
+ }
+ 
+ 
+-int wland_efuse_set_vendor_id(struct net_device *net,
+-	char *data, int len)
+-{
+-	int ret = 0;
+-	char *c= data;
+-	__le16 vendor_id;
+-	u8 efuse_value[28] = {0};
+-	struct wland_if *ifp = netdev_priv(net);
+-	struct wland_private *drvr = ifp->drvr;
+-	struct wland_proto *prot = drvr->prot;
+-	u8 *buf = prot->buf;
+-	u8 write[4] = {0};
+-
+-	vendor_id = simple_strtol(c, &c, 16);
+-
+-	WLAND_DBG(RFTEST, INFO, "set_vendor_id%x\n", vendor_id);
+-
+-	if (wland_read_efuse(ifp, efuse_value))
+-		return -1;
+-
+-	if (wland_efuse_canbe_overwrite(&(efuse_value[16]), (u8*)(&vendor_id), 2) == false) {
+-		WLAND_ERR("one bit is already 1 can not write 0\n");
+-		return -1;
+-	}
+-
+-	mutex_lock(&drvr->proto_block);
+-	memset(prot->buf, '\0', sizeof(prot->buf));
+-
+-	write[0] = vendor_id & 0x00FF;
+-	write[1] = (vendor_id & 0xFF00) >> 8;
+-	write[2] = 0x0a;
+-
+-	ret = wland_push_wid(buf, WID_SET_EFUSE_ONE_PAGE, write, 4, false);
+-	if (ret < 0) {
+-		WLAND_ERR("put wid error\n");
+-		goto done;
+-	}
+-	buf += ret;
+-
+-	ret = wland_proto_cdc_data(drvr, buf-(prot->buf) + FMW_HEADER_LEN);
+-	if (ret < 0) {
+-		WLAND_ERR("WID Result Failed\n");
+-		goto done;
+-	}
+-
+-done:
+-	mutex_unlock(&drvr->proto_block);
+-	return ret;
+-
+-}
++
+ 
+ 
+ int wland_read_efuse_xtal_cal_val(struct net_device *net,
+@@ -200,85 +151,7 @@
+ 	return ret;
+ }
+ 
+-int wland_write_efuse_xtal_cal_val(struct net_device *net,
+-	char *data, int len)
+-{
+-	int ret = 0;
+-	struct wland_if *ifp = netdev_priv(net);
+-	struct wland_private *drvr = ifp->drvr;
+-	struct wland_proto *prot = drvr->prot;
+-	u8 cal_val = 0;
+-	char *c = data;
+-	u8 efuse_value[28] = {0};
+-	u8 xtal_cal_efuse[2] = {0};
+-	u8 write[4] = {0};
+-	u8 *buf = prot->buf;
+-
+-	WLAND_DBG(RFTEST, INFO, "write_efuse_xtal_cal_val:%s\n",data);
+-#if 1
+-	if(strncasecmp(c, "0x", strlen("0x")) != 0) {
+-		WLAND_ERR("not a hex value\n");
+-		return -1;
+-	}
+-#endif
+-	cal_val = simple_strtol(c, &c, 16);
+-	if ((cal_val >= 0xFF) || (cal_val == 0)) {
+-		WLAND_ERR("error:cal_val >= 0xFF || cal_val== 0\n");
+-		return -1;
+-	}
+-	cal_val = cal_val & 0xFE;
+-
+-	WLAND_DBG(RFTEST, INFO, "write_efuse_xtal_cal_val:%02x\n", cal_val);
+-
+-	if (wland_read_efuse(ifp, efuse_value))
+-		return -1;
+-
+-	memcpy(xtal_cal_efuse, &efuse_value[18], 2);
+-
+-	if (xtal_cal_efuse[1] == 0) {//bak buf not used
+-		if (wland_efuse_canbe_overwrite(&xtal_cal_efuse[0], &cal_val, 1) == true)
+-			xtal_cal_efuse[0] = cal_val;
+-		else
+-			xtal_cal_efuse[1] = cal_val;
+-	} else {
+-		if (wland_efuse_canbe_overwrite(&xtal_cal_efuse[1], &cal_val, 1) == true)
+-			xtal_cal_efuse[1] = cal_val;
+-		else {
+-			if (wland_efuse_canbe_overwrite(&xtal_cal_efuse[0], &cal_val, 1) == true) {
+-				xtal_cal_efuse[0] = cal_val;
+-				xtal_cal_efuse[1] = 0xFF;
+-			} else {
+-				WLAND_ERR("one bit is already 1, can not wirte 0\n");
+-				return -1;
+-			}
+-		}
+-	}
+-
+-	mutex_lock(&drvr->proto_block);
+-	memset(prot->buf, '\0', sizeof(prot->buf));
+-
+-	write[0] = xtal_cal_efuse[0];
+-	write[1] = xtal_cal_efuse[1];
+-	write[2] = 0x0b;
+-
+-	ret = wland_push_wid(buf, WID_SET_EFUSE_ONE_PAGE, write, 4, false);
+-	if (ret < 0) {
+-		WLAND_ERR("put wid error\n");
+-		goto done;
+-	}
+-	buf += ret;
+-
+-	ret = wland_proto_cdc_data(drvr, buf-(prot->buf) + FMW_HEADER_LEN);
+-	if (ret < 0) {
+-		WLAND_ERR("WID Result Failed\n");
+-		goto done;
+-	}
+-
+-done:
+-	mutex_unlock(&drvr->proto_block);
+-	return ret;
+-
+-}
++
+ #else
+ 
+ int wland_read_efuse_xtal_cal_val(struct net_device *net,
+@@ -342,121 +215,7 @@
+ 	return ret;
+ }
+ 
+-int wland_write_efuse_xtal_cal_val(struct net_device *net,
+-	char *data, int len)
+-{
+-	int ret = 0;
+-	struct wland_if *ifp = netdev_priv(net);
+-	struct wland_private *drvr = ifp->drvr;
+-	struct wland_proto *prot = drvr->prot;
+-	u8 cal_val = 0;
+-	char *c = data;
+-	u8 efuse_value[28] = {0};
+-	u8 xtal_cal_efuse[4] = {0};
+-	u8 write[4] = {0};
+-	u8 *buf = prot->buf;
+-	int i = 0;
+-	u8 cal_val_get = 0;
+-
+-	WLAND_DBG(RFTEST, INFO, "write_efuse_xtal_cal_val:%s\n",data);
+-
+-	if(strncasecmp(c, "0x", strlen("0x")) != 0) {
+-		WLAND_ERR("not a hex value\n");
+-		return -1;
+-	}
+-
+-	cal_val = simple_strtol(c, &c, 16);
+-	if ((cal_val >= 0xFF) || (cal_val == 0)) {
+-		WLAND_ERR("error:cal_val >= 0xFF || cal_val== 0\n");
+-		return -1;
+-	}
+-	cal_val = cal_val & 0xFE;
+-
+-	WLAND_DBG(RFTEST, INFO, "write_efuse_xtal_cal_val:%02x\n", cal_val);
+-
+-	if (wland_read_efuse(ifp, efuse_value))
+-		return -1;
+-
+-	memcpy(xtal_cal_efuse, &efuse_value[16], 4);
+-
+-	if (xtal_cal_efuse[3] != 0) {
+-		if (wland_efuse_canbe_overwrite(&xtal_cal_efuse[3], &cal_val, 1) == false) {
+-			WLAND_ERR("can not write xtal_cal_val xtal_cal_efuse[3]:%x cal_val:%x\n",
+-				xtal_cal_efuse[3], cal_val);
+-			return -1;
+-		} else {
+-			xtal_cal_efuse[3] = cal_val;
+-			goto send;
+-		}
+-	}
+-
+-	for (i=0; i<=3; i++) {//0 1 2 3
+-		if(xtal_cal_efuse[i] == 0)
+-			break;
+-	}
+-
+-#ifdef WLAND_OLD_EFUSE_COMPATIBLE
+-	if (wland_is_old_efuse(efuse_value)) {
+-		xtal_cal_efuse[i] = cal_val;
+-		goto send;
+-	}
+-#endif
+-
+-	if (i==0) {
+-		xtal_cal_efuse[0] = cal_val;
+-	} else {
+-		if (wland_efuse_canbe_overwrite(&xtal_cal_efuse[i-1], &cal_val, 1) == true)
+-			xtal_cal_efuse[i-1] = cal_val;
+-		else
+-			xtal_cal_efuse[i] = cal_val;
+-	}
+-
+-send:
+-	mutex_lock(&drvr->proto_block);
+-	memset(prot->buf, '\0', sizeof(prot->buf));
+-
+-	write[0] = xtal_cal_efuse[0];
+-	write[1] = xtal_cal_efuse[1];
+-	write[2] = 0x0a;
+-
+-	ret = wland_push_wid(buf, WID_SET_EFUSE_ONE_PAGE, write, 4, false);
+-	if (ret < 0) {
+-		WLAND_ERR("put wid error\n");
+-		mutex_unlock(&drvr->proto_block);
+-		return ret;
+-	}
+-	buf += ret;
+-
+-	write[0] = xtal_cal_efuse[2];
+-	write[1] = xtal_cal_efuse[3];
+-	write[2] = 0x0b;
+-
+-	ret = wland_push_wid(buf, WID_SET_EFUSE_ONE_PAGE, write, 4, false);
+-	if (ret < 0) {
+-		WLAND_ERR("put wid error\n");
+-		mutex_unlock(&drvr->proto_block);
+-		return ret;
+-	}
+-	buf += ret;
+-
+-	ret = wland_proto_cdc_data(drvr, buf-(prot->buf) + FMW_HEADER_LEN);
+-	mutex_unlock(&drvr->proto_block);
+-	if (ret < 0) {
+-		WLAND_ERR("WID Result Failed\n");
+-		return ret;
+-	}
+-
+-	ret = wland_read_efuse_xtal_cal_val(ifp->ndev, NULL, 0, &cal_val_get);
+-	if ((ret < 0) || (cal_val_get == 0)
+-		|| ((cal_val_get & 0xFE) != (cal_val & 0xFE))) {
+-		WLAND_ERR("check failed\n");
+-		return -1;
+-	} else {
+-		WLAND_ERR("success!\n");
+-	}
+-
+-	return ret;
+-}
++
+ 
+ #endif
+ int wland_efuse_get_mac_addr(struct net_device *net,
+@@ -503,105 +262,7 @@
+ 	return ret;
+ }
+ 
+-int wland_efuse_set_mac_addr(struct net_device *net,
+-	char *data, int len)
+-{
+-	int i;
+-	int ret = 0;
+-	char *c= data;
+-	u8 mac[ETH_ALEN];
+-	u8 mac_get[ETH_ALEN] = {0};
+-	u8 mac_efuse[2*ETH_ALEN];
+-	u8 efuse_value[28] = {0};
+-	struct wland_if *ifp = netdev_priv(net);
+-	struct wland_private *drvr = ifp->drvr;
+-	struct wland_proto *prot = drvr->prot;
+-	u8 *buf = prot->buf;
+-	u8 write[4] = {0};
+-
+-	for (i=0; i<ETH_ALEN; ++i) {
+-		mac[i] = simple_strtol(c, &c, 16);
+-		c += 1;
+-	}
+-
+-	WLAND_DBG(RFTEST, INFO, "set_mac_addr%pM\n", mac);
+-
+-	if (wland_read_efuse(ifp, efuse_value))
+-		return -1;
+-
+-	if ((mac[0] & BIT(0)) == 1) {
+-		WLAND_ERR("can not write multicast address\n");
+-		return -1;
+-	}
+-
+-	if (wland_buf_equals(mac, ETH_ALEN, 0)) {
+-		WLAND_ERR("can not write all zero address\n");
+-		return -1;
+-	}
+-
+-	memcpy(mac_efuse, &efuse_value[4], 2*ETH_ALEN);
+-
+-	if (wland_buf_equals(&mac_efuse[6], ETH_ALEN, 0)) {//bak buf not used
+-		if (wland_efuse_canbe_overwrite(mac_efuse, mac, ETH_ALEN) == true)
+-			memcpy(mac_efuse, mac, ETH_ALEN);
+-		else
+-			memcpy(&mac_efuse[6], mac, ETH_ALEN);
+-	} else {
+-		if (wland_efuse_canbe_overwrite(&mac_efuse[6], mac, ETH_ALEN) == true)
+-			memcpy(&mac_efuse[6], mac, ETH_ALEN);
+-		else {
+-			if (wland_efuse_canbe_overwrite(mac_efuse, mac, ETH_ALEN) == true) {
+-				memcpy(mac_efuse, mac, ETH_ALEN);
+-				memset(&mac_efuse[6], 0xFF, ETH_ALEN);
+-			} else {
+-				WLAND_ERR("one bit is already 1, can not wirte 0\n");
+-				return -1;
+-			}
+-		}
+-	}
+-
+-	mutex_lock(&drvr->proto_block);
+-	memset(prot->buf, '\0', sizeof(prot->buf));
+-
+-	for (i=0; i<6; i++) {
+-		write[0] = mac_efuse[2*i];
+-		write[1] = mac_efuse[2*i+1];
+-		write[2] = 4+i;
+-		write[3] = 0;
+-
+-		ret = wland_push_wid(buf, WID_SET_EFUSE_ONE_PAGE, write, 4, false);
+-		if (ret < 0) {
+-			WLAND_ERR("put wid error\n");
+-			mutex_unlock(&drvr->proto_block);
+-			return ret;
+-		}
+-		buf += ret;
+-		memset(write, 0, 4);
+-	}
+-
+-	ret = wland_proto_cdc_data(drvr, buf-(prot->buf) + FMW_HEADER_LEN);
+-	mutex_unlock(&drvr->proto_block);
+-	if (ret < 0) {
+-		WLAND_ERR("WID Result Failed\n");
+-		return ret;
+-	} else {//read and check
+-
+-		ret = wland_efuse_get_mac_addr(ifp->ndev, NULL, 0, mac_get);
+-		if (ret<0 || !is_valid_ether_addr(mac_get)) {
+-			WLAND_ERR("This mac address is not valid, ignored, ret:%d\n", ret);
+-			return -1;
+-		}
+-
+-		if (memcmp(mac_get, mac, ETH_ALEN) != 0) {
+-			WLAND_ERR("mac get do not equals mac set!\n");
+-			return -5;
+-		} else {
+-			WLAND_ERR("success!\n");
+-		}
+-	}
+-
+-	return ret;
+-}
++
+ 
+ 
+ int wland_get_rx_result(struct net_device *net,
+@@ -1544,94 +1205,7 @@
+ 
+ #if 0
+ //the case WLAND_TXP_NUM == 4
+-int wland_write_txpower_to_efuse(struct net_device *net,
+-	char *data, int len)
+-{
+-	int ret = 0;
+-	struct wland_if *ifp = netdev_priv(net);
+-	struct wland_private *drvr = ifp->drvr;
+-	struct wland_proto *prot = drvr->prot;
+-	u8 tx_power_set[WLAND_TXP_NUM] = {0};
+-	char *c = data;
+-	int i = 0;
+-	u8 efuse_value[28] = {0};
+-	u8 write[4] = {0};
+-	u8 *buf = prot->buf;
+-	u8 tx_power_efuse[2*WLAND_TXP_NUM] = {0};
+-
+-	WLAND_DBG(RFTEST, INFO, "wland_write_txpower_to_efuse:%s\n",data);
+-
+-	for (i=0; i<WLAND_TXP_NUM; i++) {
+-		if(strncasecmp(c, "0x", strlen("0x")) != 0) {
+-			WLAND_ERR("not a hex value\n");
+-			return -1;
+-		}
+-
+-		tx_power_set[i] = simple_strtol(c, &c, 16);
+-		if ((tx_power_set[i] >= 0xFF) || (tx_power_set[i] == 0)) {
+-			WLAND_ERR("invalid value!\n");
+-		}
+-		c++;
+-	}
+-	WLAND_DBG(RFTEST, INFO, "tx power value: %02x,%02x,%02x,%02x\n",
+-		tx_power_set[0], tx_power_set[1], tx_power_set[2], tx_power_set[3]);
+-
+-	if (wland_read_efuse(ifp, efuse_value))
+-		return -1;
+-
+-	memcpy(tx_power_efuse, &efuse_value[20], 2*WLAND_TXP_NUM);
+-
+-	for (i=0; i<WLAND_TXP_NUM; i++) {
+-
+-		if (tx_power_efuse[i+WLAND_TXP_NUM] == 0) {//bak buf not used
+-			if(wland_efuse_canbe_overwrite(&tx_power_efuse[i],&tx_power_set[i],1) == true)
+-				tx_power_efuse[i] = tx_power_set[i];
+-			else
+-				tx_power_efuse[i+WLAND_TXP_NUM] = tx_power_set[i];
+-		} else {
+-			if(wland_efuse_canbe_overwrite(&tx_power_efuse[i+WLAND_TXP_NUM],&tx_power_set[i],1))
+-				tx_power_efuse[i+WLAND_TXP_NUM] = tx_power_set[i];
+-			else {
+-				if(wland_efuse_canbe_overwrite(&tx_power_efuse[i],&tx_power_set[i],1) == true) {
+-					tx_power_efuse[i] = tx_power_set[i];
+-					tx_power_efuse[i+WLAND_TXP_NUM] = 0xFF;
+-				} else {
+-					WLAND_ERR("one bit is already 1, can not write 0\n");
+-					return -1;
+-				}
+-			}
+-		}
+-	}
+-
+-	mutex_lock(&drvr->proto_block);
+-	memset(prot->buf, '\0', sizeof(prot->buf));
+-
+-	for (i=0; i<WLAND_TXP_NUM; i++) {
+-		write[0] = tx_power_efuse[2*i];
+-		write[1] = tx_power_efuse[2*i+1];
+-		write[2] = 12+i;
+-		write[3] = 0;
+-
+-		ret = wland_push_wid(buf, WID_SET_EFUSE_ONE_PAGE, write, 4, false);
+-		if (ret < 0) {
+-			WLAND_ERR("put wid error\n");
+-			goto done;
+-		}
+-		buf += ret;
+-		memset(write, 0, 4);
+-	}
+-
+-	ret = wland_proto_cdc_data(drvr, buf-(prot->buf) + FMW_HEADER_LEN);
+-	if (ret < 0) {
+-		WLAND_ERR("WID Result Failed\n");
+-		goto done;
+-	}
+-
+-done:
+-	mutex_unlock(&drvr->proto_block);
+-	return ret;
+-
+-}
++
+ 
+ int wland_read_txpower_from_efuse(struct net_device *net,
+ 	 char *data, int len, u8 *tx_power)
+@@ -1667,106 +1241,7 @@
+ #endif
+ #if 0
+ //the case WLAND_TXP_NUM == 2 and use 8bit to contain 0x01-0xFE
+-int wland_write_txpower_to_efuse(struct net_device *net,
+-	char *data, int len)
+-{
+-	int ret = 0;
+-	struct wland_if *ifp = netdev_priv(net);
+-	struct wland_private *drvr = ifp->drvr;
+-	struct wland_proto *prot = drvr->prot;
+-	u8 tx_power_set[WLAND_TXP_NUM] = {0};
+-	char *c = data;
+-	int i = 0;
+-	u8 efuse_value[28] = {0};
+-	u8 write[4] = {0};
+-	u8 *buf = prot->buf;
+-	u8 tx_power_efuse[8] = {0};
+-
+-	WLAND_DBG(RFTEST, INFO, "wland_write_txpower_to_efuse:%s\n",data);
+-
+-	for (i=0; i<WLAND_TXP_NUM; i++) {
+-		if(strncasecmp(c, "0x", strlen("0x")) != 0) {
+-			WLAND_ERR("not a hex value\n");
+-			return -1;
+-		}
+-
+-		tx_power_set[i] = simple_strtol(c, &c, 16);
+-
+-		if ((tx_power_set[i] >= 0xFF) || (tx_power_set[i] == 0)) {
+-			WLAND_ERR("invalid value!\n");
+-			return -1;
+-		}
+-		c++;
+-	}
+-	WLAND_DBG(RFTEST, INFO, "tx power value: 0x%02x,0x%02x\n",
+-		tx_power_set[0], tx_power_set[1]);
+-
+-	if (wland_read_efuse(ifp, efuse_value))
+-		return -1;
+-
+-	memcpy(tx_power_efuse, &efuse_value[20], 8);
+-
+-	if (wland_buf_equals(&tx_power_efuse[6], 2, 0) == false) {
+-		if (wland_efuse_canbe_overwrite(&tx_power_efuse[6],
+-			tx_power_set, WLAND_TXP_NUM) == false) {
+-			WLAND_ERR("can not write txp\n");
+-			return -1;
+-		} else {
+-			tx_power_efuse[6] = tx_power_set[0];
+-			tx_power_efuse[7] = tx_power_set[1];
+-			goto send;
+-		}
+-	}
+-
+-	for (i=0; i<=3; i++) {//0 1 2 3 :page
+-		if(wland_buf_equals(&tx_power_efuse[2*i], 2, 0) == true)
+-			break;
+-	}
+-
+-	if (i==0) {
+-		tx_power_efuse[0] = tx_power_set[0];
+-		tx_power_efuse[1] = tx_power_set[1];
+-	} else {
+-		if (wland_efuse_canbe_overwrite(&tx_power_efuse[2*(i-1)],
+-			tx_power_set, WLAND_TXP_NUM) == true) {
+-			tx_power_efuse[2*(i-1)] = tx_power_set[0];
+-			tx_power_efuse[2*(i-1)+1] = tx_power_set[1];
+-		} else {
+-			tx_power_efuse[2*i] = tx_power_set[0];
+-			tx_power_efuse[2*i+1] = tx_power_set[1];
+-		}
+-	}
+-
+-send:
+-	mutex_lock(&drvr->proto_block);
+-	memset(prot->buf, '\0', sizeof(prot->buf));
+-
+-	for (i=0; i<4; i++) {
+-		write[0] = tx_power_efuse[2*i];
+-		write[1] = tx_power_efuse[2*i+1];
+-		write[2] = 12+i;
+-		write[3] = 0;
+-
+-		ret = wland_push_wid(buf, WID_SET_EFUSE_ONE_PAGE, write, 4, false);
+-		if (ret < 0) {
+-			WLAND_ERR("put wid error\n");
+-			goto done;
+-		}
+-		buf += ret;
+-		memset(write, 0, 4);
+-	}
+-
+-	ret = wland_proto_cdc_data(drvr, buf-(prot->buf) + FMW_HEADER_LEN);
+-	if (ret < 0) {
+-		WLAND_ERR("WID Result Failed\n");
+-		goto done;
+-	}
+-
+-done:
+-	mutex_unlock(&drvr->proto_block);
+-	return ret;
+-
+-}
++
+ 
+ int wland_read_txpower_from_efuse(struct net_device *net,
+ 	 char *data, int len, u8 *tx_power)
+@@ -1809,107 +1284,7 @@
+ 
+ #endif
+ //the case WLAND_TXP_NUM == 2 and use 6bit to contain 0x**-0x**
+-int wland_write_txpower_to_efuse(struct net_device *net,
+-	char *data, int len)
+-{
+-	int ret = 0;
+-	struct wland_if *ifp = netdev_priv(net);
+-	u8 tx_power_set[WLAND_TXP_NUM] = {0};
+-	u8 tx_power_get[WLAND_TXP_NUM] = {0};
+-	u16 tx_power_write = 0;
+-	char *c = data;
+-	int i = 0;
+-	u8 efuse_value[28] = {0};
+-	u8 write[4] = {0};
+-	u8 tx_power_efuse[8] = {0};
+-	u16 tx_power_comp = 0;
+-	u8 send_page = 0;
+-
+-	WLAND_DBG(RFTEST, INFO, "wland_write_txpower_to_efuse:%s\n",data);
+-
+-	for (i=0; i<WLAND_TXP_NUM; i++) {
+-		if(strncasecmp(c, "0x", strlen("0x")) != 0) {
+-			WLAND_ERR("not a hex value\n");
+-			return -1;
+-		}
+-
+-		tx_power_set[i] = simple_strtol(c, &c, 16);
+-
+-		if ((tx_power_set[i] >= 0xFF) || (tx_power_set[i] == 0)) {
+-			WLAND_ERR("invalid value!\n");
+-			return -1;
+-		}
+-		c++;
+-	}
+-
+-	if (((tx_power_set[0] < WLAND_TXP_11F_BASE)
+-		|| (tx_power_set[0] > WLAND_TXP_11F_END))
+-		|| ((tx_power_set[1] < WLAND_TXP_120_BASE)
+-		|| (tx_power_set[1] > WLAND_TXP_120_END))) {
+-		WLAND_ERR("invalid param!\n");
+-		return -1;
+-	}
+-	WLAND_DBG(RFTEST, INFO, "tx power value: 0x%02x,0x%02x\n",
+-		tx_power_set[0], tx_power_set[1]);
+-
+-	tx_power_write = ((((tx_power_set[1] - WLAND_TXP_120_BASE) & 0x3F) << 6)
+-					| ((tx_power_set[0] - WLAND_TXP_11F_BASE) & 0x3F));
+-
+-	if (wland_read_efuse(ifp, efuse_value))
+-		return -1;
+-
+-	memcpy(tx_power_efuse, &efuse_value[20], 8);
+-
+-	for (i=3; i>=0; i--) {
+-		tx_power_comp = ((MAKE_WORD16(tx_power_efuse[2*i], tx_power_efuse[2*i+1])) & 0x0FFF);
+-		if(tx_power_comp != 0)
+-			break;
+-	}
+-
+-	if (i == 3) {
+-		tx_power_comp = ((tx_power_write & 0x0FFF) | ((tx_power_efuse[7] & 0xF0)<< 8));
+-		if (wland_efuse_canbe_overwrite(&tx_power_efuse[6],
+-			(u8*)(&tx_power_comp), WLAND_TXP_NUM) == false) {
+-			WLAND_ERR("can not write txp\n");
+-			return -1;
+-		} else {
+-			send_page = 3;
+-		}
+-	} else if (i == -1) {
+-		send_page = 0;
+-	} else {
+-		tx_power_comp = ((tx_power_write & 0x0FFF) | ((tx_power_efuse[2*i+1] & 0xF0)<< 8));
+-		if (wland_efuse_canbe_overwrite(&tx_power_efuse[2*i],
+-			(u8*)(&tx_power_comp), WLAND_TXP_NUM) == true) {
+-			send_page = i;
+-		} else {
+-			send_page = i+1;
+-		}
+-	}
+-
+-	tx_power_comp = ((tx_power_write & 0x0FFF) | ((tx_power_efuse[2*send_page+1] & 0xF0)<< 8));
+-	write[0] = (tx_power_comp & 0x00FF);
+-	write[1] = ((tx_power_comp & 0xFF00) >> 8);
+-	write[2] = 12 + send_page;
+-	write[3] = 0;
+-
+-	ret = wland_fil_set_cmd_data(ifp, WID_SET_EFUSE_ONE_PAGE, write, 4);
+-	if(ret < 0) {
+-		WLAND_ERR("fil set cmd data failed!\n");
+-		return ret;
+-	}
+-
+-	ret = wland_read_txpower_from_efuse(ifp->ndev, NULL, 0, tx_power_get);
+-	if ((ret < 0) || (tx_power_get[0] == 0) || (tx_power_get[1] == 0)
+-		|| (tx_power_get[0] >= 0xFF) || (tx_power_get[1] >= 0xFF)
+-		|| (tx_power_get[0] != tx_power_set[0]) || (tx_power_get[1] != tx_power_set[1])) {
+-		WLAND_ERR("check failed\n");
+-		return -1;
+-	} else {
+-		WLAND_ERR("success!\n");
+-	}
+-	return ret;
+-}
++
+ 
+ int wland_read_txpower_from_efuse(struct net_device *net,
+ 	 char *data, int len, u8 *tx_power)
+@@ -2449,236 +1824,7 @@
+ 	return ret;
+ }
+ 
+-int wland_rf_test_cmd(struct net_device *net, struct ifreq *ifr, int cmd)
+-{
+-#define PRIVATE_COMMAND_MAX_LEN	1024
+-	int ret = 0, bytes_written = 0;
+-	char *command = NULL;
+-	struct android_wifi_priv_cmd priv_cmd;
+-
+-	WLAND_DBG(RFTEST, INFO, "Enter\n");
+-
+-#if 0
+-	net_os_wake_lock(net);
+-#endif
+-	if (!ifr->ifr_data) {
+-		ret = -EINVAL;
+-		goto exit;
+-	}
+-
+-#ifdef CONFIG_COMPAT
+-	if (is_compat_task()) {
+-		compat_android_wifi_priv_cmd compat_priv_cmd;
+-		if (copy_from_user(&compat_priv_cmd, ifr->ifr_data,
+-			sizeof(compat_android_wifi_priv_cmd))) {
+-			ret = -EFAULT;
+-			goto exit;
+-
+-		}
+-		priv_cmd.buf = compat_ptr(compat_priv_cmd.buf);
+-		priv_cmd.used_len = compat_priv_cmd.used_len;
+-		priv_cmd.total_len = compat_priv_cmd.total_len;
+-	} else
+-#endif /* CONFIG_COMPAT */
+-	{
+-		if (copy_from_user(&priv_cmd, ifr->ifr_data,
+-				sizeof(struct android_wifi_priv_cmd))) {
+-			ret = -EFAULT;
+-			goto exit;
+-		}
+-	}
+-
+-	if (priv_cmd.total_len > 1536) {
+-		WLAND_ERR("too long priavte command. %d\n", priv_cmd.total_len);
+-		ret = -EINVAL;
+-		priv_cmd.total_len = 1536;
+-	}
+-	command = memdup_user(priv_cmd.buf, priv_cmd.total_len);
+-	if (IS_ERR(command)) {
+-		WLAND_ERR("failed to allocate or write memory\n");
+-		ret= PTR_ERR(command);
+-		command = NULL;
+-		goto exit;
+-	}
+-
+-	WLAND_DBG(RFTEST, INFO, "RF TEST cmd \"%s\" on %s\n", command,
+-		ifr->ifr_name);
+-
+-	if (strncasecmp(command, CMD_TX_TEST, strlen(CMD_TX_TEST)) == 0) {
+-		int skip = strlen(CMD_RX_TEST) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_TX_TEST\n");
+-		bytes_written =	wland_start_rf_test(net, command + skip,
+-			priv_cmd.used_len- skip, 1);
+-	} else if (strncasecmp(command, CMD_RX_TEST, strlen(CMD_RX_TEST)) == 0) {
+-		int skip = strlen(CMD_RX_TEST) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_RX_TEST\n");
+-		bytes_written =	wland_start_rf_test(net, command + skip,
+-			priv_cmd.used_len - skip, 0);
+-	} else if (strncasecmp(command, CMD_RX_STOP, strlen(CMD_RX_STOP)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_RX_STOP\n");
+-		bytes_written =	wland_stop_rx_test(net);
+-	} else if (strncasecmp(command, CMD_RX_RESULT, strlen(CMD_RX_RESULT)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_RX_RESULT\n");
+-		bytes_written =	wland_get_rx_result(net, command, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_SET_MACADDR, strlen(CMD_SET_MACADDR)) == 0) {
+-		int skip = strlen(CMD_SET_MACADDR) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SET_MACADDR\n");
+-		bytes_written =	wland_efuse_set_mac_addr(net, command + skip,
+-			priv_cmd.used_len - skip);
+-	} else if (strncasecmp(command, CMD_GET_MACADDR, strlen(CMD_GET_MACADDR)) == 0) {
+-		u8 mac[6] = {0};
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_GET_MACADDR\n");
+-		bytes_written = wland_efuse_get_mac_addr(net, command, priv_cmd.total_len, mac);
+-	}
+-#if 0
+-	else if (strncasecmp(command, CMD_SET_VENDOR_ID, strlen(CMD_SET_VENDOR_ID)) == 0) {
+-		int skip = strlen(CMD_SET_VENDOR_ID) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SET_VENDOR_ID\n");
+-		bytes_written = wland_efuse_set_vendor_id(net, command + skip,
+-			priv_cmd.used_len - skip);
+-	} else if (strncasecmp(command, CMD_GET_VENDOR_ID, strlen(CMD_GET_VENDOR_ID)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_GET_VENDOR_ID\n");
+-		bytes_written = wland_efuse_get_vendor_id(net, command, priv_cmd.total_len);
+-	}
+-#endif
+-	else if (strncasecmp(command, CMD_SET_PARAM, strlen(CMD_SET_PARAM)) == 0) {
+-		int skip = strlen(CMD_SET_PARAM) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SET_PARAM\n");
+-		bytes_written =	wland_set_hardware_param(net, command + skip,
+-			priv_cmd.used_len - skip, -1, 0);
+-	}  else if (strncasecmp(command, CMD_WRITE_F_CAL_VAL, strlen(CMD_WRITE_F_CAL_VAL)) == 0) {
+-		int skip = strlen(CMD_WRITE_F_CAL_VAL) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_WRITE_F_CAL_VAL\n");
+-		bytes_written =	wland_write_efuse_xtal_cal_val(net, command + skip,
+-			priv_cmd.used_len - skip);
+-	} else if (strncasecmp(command, CMD_READ_F_CAL_VAL, strlen(CMD_READ_F_CAL_VAL)) == 0) {
+-		u8 cal_val = 0;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_READ_F_CAL_VAL\n");
+-		bytes_written = wland_read_efuse_xtal_cal_val(net, command,
+-			priv_cmd.total_len, &cal_val);
+-	} else if (strncasecmp(command, CMD_WRITE_TXPOWER, strlen(CMD_WRITE_TXPOWER)) == 0) {
+-		int skip = strlen(CMD_WRITE_TXPOWER) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_WRITE_TXPOWER\n");
+-		bytes_written =	wland_write_txpower_to_efuse(net, command + skip,
+-			priv_cmd.used_len - skip);
+-	} else if (strncasecmp(command, CMD_READ_TXPOWER, strlen(CMD_READ_TXPOWER)) == 0) {
+-		u8 tx_power[WLAND_TXP_NUM] = {0};
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_READ_TXPOWER\n");
+-		bytes_written = wland_read_txpower_from_efuse(net, command,
+-			priv_cmd.total_len, tx_power);
+-	} else if (strncasecmp(command, CMD_GET_EFUSE, strlen(CMD_GET_EFUSE)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_GET_EFUSE\n");
+-		bytes_written = wland_get_efuse_data(net, command, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_GET_PARAM, strlen(CMD_GET_PARAM)) == 0) {
+-		u16 value = 0;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_GET_PARAM\n");
+-		bytes_written = wland_get_hardware_param(net, command, priv_cmd.total_len, -1, &value);
+-	} else if (strncasecmp(command, CMD_GET_REG_CHAN, strlen(CMD_GET_REG_CHAN)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_GET_REG_CHAN\n");
+-		bytes_written = wland_get_reg_for_all_channels(net, command,
+-			priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_SET_REG_CHAN, strlen(CMD_SET_REG_CHAN)) == 0) {
+-		int skip = strlen(CMD_SET_REG_CHAN) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SET_REG_CHAN\n");
+-		bytes_written =	wland_set_reg_for_one_channel(net, command + skip,
+-			priv_cmd.used_len - skip);
+-	} else if (strncasecmp(command, CMD_SET_SDIO_PIN, strlen(CMD_SET_SDIO_PIN)) == 0) {
+-		int skip = strlen(CMD_SET_SDIO_PIN) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SET_SDIO_PIN\n");
+-		bytes_written = wland_set_sdio_pin_level(net, command + skip,
+-			priv_cmd.used_len - skip);
+-	} else if (strncasecmp(command, CMD_MD, strlen(CMD_MD)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_MD\n");
+-		bytes_written = wland_md(net, command, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_MW, strlen(CMD_MW)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_MW\n");
+-		bytes_written = wland_mw(net, command, priv_cmd.total_len, 0, 0);
+-	} else if (strncasecmp(command, CMD_RF_REGR, strlen(CMD_RF_REGR)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_RF_REGR\n");
+-		bytes_written = wland_rf_phy_reg_read(net, command, priv_cmd.total_len, 0);
+-	} else if (strncasecmp(command, CMD_RF_REGW, strlen(CMD_RF_REGW)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_RF_REGW\n");
+-		bytes_written = wland_rf_phy_reg_write(net, command, priv_cmd.total_len, 0, 0, 0);
+-	} else if (strncasecmp(command, CMD_PHY_REGR, strlen(CMD_PHY_REGR)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_PHY_REGR\n");
+-		bytes_written = wland_rf_phy_reg_read(net, command, priv_cmd.total_len, 1);
+-	} else if (strncasecmp(command, CMD_PHY_REGW, strlen(CMD_PHY_REGW)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_PHY_REGW\n");
+-		bytes_written = wland_rf_phy_reg_write(net, command, priv_cmd.total_len, 1, 0, 0);
+-	} else if (strncasecmp(command, CMD_SET_RSSI_SNR, strlen(CMD_SET_RSSI_SNR)) == 0) {
+-		int skip = strlen(CMD_SET_RSSI_SNR) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SET_RSSI_SNR\n");
+-		bytes_written = wland_dev_set_rssi_snr_config(net, command + skip,priv_cmd.used_len - skip);
+-	} else if (strncasecmp(command, CMD_GET_RSSI_SNR, strlen(CMD_GET_RSSI_SNR)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_GET_RSSI_SNR\n");
+-		bytes_written = wland_dev_get_rssi_snr(net, command, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_GET_TX_STATUS, strlen(CMD_GET_TX_STATUS)) == 0) {
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_GET_TX_STATUS\n");
+-		bytes_written = wland_dev_get_tx_status(net, command, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_SET_RATE, strlen(CMD_SET_RATE)) == 0) {
+-		int skip = strlen(CMD_SET_RATE) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SET_RATE\n");
+-		bytes_written =	wland_set_rate(net, command + skip, priv_cmd.used_len - skip);
+-	}  else if (strncasecmp(command, CMD_SET_TBTT_CNT, strlen(CMD_SET_TBTT_CNT)) == 0) {
+-		int skip = strlen(CMD_SET_TBTT_CNT) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SET_TBTT_CNT\n");
+-		bytes_written = wland_set_tbtt_cnt(net, command + skip, priv_cmd.used_len - skip);
+-	} 
+-#ifdef WLAND_SMART_CONFIG_SUPPORT
+-	else if (strncasecmp(command, CMD_SNIFFER_ENABLE, strlen(CMD_SNIFFER_ENABLE)) == 0) {
+-		int skip = strlen(CMD_SNIFFER_ENABLE) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SNIFFER_ENABLE\n");
+-		bytes_written = wland_sniffer_enable(net, command + skip, priv_cmd.total_len);
+-	} else if (strncasecmp(command, CMD_SET_CHANNEL, strlen(CMD_SET_CHANNEL)) == 0) {
+-		int skip = strlen(CMD_SET_CHANNEL) + 1;
+-		WLAND_DBG(RFTEST, DEBUG, "CMD_SET_CHANNEL\n");
+-		bytes_written = wland_parse_and_set_channel(net, command + skip, priv_cmd.total_len);
+-	}
+-#endif
+-#ifdef WLAND_AP_RESET
+-	else if (strncasecmp(command, "ap_reset", strlen("ap_reset")) == 0) {
+-		ap_reseting = true;
+-		schedule_work(&wland_chip_reset_work);
+-		bytes_written = 0;
+-	}
+-#endif
+-    else {
+-		WLAND_DBG(RFTEST, ERROR,
+-			"Unknown RF command %s - ignored\n", command);
+-		snprintf(command, 3, "OK");
+-		bytes_written = strlen("OK");
+-	}
+-
+-	if (bytes_written >= 0) {
+-		if ((bytes_written == 0) && (priv_cmd.total_len > 0))
+-			command[0] = '\0';
+-		if (bytes_written >= priv_cmd.total_len) {
+-			WLAND_ERR("bytes_written = %d\n", bytes_written);
+-			bytes_written = priv_cmd.total_len;
+-		} else {
+-			bytes_written++;
+-		}
+-		priv_cmd.used_len = bytes_written;
+-		if (copy_to_user(priv_cmd.buf, command, bytes_written)) {
+-			WLAND_ERR("failed to copy data to user buffer\n");
+-			ret = -EFAULT;
+-		} else
+-			ret = bytes_written;
+-	} else {
+-		ret = bytes_written;
+-	}
+-
+-exit:
+-#if 0
+-	net_os_wake_unlock(net);
+-#endif
+-	//WLAND_DBG(RFTEST, INFO, "Done(%s, on:%s,ret:%d)\n", command, ifr->ifr_name, ret);
+-
+-	if (command)
+-		kfree(command);
+-
+-	return ret;
+-}
++
+ 
+ int wland_update_rf_rxtest_result(struct wland_private *drvr,
+ 	u8* buffer)
+--- a/rdawlan/wland_rx.c
++++ b/rdawlan/wland_rx.c
+@@ -431,7 +431,7 @@
+ 	if (in_interrupt()) {
+ 		netif_rx(skb);
+ 	} else {
+-		netif_rx_ni(skb);
++		netif_rx(skb);
+ 	}
+ }
+ 
+@@ -706,7 +706,7 @@
+ 		 * If the receive is not processed inside an ISR, the softirqd must be woken explicitly to service the NET_RX_SOFTIRQ.
+ 		 * * In 2.6 kernels, this is handledby netif_rx_ni(), but in earlier kernels, we need to do it manually.
+ 		 */
+-		netif_rx_ni(skb);
++		netif_rx(skb);
+ 	}
+ }
+ 
+--- a/rdawlan/wland_trap.c
++++ b/rdawlan/wland_trap.c
+@@ -246,9 +246,7 @@
+ 	if (!image)
+ 		return 0;
+ 
+-	rdlen = kernel_read(fp, fp->f_pos, buf, len);
+-	if (rdlen > 0)
+-		fp->f_pos += rdlen;
++	rdlen = kernel_read(fp, buf, len, &fp->f_pos);
+ 
+ 	return rdlen;
+ }
+@@ -750,6 +748,12 @@
+ 	char *filename = NULL;
+ 	struct wland_private *drvr= ifp->drvr;
+ 
++
++	if (strcmp(rdawlan_firmware_path, "sta") &&
++	    strcmp(rdawlan_firmware_path, "ap") &&
++	    strcmp(rdawlan_firmware_path, "p2p"))
++		return -EPERM;
++
+ 	WLAND_DBG(TRAP, TRACE, "Enter, chip:%d,firmware_path%s\n",
+ 		drvr->bus_if->chip, rdawlan_firmware_path);
+ 
+@@ -772,12 +776,7 @@
+ #else
+ 			filename = RDA5991H_USB_CODE_AP;
+ #endif
+-		else if (strncasecmp(rdawlan_firmware_path, "rf", strlen("rf")) == 0)
+-#ifdef WLAND_SDIO_SUPPORT
+-			filename = RDA5991H_SDIO_CODE_RF;
+-#else
+-			filename = RDA5991H_USB_CODE_RF;
+-#endif
++
+ 	}
+ 
+ 	if (filename)
+@@ -800,6 +799,12 @@
+ 	u32 addr;
+ 	struct wland_private *drvr = ifp->drvr;
+ 
++
++	if (strcmp(rdawlan_firmware_path, "sta") &&
++	    strcmp(rdawlan_firmware_path, "ap") &&
++	    strcmp(rdawlan_firmware_path, "p2p"))
++		return -EPERM;
++
+ 	WLAND_DBG(TRAP, TRACE, "Enter\n");
+ 	addr = RDA5991H_DATA_ADDR_STA_AP;
+ 
+@@ -827,12 +832,7 @@
+ #else
+ 			filename = RDA5991H_USB_DATA_AP;
+ #endif
+-		else if (strncasecmp(rdawlan_firmware_path, "rf", strlen("rf")) == 0)
+-#ifdef WLAND_SDIO_SUPPORT
+-			filename = RDA5991H_SDIO_DATA_RF;
+-#else
+-			filename = RDA5991H_USB_DATA_RF;
+-#endif
++
+ 	}
+ 
+ 	if (filename)
+--- a/rdawlan/wland_utils.h
++++ b/rdawlan/wland_utils.h
+@@ -21,7 +21,7 @@
+ #include <80211.h>
+ 
+ #if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0))
+-#define RANDOM32        prandom_u32
++#define RANDOM32        get_random_u32
+ #else
+ #define RANDOM32        random32
+ #endif
+--- a/rdawlan/wland_wid.c
++++ b/rdawlan/wland_wid.c
+@@ -503,19 +503,17 @@
+ 		goto fail;
+ 	}
+ 
+-	if (wland_nvram_read(RDA5995_TESTMODE_FILE, NULL, 0, 0) >= 0)
+-		strcpy(rdawlan_firmware_path, "rf");
++	/* No filesystem trigger for manufacturing firmware. */
+ #if 0
+ 	if (strncasecmp(rdawlan_firmware_path, "p2p", strlen("p2p")) == 0)
+ 		drvr->p2p_enable = true;
+ 	else
+ 		drvr->p2p_enable = false;
+ #endif
+-	if (strncasecmp(rdawlan_firmware_path, "rf", strlen("rf")) == 0) {
+-		WLAND_DBG(RFTEST, INFO, "RF Test Mode!\n");
+-		wland_set_test_mode(1);
+-	} else
+-		wland_set_test_mode(0);
++	if (strcmp(rdawlan_firmware_path, "sta") &&
++	    strcmp(rdawlan_firmware_path, "ap") &&
++	    strcmp(rdawlan_firmware_path, "p2p"))
++		return -EPERM;
+ 
+ 	WLAND_ERR("firmware_path:%s\n", rdawlan_firmware_path);
+ 
+--- /dev/null
++++ b/rdawlan/wland_port_key.h
+@@ -0,0 +1,20 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef WLAND_PORT_KEY_H
++#define WLAND_PORT_KEY_H
++
++/* Caller provides a 32-byte firmware key buffer; never read padding from key. */
++static inline int wland_port_copy_key(u8 *out, const u8 *key, int length,
++				     bool swap_mic)
++{
++	if (!key || (length != 5 && length != 13 && length != 16 && length != 32))
++		return -EINVAL;
++	memset(out, 0, 32);
++	memcpy(out, key, length);
++	if (length == 32 && swap_mic) {
++		memcpy(out + 16, key + 24, 8);
++		memcpy(out + 24, key + 16, 8);
++	}
++	return 0;
++}
++
++#endif

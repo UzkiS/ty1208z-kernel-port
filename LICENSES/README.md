@@ -2,7 +2,8 @@
 
 This repository is not relicensed under a single blanket license.
 
-- New Linux board/timer/DTS files in `overlay/` use **GPL-2.0-only**, as stated by
+- New Linux board/timer/DTS files in `overlay/` and wireless helpers in
+  `wifi/overlay/` use **GPL-2.0-only**, as stated by
   their SPDX headers. Generated Linux patches retain upstream licensing.
 - BusyBox's `coreutils/stat.c` declares **GPL-2.0-or-later**. Its generated patch
   follows that licensing. The complete BusyBox source/license is obtained from
@@ -14,6 +15,10 @@ This repository is not relicensed under a single blanket license.
   hashes. They keep their original licenses (including GPL and Apache notices).
   Downloaded reference files are not redistributed by this Git repository.
 - Original device firmware, bootloader binaries and extracted DTBs remain local.
+- Optional RDA source files retain their Rdamicro permission notices and module
+  GPL declaration. Checked patches preserve those notices; the locked original
+  code is fetched locally rather than vendored. No vendor firmware is fetched
+  or redistributed by the Wi-Fi build.
 
 Upstream source locks and patch generators ship with each local/CI diagnostic
 artifact. No ready-to-install binary release is published by this project.

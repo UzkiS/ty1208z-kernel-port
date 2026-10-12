@@ -65,6 +65,40 @@
 生产驱动不得启用或包含制造测试中的 eFuse 写入入口；这些接口须在模块集成前
 审计并排除。当前最小诊断镜像仍没有 USB/Wi-Fi 驱动。
 
+## 独立完整模块构建
+
+`make wifi-port` 使用同一个固定 RDA 来源，但有单独的 API 补丁、配置和内核输出目录。
+`wifi/overlay/` 只维护无线层新增文件，不能进入普通 Linux 板级 `overlay/`。
+当前已在 Linux 6.12.112 下编译并链接完整 USB `rdawfmac.ko`，modpost 检查通过；
+它不是已经能联网的驱动，也没有加载到本机。模块只能匹配相应配置/版本的内核。
+
+本次适配覆盖 kernel_read/文件读取、随机数、unaligned include、网络地址/接收/超时
+回调、cfg80211 的 link 参数、管理帧注册、AP beacon/stop 回调和漫游通知。
+boottime 使用 64 位 ktime 和 ARM 内核的 div_u64，不引入 32 位 timespec 或
+无法链接的用户空间除法辅助函数。厂商现有定时器兼容分支可在 6.12 编译。
+
+生产边界包括：
+
+- 删除 eFuse 写函数和 RF 私有命令解析器，拒绝 Android/RF 私有 ioctl；
+  普通扫描、STA/AP/P2P 使用 cfg80211 路径，私有厂商工具不受支持。
+- 普通/批量 WID 打包同时拒绝三个 eFuse 写 ID，保留校准信息读取。
+  `WLAND_POWER_EFUSE` 的读取后 RAM RF 设置不是 eFuse 烧写。
+- 删除测试文件触发、RF 固件分支和可变 test-mode 状态；只接受精确的 sta/ap/p2p 模式。
+- 文件写辅助函数返回不支持，由用户空间管理持久配置；模块不写 `/etc/WLANMAC`。
+- 修复短 WEP/CCMP 密钥被无条件按 32 字节读取、TKIP MIC 布局、GTK sequence 边界，
+  并传播固件加密密钥设置失败。删除调试前的漫游 BSS 引用释放，交给 cfg80211 消费。
+- 独立完整模块配置关闭 debugfs；符号/ELF/vermagic/USB alias 检查拒绝残留制造写函数。
+
+`test_wifi_port.py` 在 ASan/UBSan 下执行实际 WID 打包函数与新增密钥处理代码，
+验证 eFuse 写入在改动消息前被拒绝、合法查询/普通请求继续打包、短密钥没有越界，
+TKIP MIC 顺序和错误长度处理正确。它也检查制造入口/固件路径/漫游引用的源码边界。
+这些是软件回归，不是射频或联网证据。
+
+尚需确认的硬件/功能包括现代内核 USB host/PHY、准确芯片 revision、对应固件、
+供电/冷启动、扫描、加密关联、DHCP、吞吐、断线恢复和 AP。
+公开来源中的其他旧逻辑（例如部分 key deletion/AP stop 实现）仍需行为审查及实测，
+不能用成功链接替代这些验证。固件未下载、未打包，分发许可仍未确证。
+
 ## 后续实施顺序
 
 1. 先让现代内核最小串口/计时诊断在实机启动，再适配 USB 控制器、PHY、时钟、
