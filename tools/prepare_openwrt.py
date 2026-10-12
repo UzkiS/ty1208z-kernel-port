@@ -122,6 +122,9 @@ def prepare(project, taskbase):
     shutil.copyfile(probe, output)
     manifest[str(relative)] = sha256(probe)
     (destination / "feeds.conf").write_text("# RAM bring-up: no external feeds.\n")
+    # codeload archives have no Git revision. OpenWrt's 'unknown' fallback is
+    # invalid in the APK package version; preserve the actual fixed commit.
+    (destination / "version").write_text("source-" + item["commit"] + "\n")
     (destination / ".ty1208z-overlay.json").write_text(json.dumps(manifest, indent=2) + "\n")
     config = project / "openwrt/config/ram.config"
     if not (destination / ".config").exists():

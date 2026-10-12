@@ -4,6 +4,7 @@ include $(TOPDIR)/rules.mk
 ARCH:=arm
 BOARD:=hi3798mv100
 BOARDNAME:=HiSilicon Hi3798MV100 RAM bring-up
+SUBTARGETS:=ram
 FEATURES:=fpu ramdisk
 CPU_TYPE:=cortex-a7
 CPU_SUBTYPE:=neon-vfpv4

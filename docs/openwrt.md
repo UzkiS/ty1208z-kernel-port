@@ -49,8 +49,10 @@ and hashes come from that archive. `prepare_openwrt.py` validates the archive,
 extracts into a separate Linux build tree, installs the reviewed overlay and
 copies the authoritative board patch, BusyBox stat time64 patch and time64
 probe. The BusyBox custom configuration enables stat/format without changing
-the other inherited defaults. The initial profile
-resolves locally; full native compilation and hardware acceptance are pending.
+the other inherited defaults. Native GCC/musl compilation, image checks and
+QEMU core time64 acceptance now pass locally; see
+[the exact artifact and limits](../verification/openwrt-native-20261012.md).
+CI and physical acceptance are tracked separately.
 
 Run these commands as a regular user on a Linux filesystem (including WSL):
 
@@ -90,6 +92,18 @@ stock partition write actions until backups and recovery have been established
 and the exact installation plan has session authorization.
 
 ## Passwall and Y2038 acceptance
+
+The initial read-only recipe audit is pinned separately in
+`reference/passwall-audit.lock.json`: Passwall 26.10.4 at
+`14b4ef0bcfeb8a01a22f70a3c4f01cdb87fd0b1d`, and the package repository at
+`1af0a5c4fb3a227201683b64d32f61c65db9be72`. Its audited recipes select
+Xray 26.10.10 or sing-box 1.14.3 through the external packages feed's Go
+toolchain. Passwall also needs LuCI/Lua, dnsmasq-full, DNS/proxy helpers and
+transparent-proxy kernel modules. These are not in the native RAM profile.
+Default Passwall options pull multiple engines/plugins; the router profile
+must select an explicit set and measure size/memory rather than accepting
+the entire default list. This file audit does not fix all feeds, Go modules,
+runtime downloads or choose a working backend.
 
 Pin Passwall and its actual selected backend/transport/DNS dependencies as a
 separate application layer. The user requires Passwall; the choice of engine

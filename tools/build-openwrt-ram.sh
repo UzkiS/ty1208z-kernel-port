@@ -14,16 +14,19 @@ export SOURCE_DATE_EPOCH=1791676800
 export TZ=UTC
 export LC_ALL=C
 source_tree=$(python3 "$project/tools/prepare_openwrt.py" --taskbase "$taskbase")
-make -C "$source_tree" defconfig
+# Archive builds use a fixed local package revision, not the timestamp-based
+# commit-count fallback or a fabricated upstream Git history.
+make_args=(-C "$source_tree" "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" COMMITCOUNT=1)
+make "${make_args[@]}" defconfig
 python3 "$project/tools/check_openwrt.py" --source "$source_tree"
 if [ "$stage" = config ]; then
     exit 0
 fi
-make -C "$source_tree" -j"$jobs" tools/install V=s
-make -C "$source_tree" -j"$jobs" toolchain/install V=s
+make "${make_args[@]}" -j"$jobs" tools/install V=s
+make "${make_args[@]}" -j"$jobs" toolchain/install V=s
 if [ "$stage" = toolchain ]; then
     exit 0
 fi
-make -C "$source_tree" -j"$jobs" V=s
+make "${make_args[@]}" -j"$jobs" V=s
 python3 "$project/tools/check_openwrt.py" --source "$source_tree" --built
 python3 "$project/tools/test_openwrt_qemu.py" --source "$source_tree"

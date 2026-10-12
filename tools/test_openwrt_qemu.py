@@ -9,10 +9,10 @@ import time
 
 
 def test(source):
-    kernels = list((source / "build_dir").glob("target-*/linux-hi3798mv100/zImage-initramfs"))
+    kernels = list((source / "build_dir").glob("target-*/linux-hi3798mv100_ram/zImage-initramfs"))
     if len(kernels) != 1:
         raise ValueError("Expected one actual OpenWrt initramfs kernel")
-    output = source / "bin/targets/hi3798mv100/checks"
+    output = source / "bin/targets/hi3798mv100/ram/checks"
     output.mkdir(parents=True, exist_ok=True)
     process = subprocess.Popen([
         "qemu-system-arm", "-machine", "virt,gic-version=2", "-cpu", "cortex-a7",
@@ -23,12 +23,15 @@ def test(source):
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ)
     transcript = bytearray()
-    activated = False
+    activation_at = None
+    activation_count = 0
     sent = False
     deadline = time.monotonic() + 90
     # This future wall-clock change happens only in the isolated QEMU process.
     # Validate procd/ubus, UCI and logging as well as the installed musl probe.
     command = (
+        b"n=0; while [ ! -S /dev/log ] && [ $n -lt 30 ]; "
+        b"do n=$((n+1)); sleep 1; done; test -S /dev/log && "
         b"time64-probe --set-clock-2040 && "
         b"test $(date -u +%Y) = 2040 && "
         b"touch /tmp/time64-stat && test $(stat -c %Y /tmp/time64-stat) -ge 2208988800 && "
@@ -49,14 +52,20 @@ def test(source):
                     transcript.extend(data)
                     log.write(data)
                     log.flush()
-                    if not activated and b"Please press Enter" in transcript:
-                        process.stdin.write(b"\n")
-                        process.stdin.flush()
-                        activated = True
+                    if activation_at is None and b"Please press Enter" in transcript:
+                        # askfirst configures/flushed its TTY after printing
+                        # the prompt. Send Enter once the console is ready.
+                        activation_at = time.monotonic() + 1
                     if not sent and re.search(rb"(?:^|[\r\n])root@[^\r\n]*[#$] $", transcript):
                         process.stdin.write(command)
                         process.stdin.flush()
                         sent = True
+                if (not sent and activation_at is not None and activation_count < 3
+                        and time.monotonic() >= activation_at):
+                    process.stdin.write(b"\r")
+                    process.stdin.flush()
+                    activation_count += 1
+                    activation_at = time.monotonic() + 2
                 if process.poll() is not None:
                     break
             else:

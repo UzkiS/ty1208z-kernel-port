@@ -1,0 +1,27 @@
+{
+  "schema": 1,
+  "scope": "Read-only recipe audit; not a complete feed/build lock or a selected backend",
+  "files": [
+    {
+      "repository": "https://github.com/openwrt-passwall/openwrt-passwall",
+      "commit": "14b4ef0bcfeb8a01a22f70a3c4f01cdb87fd0b1d",
+      "path": "luci-app-passwall/Makefile",
+      "url": "https://raw.githubusercontent.com/openwrt-passwall/openwrt-passwall/14b4ef0bcfeb8a01a22f70a3c4f01cdb87fd0b1d/luci-app-passwall/Makefile",
+      "sha256": "be446530673bc9fbddecc23cd777d418490f40b838958b049916db7e38916ec1"
+    },
+    {
+      "repository": "https://github.com/openwrt-passwall/openwrt-passwall-packages",
+      "commit": "1af0a5c4fb3a227201683b64d32f61c65db9be72",
+      "path": "xray-core/Makefile",
+      "url": "https://raw.githubusercontent.com/openwrt-passwall/openwrt-passwall-packages/1af0a5c4fb3a227201683b64d32f61c65db9be72/xray-core/Makefile",
+      "sha256": "566b5dc33ff4d2117baeba32b34badf6ecec047fad2fd18a2bf5a112a7164e4b"
+    },
+    {
+      "repository": "https://github.com/openwrt-passwall/openwrt-passwall-packages",
+      "commit": "1af0a5c4fb3a227201683b64d32f61c65db9be72",
+      "path": "sing-box/Makefile",
+      "url": "https://raw.githubusercontent.com/openwrt-passwall/openwrt-passwall-packages/1af0a5c4fb3a227201683b64d32f61c65db9be72/sing-box/Makefile",
+      "sha256": "5c78eb5190b06dcbfc82b598cfaf5316674060e03a635c5949deab81a47be23d"
+    }
+  ]
+}

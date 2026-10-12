@@ -5,6 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 import subprocess
+import struct
 import sys
 
 from inspect_images import inspect_image
@@ -13,7 +14,7 @@ from inspect_images import inspect_image
 def check(source, built=False):
     config = (source / ".config").read_text()
     for option in (
-            "TARGET_hi3798mv100", "TARGET_hi3798mv100_DEVICE_ty1208z_ca_ram",
+            "TARGET_hi3798mv100", "TARGET_hi3798mv100_ram", "TARGET_hi3798mv100_ram_DEVICE_ty1208z_ca_ram",
             "TARGET_ROOTFS_INITRAMFS", "TARGET_INITRAMFS_COMPRESSION_GZIP", "USE_MUSL",
             "PACKAGE_ty1208z-time64", "BUSYBOX_CUSTOM", "BUSYBOX_CONFIG_STAT",
             "BUSYBOX_CONFIG_FEATURE_STAT_FORMAT"):
@@ -24,26 +25,31 @@ def check(source, built=False):
             raise ValueError(f"Unexpected persistent-storage option: {option}")
     if (source / "feeds.conf").read_text() != "# RAM bring-up: no external feeds.\n":
         raise ValueError("Unexpected external feeds")
+    source_identity = json.loads((source / ".ty1208z-source.json").read_text())
+    if (source / "version").read_text() != "source-" + source_identity["commit"] + "\n":
+        raise ValueError("Archive source version differs from the locked commit")
     manifest = json.loads((source / ".ty1208z-overlay.json").read_text())
     for relative, expected in manifest.items():
         actual = hashlib.sha256((source / relative).read_bytes()).hexdigest()
         if actual != expected:
             raise ValueError(f"Changed target input: {relative}")
     if built:
-        kernels = list((source / "build_dir").glob("target-*/linux-hi3798mv100/linux-6.12.112/.config"))
+        kernels = list((source / "build_dir").glob("target-*/linux-hi3798mv100_ram/linux-6.12.112/.config"))
         if len(kernels) != 1:
             raise ValueError("Expected one native kernel build")
         resolved = kernels[0].read_text()
-        for option in ("ARCH_HI3798MV100", "HI3798MV100_TIMER", "SERIAL_AMBA_PL011_CONSOLE", "ARM_APPENDED_DTB"):
+        for option in ("ARCH_HI3798MV100", "HI3798MV100_TIMER", "SERIAL_AMBA_PL011_CONSOLE",
+                       "ARM_APPENDED_DTB", "CPU_LITTLE_ENDIAN", "KERNEL_GZIP"):
             if f"CONFIG_{option}=y\n" not in resolved:
                 raise ValueError(f"Required native kernel option missing: {option}")
-        for option in ("SMP", "BLOCK", "MTD", "MMC", "USB_SUPPORT", "PCI", "HI3798MV100_EMMC_AUDIT"):
+        for option in ("SMP", "BLOCK", "MTD", "MMC", "USB_SUPPORT", "PCI",
+                       "HI3798MV100_EMMC_AUDIT", "CPU_BIG_ENDIAN"):
             if f"CONFIG_{option}=y\n" in resolved or f"CONFIG_{option}=m\n" in resolved:
                 raise ValueError(f"Unexpected native RAM kernel subsystem: {option}")
-        images = list((source / "bin/targets/hi3798mv100").rglob("*initramfs*uImage-UNTESTED.bin"))
+        images = list((source / "bin/targets/hi3798mv100/ram").glob("*initramfs*uImage-UNTESTED.bin"))
         if len(images) != 1:
             raise ValueError("Expected one native initramfs CA uImage")
-        output = source / "bin/targets/hi3798mv100/checks"
+        output = source / "bin/targets/hi3798mv100/ram/checks"
         output.mkdir(parents=True, exist_ok=True)
         result = inspect_image(images[0], output)
         headers = result["uimages"]
@@ -56,6 +62,15 @@ def check(source, built=False):
                 or len(result["device_trees"]) != 1):
             raise ValueError("Native CA uImage/DTB structure differs or is corrupt")
         (output / "image.json").write_text(json.dumps(result, indent=2) + "\n")
+        tree = result["device_trees"][0]
+        properties = {node["path"]: node["properties"] for node in tree["nodes"]}
+        dtb = (output / tree["extracted_file"]).read_bytes()
+        reservation_offset = struct.unpack_from(">I", dtb, 16)[0]
+        if (properties["/memory@0"]["reg"]["cells"] != [0, 0x10000000]
+                or struct.unpack_from(">QQ", dtb, reservation_offset) != (0, 0x01000000)
+                or properties["/chosen"]["bootargs"]["strings"] != [
+                    "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=7 panic=0"]):
+            raise ValueError("Native DTB memory reservation or RAM-root command line differs")
         subprocess.run([
             sys.executable, str(Path(__file__).with_name("inspect_kernel_layout.py")),
             "--build", str(kernels[0].parent), "--output", str(output / "kernel-layout.json"),
@@ -63,7 +78,7 @@ def check(source, built=False):
         copied = kernels[0].parent.parent / "zImage-initramfs"
         if copied.read_bytes() != (kernels[0].parent / "arch/arm/boot/zImage").read_bytes():
             raise ValueError("Copied native initramfs kernel differs from the measured footprint")
-        print(json.dumps(result, indent=2))
+        print(json.dumps({key: result[key] for key in ("bytes", "sha256", "uimages")}, indent=2))
     print("OPENWRT_RAM_CONFIG_PASS" + ("; built, hardware untested" if built else ""))
 
 
