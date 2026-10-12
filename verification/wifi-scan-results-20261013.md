@@ -61,7 +61,7 @@ All previous WID/control/key/operation/startup/scan sanitizers and the final
 ARM module link/modpost/identity gates passed. `make lint`, `make build` and
 `make test` passed locally, including core QEMU time64 and RAM-boot/TFTP
 regressions. No image/module was loaded on the TY1208Z. Remote acceptance
-of these result-parser changes is pending.
+of these result-parser changes subsequently passed in the run recorded below.
 
 | Local item | Identity |
 |---|---|
@@ -75,3 +75,22 @@ of these result-parser changes is pending.
 This supersedes the earlier local [scan-dispatch module](wifi-scan-20261013.md)
 identity. Remote/local artifacts remain distinct and must match their exact
 kernel/config; none is evidence of usable board Wi-Fi.
+
+## Remote parser acceptance
+
+[Run 38313816693](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38313816693)
+completed successfully on `e52cfb5f2689ef336b9e59cb8cbbc21c67ad3c2b`.
+The job ran from 21:57:26 to 22:26:22 UTC on 2026-10-12; every step was
+inspected and passed, including all independent diagnostic profiles and upload.
+The downloaded Wi-Fi artifact's six manifest files matched their lengths and
+SHA-256 hashes. Its port patch matches `887ed779...`, and the actual build log
+contains all six control/key/operation/startup/scan/result sanitizer markers.
+
+The remote module is 339124 bytes, SHA-256
+`df59a0773395fedabe5bc058a7c6174db226cfa93bbfe6846ac906dd5df0f5c7`;
+the Wi-Fi build log SHA-256 is
+`49b9c278cfa549996ff94724877fa4e7884604686ca0c1504ee2f07eaf5f8c4c`.
+It has the same standalone kernel release, but remains a distinct compiler/build
+artifact from the local module above. The later native-OpenWrt package and
+strict declaration/linkage changes are excluded from this run. No physical
+Wi-Fi or USB initialization is established.

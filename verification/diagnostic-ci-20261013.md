@@ -73,3 +73,16 @@ actual build log contains standalone `RDA_SCAN_FAILURE_PASS`,
 [result-parser changes](wifi-scan-results-20261013.md) are excluded from this
 run. Physical Wi-Fi/native OpenWrt and application UDP/NTP acceptance remain
 separate and unestablished by these diagnostic checks.
+
+## Scan-result parser accepted remotely
+
+[Run 38313816693](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38313816693)
+completed successfully on `e52cfb5f2689ef336b9e59cb8cbbc21c67ad3c2b`.
+The complete job and every step were inspected, from 21:57:26 to 22:26:22 UTC
+on 2026-10-12. This includes the actual NETINFO/IE/result-ownership regression,
+all earlier RDA guards, serial/TFTP gates, core time64 and every independent
+eMMC/Ethernet/USB/restart profile. Six downloaded Wi-Fi files and all six
+actual-function sanitizer markers were verified; identities are recorded in
+the [parser report](wifi-scan-results-20261013.md). Later native-package and
+strict declaration/linkage changes are excluded. Physical acceptance remains
+separate.
