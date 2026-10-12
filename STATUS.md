@@ -14,7 +14,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Linux 6.12.112 candidate | Cross-compiled; board descriptor, UART/GIC DTB, single-core timer and embedded initramfs |
 | Structural checks | Passed: CRC, ARM uImage/zImage, appended DTB, static ARM ELF, required/disabled config |
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
-| GitHub CI | Passed for code commit `8477701`: clean diagnostic build, serial/RAM gates, QEMU time64, RDA USB object/full module with sanitizer regressions, eMMC register audit and restricted PIO card-identification build/tests; [run 38219145833](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38219145833) |
+| GitHub CI | Passed for code commit `45990b6`: clean diagnostic build, serial/RAM gates, QEMU time64, RDA USB object/full module with key/control-protocol sanitizer regressions, eMMC register audit and restricted PIO card-identification build/tests; [run 38222503535](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38222503535). Native OpenWrt changes below are not covered by this run |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
 | Serial CLI | Replacing the TTL adapter resolved console input; CLI attached to the stopped CA bootloader on COM9 and completed command/environment queries without another reboot; see [inspection record](verification/bootloader-inspection-20261012.md) |
 | Original Hinas TTL boot | Complete from Boot ROM to login; bootloader and allocation evidence recorded in [TTL report](verification/ttl-boot-20261012.md) |
@@ -25,7 +25,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | eMMC register audit | Passed on hardware: separate RAM candidate, MMC/BLOCK disabled, DW revision `0x270a`, HCON `0x00e44c81`, inherited source 100 MHz; no card commands; [measurement](verification/emmc-audit-20261012.md) |
 | eMMC card identification | Independent restricted PIO/1-bit/25-MHz candidate built; real request-policy/queue-entry tests, image/resource gates and QEMU passed locally; hardware untested, no block devices or sector I/O; [scope](docs/emmc.md) |
 | Wi-Fi | RDA USB `1e04:8888`; compatible-descriptor source pinned; complete USB module linked locally and in CI against separate Linux 6.12 config, manufacturing eFuse-write entry points excluded, key/WID sanitizer regression passed; [initial module report](verification/wifi-module-port-20261012.md); later control-response fixes and local sanitizer checks in [control report](verification/wifi-control-20261012.md); chip revision, firmware and hardware operation remain unverified |
-| OpenWrt/Kwrt / Passwall | [Pinned integration audit](docs/openwrt.md): Kwrt uses OpenWrt 25.12; audited upstream kernel matches 6.12.112; no existing TY1208Z target, complete feed lock, working native target or router image yet |
+| OpenWrt/Kwrt / Passwall | [Independent native RAM target](docs/openwrt.md) added against a SHA-256-locked OpenWrt 25.12 source archive; Cortex-A7/musl profile resolves locally; full toolchain/image build in progress. No external feeds, Kwrt customization, Passwall, hardware network or usable router image yet |
 | Whole-system Y2038 | Not established; diagnostic time64 passed, application-level testing remains |
 
 Known-successful CA bootloader SHA-256:

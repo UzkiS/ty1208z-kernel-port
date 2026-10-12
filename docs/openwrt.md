@@ -36,6 +36,39 @@ enable separately validated SoC peripherals.
 
 ## Source and build boundaries
 
+The independent target now lives in `openwrt/overlay/target/linux/hi3798mv100`.
+Its single `ty1208z_ca_ram` profile inherits the measured CPU0/UART/timer and
+bounded RAM DT, uses native ARMv7 hard-float musl userspace, and emits only an
+UNTESTED initramfs uImage plus rootfs archive. No sysupgrade or install image
+is defined. BLOCK, MMC, MTD and USB remain disabled; only loopback is configured.
+This bring-up profile is not the eventual router configuration.
+
+`openwrt/sources.lock.json` fixes the complete OpenWrt source archive and has
+an empty feed list. Core package/toolchain recipes and their source versions
+and hashes come from that archive. `prepare_openwrt.py` validates the archive,
+extracts into a separate Linux build tree, installs the reviewed overlay and
+copies the authoritative board patch, BusyBox stat time64 patch and time64
+probe. The BusyBox custom configuration enables stat/format without changing
+the other inherited defaults. The initial profile
+resolves locally; full native compilation and hardware acceptance are pending.
+
+Run these commands as a regular user on a Linux filesystem (including WSL):
+
+```sh
+make openwrt-config TASKBASE=/absolute/linux/build-root
+make openwrt-toolchain TASKBASE=/absolute/linux/build-root
+make openwrt-ram TASKBASE=/absolute/linux/build-root
+```
+
+The full build checks the resolved storage exclusions, image CRC/DTB/load
+addresses and the existing low-16-MiB decompression bound. It then boots the
+actual native initramfs kernel on QEMU virt without a disk or network, and
+checks installed musl time64, UCI, procd/ubus and logging at a 2040 wall clock.
+The independent OpenWrt CI repeats that build. A configured workflow is not
+evidence of a passing run; results are recorded when it finishes. MV100 RAM
+boot still needs a dedicated profile gate and physical validation before the
+native image can be sent to the board; the diagnostic CLI does not accept it.
+
 Keep the native target/integration files separate from `overlay/` and
 `wifi/overlay/`. Generate board patches from the authoritative Linux files,
 then apply them to the fixed OpenWrt kernel and resolve generic-patch overlap

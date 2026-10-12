@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/* Inherit the physically tested UART/timer and bounded RAM description.
+ * This profile adds native OpenWrt userspace only, not new peripherals.
+ */
+/ {
+	model = "TY1208Z CA OpenWrt RAM bring-up";
+	compatible = "tianyi,ty1208z-ca-openwrt-ram", "hi3798mv100-series";
+
+	chosen {
+		bootargs = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=7 panic=0";
+	};
+};

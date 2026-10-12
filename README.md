@@ -58,6 +58,10 @@ CI 在干净环境执行相同构建，并提供名称含 `HARDWARE-UNTESTED` �
 硬件依据见 [hardware.md](docs/hardware.md)，Wi-Fi 线索见 [wifi.md](docs/wifi.md)。
 网口主线驱动对照见 [Ethernet 审计](docs/ethernet.md)，原生 target、Kwrt 来源和
 Passwall/time64 验收边界见 [OpenWrt 集成](docs/openwrt.md)。
+独立 `openwrt/` RAM target 已通过原生配置解析和通用补丁叠加检查；完整
+工具链/镜像正在构建。`make openwrt-ram` 使用锁定 OpenWrt 源码和 musl，
+复用板级及 BusyBox time64 补丁，完成后执行原生用户空间的 QEMU 验证。
+它目前仅提供 RAM bring-up，没有网口、Wi-Fi 或 Passwall 的实机验收。
 
 已有 Hinas 的只读 SSH 基线见 [baseline.md](docs/baseline.md)。本机已确认
 RDA USB `1e04:8888` 无驱动绑定；下一步先按 [TTL 记录步骤](docs/ttl-baseline.md)

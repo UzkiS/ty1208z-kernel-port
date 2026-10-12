@@ -54,9 +54,10 @@ rejection without destination mutation. RX-dispatch checks are source-order
 gates; the entire dispatcher/data path is not emulated by this harness.
 
 Local lint, full module compilation/link, normal diagnostic kernel build,
-QEMU time64 and RAM-boot protocol regressions pass. CI for the preceding
-`a03fc85` completed successfully; these additional control changes require
-their own CI result.
+QEMU time64 and RAM-boot protocol regressions pass. GitHub Actions for code
+commit `45990b6` completed successfully at 08:27 UTC, including the full
+module link and these sanitizer regressions:
+[run 38222503535](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38222503535).
 
 Vendor key deletion/AP stop and empty legacy iovar callbacks remain unresolved.
 The work does not claim complete cfg80211 behavior, data-frame parsing,

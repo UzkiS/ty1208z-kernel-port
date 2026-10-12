@@ -8,7 +8,7 @@
 | Linux 板级支持 | `overlay/`、内核配置、Linux 补丁生成器 | 固定 Linux 源码、交叉工具链、板级事实 | 编译、内存临时启动、逐项外设测试 |
 | 诊断环境 | `initramfs/`、BusyBox 配置、time64 probe | ARM 用户空间、现代内核系统调用 | QEMU 启动、shell、2040 年读写 |
 | Wi-Fi，可选 | 独立来源锁、API 补丁、`wifi/overlay/`、`make wifi-usb-audit`/`make wifi-port` | 真实芯片 ID、独立配置下的目标内核、相应驱动/固件 | USB 对象和完整模块已本地编译；扫描、联网、AP 分别验收 |
-| OpenWrt/Kwrt 集成 | 目前为实施计划；尚未建立 target | 已验证内核版本/配置、匹配模块与用户空间 | 网络、防火墙、Passwall、DNS、性能与重启 |
+| OpenWrt/Kwrt 集成 | `openwrt/` 独立 RAM target、来源锁及原生构建入口 | 板级补丁、原生工具链/用户空间；应用 feeds 后续独立锁定 | 原生镜像、QEMU time64、网络、防火墙、Passwall、DNS 与性能 |
 
 Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线配置。
 `make emmc-audit` 和 `make emmc-ident` 使用各自内核输出目录；前者只读寄存器且
@@ -25,12 +25,14 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 因为拆分仓库而消失。与现有 Hinas 用户空间的兼容验证也是独立阶段。
 
 原生 target 与 Passwall 集成边界见 [OpenWrt/Kwrt](openwrt.md)，网口主线复用与
-内部 PHY/时钟待验证条件见 [Ethernet](ethernet.md)。这两层目前只有来源审计和
-实施边界，没有可运行的 OpenWrt target 或新内核网口驱动验收结果。
+内部 PHY/时钟待验证条件见 [Ethernet](ethernet.md)。原生 RAM target 已通过配置解析、
+OpenWrt 通用补丁叠加及板级对象编译检查，完整工具链/镜像正在构建；尚无实机
+OpenWrt 或新内核网口驱动验收结果。
 
 ## 源码与产物
 
 - `config/sources.lock.json` 是下载版本、URL、哈希与已观察工具链的记录。
+- `openwrt/` 维护原生集成；引用板级及 BusyBox time64 补丁，不复制驱动源码。
 - `overlay/` 是新增 Linux 文件的唯一维护入口。
 - `tools/make_kernel_patch.py` 从已校验的原版压缩包生成新增和修改文件的补丁。
 - `tools/make_busybox_patch.py` 从原版 BusyBox 生成时间输出修复。

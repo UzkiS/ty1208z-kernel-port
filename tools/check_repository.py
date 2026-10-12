@@ -30,9 +30,10 @@ for path in root.rglob("*"):
     if path.suffix == ".json":
         json.loads(text)
 
-workflow = (root / ".github/workflows/diagnostic.yml").read_text()
-for action in re.findall(r"uses:\s*([^\s#]+)", workflow):
-    assert re.fullmatch(r"[\w/-]+@[0-9a-f]{40}", action), f"Unpinned CI action: {action}"
-assert "contents: read" in workflow
-assert "persist-credentials: false" in workflow
+for path in (root / ".github/workflows").glob("*.yml"):
+    workflow = path.read_text()
+    for action in re.findall(r"uses:\s*([^\s#]+)", workflow):
+        assert re.fullmatch(r"[\w/-]+@[0-9a-f]{40}", action), f"Unpinned CI action: {action}"
+    assert "contents: read" in workflow, f"CI must be read-only: {path.name}"
+    assert "persist-credentials: false" in workflow, f"CI must not persist credentials: {path.name}"
 print("Repository checks passed: source syntax, UTF-8/LF, fixed archive hashes, pinned read-only CI")

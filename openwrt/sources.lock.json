@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "openwrt": {
+    "repository": "https://github.com/openwrt/openwrt",
+    "branch_observed": "openwrt-25.12",
+    "commit": "58efa9917d4cc53fceed173529a286187649e827",
+    "url": "https://codeload.github.com/openwrt/openwrt/tar.gz/58efa9917d4cc53fceed173529a286187649e827",
+    "archive": "openwrt-58efa9917d4cc53fceed173529a286187649e827.tar.gz",
+    "sha256": "03f874336942999416a8c35fb2379f63b70e77a579f9b65b990471bc3d16730a"
+  },
+  "feeds": [],
+  "profile": "ty1208z_ca_ram",
+  "scope": "Native RAM bring-up only; core packages fixed by the OpenWrt archive. No Kwrt customization, external feed, Passwall or Wi-Fi package is included yet."
+}
