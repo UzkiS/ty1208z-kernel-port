@@ -394,6 +394,20 @@
       "git_blob_sha1": "fa6c07fe6fc82cd0f10c5a8d7882f48104cd068c",
       "sha256": "ec316064757fe5f515dc6bb4d95bb77b8771322700e4e9dd43f03d0614247cba",
       "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/drivers/net/ethernet/hieth/pm.c"
+    },
+    {
+      "path": "include/linux/hisilicon_phy.h",
+      "bytes": 466,
+      "git_blob_sha1": "d9ca6c6b8b6d88a8b63d3050982faf34ba9bdf7b",
+      "sha256": "401ad2a6f05c9b3a74a7c35cd29bd5b7b90a019d5f688cc532eac5d65b737405",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/include/linux/hisilicon_phy.h"
+    },
+    {
+      "path": "include/dt-bindings/clock/hi3798mv100-clock.h",
+      "bytes": 6058,
+      "git_blob_sha1": "0d3cce0bfa53a47079ac380cacfe54bec94b8ff2",
+      "sha256": "06f05a8dcc0126ec3f97c2f0d4000d9b0af358530c584ca62f55ce77a786662d",
+      "url": "https://raw.githubusercontent.com/07bug/HiSTBLinuxV100R005C00SPC060/a9f05973129d738e175416dd4a91b2c264ffcdd4/source/kernel/linux-4.4.y.patch/include/dt-bindings/clock/hi3798mv100-clock.h"
     }
   ]
 }

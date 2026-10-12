@@ -36,7 +36,8 @@ changes = {
         'dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb\n'
         'dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb\n'
-        'dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb\n'),
+        'dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb\n'
+        'dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb\n'),
     "drivers/soc/hisilicon/Kconfig": (
         'config KUNPENG_HCCS\n',
         'config HI3798MV100_EMMC_AUDIT\n'
@@ -45,11 +46,18 @@ changes = {
         '\thelp\n'
         '\t  Read controller identification and clock registers only.\n'
         '\t  Does not initialize the card or change clock/reset state.\n\n'
+        'config HI3798MV100_ETHERNET_AUDIT\n'
+        '\tbool "TY1208Z inherited Ethernet state and PHY ID audit"\n'
+        '\tdepends on ARCH_HI3798MV100 && !NET && !MMC && !BLOCK\n'
+        '\thelp\n'
+        '\t  Observe fixed clock/reset registers. If already enabled, read\n'
+        '\t  PHY 1 ID via bounded MDIO. No PHY/clock/reset or DMA writes.\n\n'
         'config KUNPENG_HCCS\n'),
     "drivers/soc/hisilicon/Makefile": (
         '# SPDX-License-Identifier: GPL-2.0-only\n',
         '# SPDX-License-Identifier: GPL-2.0-only\n'
-        'obj-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-emmc-audit.o\n'),
+        'obj-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-emmc-audit.o\n'
+        'obj-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ethernet-audit.o\n'),
     "drivers/clocksource/Kconfig": (
         'config ARM_TIMER_SP804\n',
         'config HI3798MV100_TIMER\n'

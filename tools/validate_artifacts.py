@@ -7,6 +7,7 @@ import struct
 import sys
 from inspect_images import inspect_image, parse_fdt
 from emmc_profiles import identification_profile
+from ethernet_profiles import ethernet_audit_profile
 
 artifacts = Path(sys.argv[1]).resolve()
 evidence = artifacts / "checks"
@@ -34,6 +35,7 @@ if "CONFIG_HI3798MV100_EMMC_AUDIT=y\n" in config:
 else:
     assert not audits, "Audit node must only appear in the explicit audit profile"
 identification_profile(tree, config)
+ethernet_audit_profile(tree, config)
 assert (artifacts / "zImage-appended-dtb").read_bytes() == raw + dtb
 assert (artifacts / "uImage-UNTESTED.bin").read_bytes()[64:] == raw + dtb
 assert len(image["device_trees"]) == 1

@@ -61,6 +61,38 @@ Reading PHY IDs via MDIO requires a bounded, explicitly read-only PHY command
 path; attaching the generic PHY state machine can cause resets/writes and
 must not be described as a register-only audit.
 
+## Independent inherited-state diagnostic
+
+`make ethernet-audit` now builds a separate `ethernet-audit1` RAM candidate.
+It keeps NET/MMC/BLOCK/MTD/USB/MODULES/SMP/debugfs disabled and reuses the plain
+diagnostic UART/timer/userspace. The driver validates six exact resources
+before mapping them. It first reads CRG51, internal PHY CRG, selection, address
+and LDO; none is written.
+
+MAC/MDIO access is conditional on the inherited SDK fields: CRG51 mask 0x1b
+equals 0x0b, PHY CRG mask 0x11 equals 1, selection bit 8 clear and PHY address
+low five bits equal the measured address 1. Otherwise it reports a skip and
+finishes without touching the MAC. This is an observation gate, not proof
+of clock frequency or complete SoC initialization.
+
+When the gate passes, only fixed MAC mode/queue/reset/forward/IRQ/control
+registers are observed; no MAC address or FIFO/descriptor is read. Exactly
+PHY 1 Clause 22 ID registers 2 and 3 are then read. Each operation polls MDIO
+ready before and after its command with a 1-ms bound. The two possible command
+values are 0x102 and 0x103. These write the MDIO command controller to request
+a PHY read, with the PHY-write bit and hardware-ready bit clear; there are
+no PHY register, clock/reset, IRQ-enable, packet/DMA or storage writes.
+
+The real helper is executed under ASan/UBSan with an MMIO seam covering ready
+and busy states, both completion timeouts, data masking and absent/all-ones
+IDs. Profile tests reject changed resources and unreviewed subsystems. The
+standalone build, serial identity gates, image layout and QEMU are checked
+separately. A completed audit may report unavailable PHY ID; that must not be
+described as Ethernet working. The [physical audit](../verification/ethernet-audit-20261012.md)
+measured CRG51 `0x3` and skipped MAC/MDIO access because bit 3 was absent.
+The internal PHY clock/reset, selection and address fields met the remaining
+conditions; LDO was `0x8`. No PHY ID has been measured.
+
 The vendor driver selects different volatile expanded-register fixup tables
 by actual PHY ID. No PHY ID has yet been established for this board. The
 SDK's OTP-derived trim routine explicitly excludes MV100 and must not be

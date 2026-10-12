@@ -58,12 +58,18 @@ class DiagnosticTests(unittest.TestCase):
                         b"EMMC_SAMPLE_HINAS_HEADER_MATCH crc32=2ba1a125\r\n"
                         b"EMMC_SAMPLE_EXT4 magic=ef53 block_size=4096\r\n"
                         b"EMMC_SAMPLE_READ_COMPLETE count=4 no-block-device")
+                    ethernet = b"No Ethernet audit" if mode == "missing-ethernet" else (
+                        b"ETH_AUDIT CRG51=0000000b\r\nETH_AUDIT PHY_CRG=00000001\r\n"
+                        b"ETH_AUDIT PHY_SELECT=00000000\r\nETH_AUDIT PHY_ADDRESS=00000001\r\n"
+                        b"ETH_AUDIT PHY_LDO=00000068\r\n"
+                        b"ETH_AUDIT_COMPLETE no-phy-writes no-clock-reset-writes no-dma")
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
-                                 b"\r\n" + audit,
-                                 b"\r\n" + ident,
-                                 b"\r\n" + samples,
+                                 b"\r\n" + (audit if profile == "emmc-audit1" else b""),
+                                 b"\r\n" + (ident if profile in ("emmc-ident1", "emmc-read1") else b""),
+                                 b"\r\n" + (samples if profile == "emmc-read1" else b""),
+                                 b"\r\n" + (ethernet if profile == "ethernet-audit1" else b""),
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -127,6 +133,12 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_sector_reads_capture_verified_content(self):
         self.exercise("success", profile="emmc-read1")
+
+    def test_ethernet_audit_requires_control_state_and_completion(self):
+        self.exercise("missing-ethernet", profile="ethernet-audit1")
+
+    def test_ethernet_audit_captures_measured_state(self):
+        self.exercise("success", profile="ethernet-audit1")
 
 
 if __name__ == "__main__":

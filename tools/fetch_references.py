@@ -38,7 +38,8 @@ def main():
     with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
         entries = list(pool.map(fetch, selected))
     report = {'repository': '07bug/HiSTBLinuxV100R005C00SPC060', 'commit': COMMIT, 'patch_tree': manifest['patch_tree'], 'files': entries}
-    (ROOT / 'reference/reference-manifest.json').write_text(json.dumps(report, indent=2) + '\n', encoding='utf-8')
+    (ROOT / 'reference/reference-manifest.json').write_text(
+        json.dumps(report, indent=2) + '\n', encoding='utf-8', newline='\n')
     print(f'Verified and stored {len(entries)} pinned SDK reference files ({sum(x["bytes"] for x in entries)} bytes).')
 
 

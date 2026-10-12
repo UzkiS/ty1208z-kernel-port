@@ -83,6 +83,10 @@ jobs:
           make wifi-port > logs/wifi-port.log 2>&1 || { tail -n 100 logs/wifi-port.log; exit 1; }
           tail -n 20 logs/wifi-port.log
           git diff --exit-code -- patches/0003-rda-usb-api-audit.patch patches/0004-rda-linux-6.12-port.patch
+      - name: Build inherited Ethernet audit and run protocol/profile/QEMU checks
+        run: |
+          make ethernet-audit > logs/ethernet-audit.log 2>&1 || { tail -n 100 logs/ethernet-audit.log; exit 1; }
+          tail -n 20 logs/ethernet-audit.log
       - name: Upload UNTESTED diagnostics and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -93,6 +97,7 @@ jobs:
             artifacts/emmc-audit1/
             artifacts/emmc-ident1/
             artifacts/emmc-read1/
+            artifacts/ethernet-audit1/
             artifacts/wifi-port/
             logs/
           retention-days: 14

@@ -17,6 +17,7 @@ PROFILES = {
     "emmc-audit1": b"6.12.112-ty1208z-emmc-audit1",
     "emmc-ident1": b"6.12.112-ty1208z-emmc-ident1",
     "emmc-read1": b"6.12.112-ty1208z-emmc-read1",
+    "ethernet-audit1": b"6.12.112-ty1208z-ethernet-audit1",
 }
 
 
@@ -81,6 +82,11 @@ def run(args, serial_module):
                             b"EMMC_SAMPLE_READ_COMPLETE count=4 no-block-device"))
                         or b"EMMC_SAMPLE_READ_FAILED" in report):
                     raise TransferError("Fixed read-only eMMC samples did not pass")
+                if args.profile == "ethernet-audit1" and not all(marker in report for marker in (
+                        b"ETH_AUDIT CRG51=", b"ETH_AUDIT PHY_CRG=", b"ETH_AUDIT PHY_SELECT=",
+                        b"ETH_AUDIT PHY_ADDRESS=", b"ETH_AUDIT PHY_LDO=",
+                        b"ETH_AUDIT_COMPLETE no-phy-writes no-clock-reset-writes no-dma")):
+                    raise TransferError("Inherited Ethernet audit did not complete")
                 result["report_complete"] = True
                 result["status"] = "diagnostic-captured"
             except (TransferError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:
