@@ -12,7 +12,7 @@ import threading
 import time
 import unittest
 
-from openwrt_ethernet_board_cli import REPORT, START_IPERF, COLLECT_IPERF, iperf_summary
+from openwrt_ethernet_board_cli import PROFILES, REPORT, START_IPERF, COLLECT_IPERF, iperf_summary
 from ymodem_sender import TransferError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,7 +20,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "PTY integration needs Linux")
 class NativeSerialTests(unittest.TestCase):
-    def exercise(self, mode, operation="report"):
+    def exercise(self, mode, operation="report", profile="net"):
         with tempfile.TemporaryDirectory() as directory:
             prefix = Path(directory) / "native"
             master, slave = os.openpty()
@@ -45,8 +45,11 @@ class NativeSerialTests(unittest.TestCase):
                     if mode == "bootloader":
                         return
                     self.assertEqual(receive(), b"uname -r; cat /etc/openwrt_release\r")
-                    release = b"6.12.112-ty1208z-openwrt-net" if mode != "wrong-kernel" else b"4.4.35"
-                    target = b"hi3798mv100/net" if mode != "wrong-rootfs" else b"hi3798mv100/apps"
+                    release, target = PROFILES[profile]
+                    if mode == "wrong-kernel":
+                        release = b"4.4.35"
+                    if mode == "wrong-rootfs":
+                        target = b"hi3798mv100/apps" if profile == "net" else b"hi3798mv100/net"
                     os.write(master, b"\r\n" + release + b"\r\nDISTRIB_ID='OpenWrt'\r\nDISTRIB_TARGET='" + target + b"'" + prompt)
                     if mode in ("wrong-kernel", "wrong-rootfs"):
                         return
@@ -81,7 +84,8 @@ class NativeSerialTests(unittest.TestCase):
 
             flags = {"report": [], "iperf-start": ["--iperf-start"], "iperf-collect": ["--iperf-collect"]}[operation]
             process = subprocess.Popen([sys.executable, "-u", str(ROOT / "tools/openwrt_ethernet_board_cli.py"),
-                                        "--port", os.ttyname(slave), "--output", str(prefix), *flags],
+                                        "--port", os.ttyname(slave), "--profile", profile,
+                                        "--output", str(prefix), *flags],
                                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             thread = threading.Thread(target=peer, daemon=True)
             thread.start()
@@ -96,6 +100,7 @@ class NativeSerialTests(unittest.TestCase):
                 self.assertEqual(process.returncode, 0 if passed else 1, output.decode())
                 metadata = json.loads(prefix.with_suffix(".json").read_text())
                 self.assertEqual(metadata["operation"], operation)
+                self.assertEqual(metadata["profile"], profile)
                 self.assertEqual(metadata["status"], operation + "-passed" if passed else "error")
                 if passed and operation == "iperf-collect":
                     self.assertEqual(metadata["iperf_summary"]["sum_received"]["bytes"], 1048576)
@@ -127,6 +132,11 @@ class NativeSerialTests(unittest.TestCase):
         for operation in ("iperf-start", "iperf-collect"):
             with self.subTest(operation=operation):
                 self.exercise("success", operation)
+
+    def test_integrated_profile_rejects_foreign_kernel_rootfs(self):
+        for mode in ("wrong-kernel", "wrong-rootfs", "success"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, profile="router")
 
 
 class IperfResultTests(unittest.TestCase):

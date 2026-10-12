@@ -11,7 +11,9 @@ import zlib
 from inspect_images import parse_fdt
 from emmc_profiles import identification_profile
 from ethernet_profiles import ethernet_audit_profile, ethernet_clock_id_profile
-from ethernet_net_profile import ethernet_net_profile, openwrt_ethernet_profile
+from ethernet_net_profile import (
+    ethernet_net_profile, openwrt_ethernet_profile, openwrt_router_ethernet_profile,
+)
 from usb_audit_profile import usb_audit_profile
 from restart_profile import restart_profile
 from openwrt_apps_ram_profile import BOOTLOADER_BOUND_ADDRESS, applications_ram_profile
@@ -83,7 +85,12 @@ def prepare(artifacts, inspection):
     usb_audit_profile(tree, config)
     restart_profile(tree, config)
     application_initrd = applications_ram_profile(tree, config, artifacts)
-    if properties["/"]["compatible"].get("strings", [None])[0] == "tianyi,ty1208z-ca-openwrt-net":
+    board = properties["/"]["compatible"].get("strings", [None])[0]
+    if board == "tianyi,ty1208z-ca-openwrt-router-ram":
+        network = openwrt_router_ethernet_profile(tree, config)
+        if application_initrd is None or not network:
+            raise ValueError("Integrated Ethernet lacks its exact external-rootfs application acceptance")
+    elif board == "tianyi,ty1208z-ca-openwrt-net":
         network = openwrt_ethernet_profile(tree, config)
         if not network:
             raise ValueError("Native Ethernet profile lacks its built-in hardware drivers")

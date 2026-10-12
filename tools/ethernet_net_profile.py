@@ -25,7 +25,12 @@ def openwrt_ethernet_profile(tree, config):
     return True
 
 
-def _ethernet_profile(tree, config, board, release):
+def openwrt_router_ethernet_profile(tree, config):
+    return _ethernet_profile(tree, config, "tianyi,ty1208z-ca-openwrt-router-ram",
+                             "-ty1208z-openwrt-router", applications=True)
+
+
+def _ethernet_profile(tree, config, board, release, applications=False):
     props = {node["path"]: node["properties"] for node in tree["nodes"]}
     enabled = "CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" in config
     nodes = props.keys() & NETWORK_NODES
@@ -88,6 +93,10 @@ def _ethernet_profile(tree, config, board, release):
                   "HI3798MV100_EMMC_AUDIT", "MMC_DW_HI3798MV100_IDENT"}
     prohibited.add("HI3798MV100_USB_AUDIT")
     prohibited.add("POWER_RESET_TY1208Z_SP805")
+    if applications:
+        # This exception belongs only to the distinct matched application
+        # kernel/rootfs profile; ordinary Ethernet diagnostics remain closed.
+        prohibited -= {"MODULES", "NETFILTER", "IPV6"}
     if active.keys() & prohibited:
         raise ValueError("Prohibited subsystem in Ethernet network profile: " +
                          ", ".join(sorted(active.keys() & prohibited)))

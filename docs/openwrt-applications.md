@@ -107,3 +107,9 @@ candidate. It has no board Ethernet/storage/USB or SMP support. The application
 CI runs both memory trials and uploads the wrapper as HARDWARE-UNTESTED. The
 actual local checks and limitations are recorded in the
 [RAM packaging report](../verification/openwrt-apps-ram-offline-20261013.md).
+
+A distinct [applications/Ethernet variant](openwrt-router.md) integrates the
+measured drivers in its own source/build tree and exercises actual netifd/fw4
+forwarding and Passwall TCP TPROXY in isolated QEMU network namespaces. The
+plain application profile remains peripheral-free; physical integration
+acceptance is still required for the Ethernet variant.

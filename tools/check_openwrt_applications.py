@@ -6,9 +6,11 @@ from pathlib import Path
 import re
 
 from prepare_openwrt import sha256
+from prepare_openwrt_applications import application_variant
 
 
 def check(source, built=False):
+    ethernet = application_variant(source) == "ethernet"
     config = (source / ".config").read_text()
     for option in (
             "TARGET_hi3798mv100_apps", "TARGET_hi3798mv100_apps_DEVICE_ty1208z_apps",
@@ -21,6 +23,13 @@ def check(source, built=False):
     for option in ("TARGET_hi3798mv100_ram", "TARGET_ROOTFS_SQUASHFS", "TARGET_ROOTFS_EXT4FS", "PACKAGE_mtd"):
         if f"CONFIG_{option}=y\n" in config:
             raise ValueError(f"Unexpected application-profile option: {option}")
+    if ethernet:
+        for option in ("PACKAGE_iperf3", "PACKAGE_ethtool", "PACKAGE_ip-full", "PACKAGE_kmod-veth",
+                       "KERNEL_NAMESPACES", "KERNEL_NET_NS"):
+            if f"CONFIG_{option}=y\n" not in config:
+                raise ValueError(f"Integrated application Ethernet option missing: {option}")
+        if "CONFIG_KERNEL_DEBUG_FS=y\n" in config:
+            raise ValueError("Integrated Ethernet experiment unexpectedly enables debugfs")
     manifest = json.loads((source / ".ty1208z-overlay.json").read_text())
     for relative, expected in manifest.items():
         if sha256(source / relative) != expected:
@@ -39,10 +48,22 @@ def check(source, built=False):
         if len(kernels) != 1:
             raise ValueError("Expected one built application kernel configuration")
         kernel_config = kernels[0].read_text()
-        for option in ("BLOCK", "MMC", "MTD", "USB_SUPPORT", "SMP", "HISI_FEMAC",
+        for option in ("BLOCK", "MMC", "MTD", "USB_SUPPORT", "SMP",
                        "HI3798MV100_EMMC_AUDIT", "MMC_DW_HI3798MV100_IDENT"):
             if re.search(rf"^CONFIG_{option}=[ym]$", kernel_config, re.MULTILINE):
                 raise ValueError(f"Unreviewed hardware subsystem in application kernel: {option}")
+        if ethernet:
+            for option in ("HISI_FEMAC", "MDIO_HISI_FEMAC", "TY1208Z_ETHERNET_INHERITED",
+                           "FESTA_TY1208Z_PHY", "PHYLIB", "NET_NS"):
+                if f"CONFIG_{option}=y\n" not in kernel_config:
+                    raise ValueError(f"Missing built-in integrated Ethernet option: {option}")
+            if 'CONFIG_LOCALVERSION="-ty1208z-openwrt-router"\n' not in kernel_config:
+                raise ValueError("Integrated application kernel release differs")
+            for option in ("WIRELESS", "WLAN", "DEBUG_FS"):
+                if re.search(rf"^CONFIG_{option}=[ym]$", kernel_config, re.MULTILINE):
+                    raise ValueError(f"Unexpected integrated Ethernet subsystem: {option}")
+        elif re.search(r"^CONFIG_HISI_FEMAC=[ym]$", kernel_config, re.MULTILINE):
+            raise ValueError("Plain application kernel unexpectedly enables board Ethernet")
         images = list((source / "bin/targets/hi3798mv100/apps").glob("*uImage*"))
         if images:
             raise ValueError("Application validation must not emit a CA board image")
@@ -56,6 +77,20 @@ def check(source, built=False):
         if len(roots) != 1:
             raise ValueError("Expected one actual application rootfs")
         rootfs = roots[0]
+        if ethernet:
+            expected = (Path(__file__).resolve().parents[1] / "openwrt/ethernet/overlay/target/linux/"
+                        "hi3798mv100/base-files/etc/config/network").read_bytes()
+            if (rootfs / "etc/config/network").read_bytes() != expected:
+                raise ValueError("Integrated netifd rootfs differs from reviewed DHCP-client selection")
+            for name in ("usr/bin/iperf3", "usr/sbin/ethtool", "usr/libexec/ip-full"):
+                if not (rootfs / name).is_file():
+                    raise ValueError(f"Integrated rootfs lacks runtime tool: {name}")
+            # OpenWrt exposes ip through an absolute target-root symlink. The
+            # target is checked above; Path.is_file() on the build host cannot
+            # follow that target outside this staging root.
+            if (not (rootfs / "sbin/ip").is_symlink() or
+                    str((rootfs / "sbin/ip").readlink()) != "/usr/libexec/ip-full"):
+                raise ValueError("Integrated rootfs lacks the /sbin/ip wrapper")
         if not (rootfs / "usr/bin/xray").is_file() or not (rootfs / "usr/share/passwall/app.sh").is_file():
             raise ValueError("Actual application rootfs is missing Xray or Passwall")
         for item in lock.get("recipe_patches", []):
@@ -74,7 +109,8 @@ def check(source, built=False):
         for package in ("luci-app-passwall - ", "xray-core - ", "firewall4 - ", "dnsmasq-full - "):
             if package not in packages:
                 raise ValueError(f"Application not installed in actual rootfs: {package}")
-    print("OPENWRT_APPLICATION_CONFIG_PASS" + ("; built, runtime/hardware untested" if built else ""))
+    print("OPENWRT_APPLICATION_CONFIG_PASS variant=" + ("ethernet" if ethernet else "qemu") +
+          ("; built, runtime/hardware untested" if built else ""))
 
 
 def main():

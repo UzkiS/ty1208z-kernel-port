@@ -13,6 +13,7 @@ on:
       - 'tools/serial_cli.py'
       - 'tools/bootloader_probe.py'
       - 'tools/ymodem_sender.py'
+      - 'tools/requirements-serial.txt'
       - 'tools/inspect_images.py'
       - 'tools/inspect_kernel_layout.py'
       - 'tools/time64-probe.c'
@@ -29,6 +30,7 @@ on:
       - 'tools/serial_cli.py'
       - 'tools/bootloader_probe.py'
       - 'tools/ymodem_sender.py'
+      - 'tools/requirements-serial.txt'
       - 'tools/inspect_images.py'
       - 'tools/inspect_kernel_layout.py'
       - 'tools/time64-probe.c'
@@ -47,6 +49,16 @@ concurrency:
 
 jobs:
   applications:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: openwrt-app-ram
+            source_dir: applications
+            ram_dir: openwrt-apps-ram1
+          - target: openwrt-router
+            source_dir: router
+            ram_dir: openwrt-router1
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
@@ -63,25 +75,29 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential clang g++ gcc-multilib \
             g++-multilib bc bison flex gawk gettext git libncurses-dev \
-            libssl-dev python3 python3-setuptools rsync swig unzip zlib1g-dev \
+            libssl-dev python3 python3-setuptools python3-venv rsync swig unzip zlib1g-dev \
             file wget curl zstd time qemu-system-arm device-tree-compiler u-boot-tools
+          python3 -m venv .work/serial-venv
+          .work/serial-venv/bin/pip install --require-hashes -r tools/requirements-serial.txt
+          echo "$GITHUB_WORKSPACE/.work/serial-venv/bin" >> "$GITHUB_PATH"
       - name: Build fixed native compiler and musl
         run: |
           mkdir -p logs
           make openwrt-toolchain > logs/application-toolchain.log 2>&1 || { tail -n 100 logs/application-toolchain.log; exit 1; }
       - name: Build applications and exercise actual ARM rootfs at 2040
         run: |
-          make openwrt-app-ram > logs/openwrt-applications.log 2>&1 || { tail -n 100 logs/openwrt-applications.log; exit 1; }
+          make ${{ matrix.target }} > logs/openwrt-applications.log 2>&1 || { tail -n 100 logs/openwrt-applications.log; exit 1; }
           tail -n 30 logs/openwrt-applications.log
       - name: Upload QEMU-only artifacts and checks
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ty1208z-applications-QEMU-ONLY-${{ github.sha }}
+          name: ty1208z-${{ matrix.source_dir }}-QEMU-ONLY-${{ github.sha }}
           path: |
-            .work/applications/build/openwrt-ram-*/bin/targets/hi3798mv100/apps/
-            .work/applications/build/openwrt-ram-*/.ty1208z-application-lock.json
-            .work/applications/build/openwrt-ram-*/.ty1208z-toolchain.json
+            .work/${{ matrix.source_dir }}/build/openwrt-ram-*/bin/targets/hi3798mv100/apps/
+            .work/${{ matrix.source_dir }}/build/openwrt-ram-*/.ty1208z-application-lock.json
+            .work/${{ matrix.source_dir }}/build/openwrt-ram-*/.ty1208z-application-variant.json
+            .work/${{ matrix.source_dir }}/build/openwrt-ram-*/.ty1208z-toolchain.json
             logs/application-toolchain.log
             logs/openwrt-applications.log
           retention-days: 14
@@ -90,7 +106,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: ty1208z-applications-RAM-HARDWARE-UNTESTED-${{ github.sha }}
-          path: artifacts/openwrt-apps-ram1/
+          name: ty1208z-${{ matrix.source_dir }}-RAM-HARDWARE-UNTESTED-${{ github.sha }}
+          path: artifacts/${{ matrix.ram_dir }}/
           retention-days: 14
           if-no-files-found: warn

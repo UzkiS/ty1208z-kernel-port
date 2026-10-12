@@ -5,6 +5,7 @@ import io
 import json
 import re
 from pathlib import Path
+from ethernet_net_profile import NETWORK_NODES, openwrt_router_ethernet_profile
 
 # Keep the complete compressed archive below the unexplained bootloader
 # Bound Addr (0x08e62000), clear of the measured kernel load/workspace.
@@ -13,6 +14,7 @@ BOOTLOADER_BOUND_ADDRESS = 0x08E62000
 MAX_COMPRESSED = 32 * 1024 * 1024
 MAX_UNCOMPRESSED = 96 * 1024 * 1024
 COMPATIBLE = "tianyi,ty1208z-ca-openwrt-apps-ram"
+ROUTER_COMPATIBLE = "tianyi,ty1208z-ca-openwrt-router-ram"
 BOOTARGS = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=7 panic=0"
 BASE_PATHS = {"/", "/aliases", "/chosen", "/memory@0", "/cpus", "/cpus/cpu@0",
               "/clock-24m", "/clock-83m3", "/interrupt-controller@f8a01000", "/soc",
@@ -21,6 +23,7 @@ MARKERS = {"CERTIFICATE_TIME64_PASS", "DNS_TIME64_PASS", "HTTPS_TIME64_PASS",
            "PASSWALL_LUCI_AUTH_TIME64_PASS", "LUCI_RPCD_TIME64_PASS",
            "PASSWALL_XRAY_SOCKS_TIME64_PASS", "PASSWALL_XRAY_TLS_TIME64_PASS",
            "NFT_EXPRESSIONS_AND_COUNTER_PASS", "OPENWRT_APPLICATIONS_QEMU_PASS"}
+ROUTER_MARKERS = {"OPENWRT_ROUTER_FORWARDING_TIME64_PASS", "PASSWALL_TPROXY_TCP_TIME64_PASS"}
 
 
 def digest(data):
@@ -32,17 +35,22 @@ def validate_pair(artifacts):
         ("kernel", "zImage"), ("rootfs", "rootfs.cpio.gz"), ("config", "linux.config"),
         ("packages", "packages.manifest"), ("console", "checks/qemu-applications-256.log"))}
     report = json.loads((Path(artifacts) / "checks/applications-qemu-256.json").read_text())
+    variant = report.get("application_variant", "qemu")
+    markers = MARKERS | (ROUTER_MARKERS if variant == "ethernet" else set())
     if (report.get("result") != "OPENWRT_APPLICATIONS_QEMU_PASS" or
+            variant not in {"qemu", "ethernet"} or
             report.get("machine") != "virt,cortex-a7,single-core" or
             report.get("memory_mib") != 256 or report.get("memory_limit_mib") != 240 or
             report.get("clock_year") != 2040 or report.get("disks") is not False or
-            report.get("host_network") is not False or set(report.get("passed_markers", [])) != MARKERS):
+            report.get("host_network") is not False or set(report.get("passed_markers", [])) != markers):
         raise ValueError("Application RAM candidate lacks the bounded-memory/time64 acceptance")
     for name, path in paths.items():
         if digest(path.read_bytes()) != report.get("artifacts", {}).get(name):
             raise ValueError(f"Application kernel/rootfs/provenance identity differs: {name}")
+    if ("CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" in paths["config"].read_text()) != (variant == "ethernet"):
+        raise ValueError("Application memory/runtime acceptance variant differs from the actual kernel")
     transcript = paths["console"].read_bytes().replace(b"\r", b"")
-    if any(b"\n" + marker.encode() + b"\n" not in transcript for marker in MARKERS):
+    if any(b"\n" + marker.encode() + b"\n" not in transcript for marker in markers):
         raise ValueError("Recorded application markers are absent from the actual console")
     data = paths["rootfs"].read_bytes()
     if not 0 < len(data) <= MAX_COMPRESSED:
@@ -64,12 +72,16 @@ def applications_ram_profile(tree, config, artifacts):
     props = {node["path"]: node["properties"] for node in tree["nodes"]}
     compatible = props["/"].get("compatible", {}).get("strings", [])
     chosen = props.get("/chosen", {})
-    if compatible != [COMPATIBLE, "hi3798mv100-series"]:
-        if COMPATIBLE in compatible or any(name.startswith("linux,initrd-") for name in chosen):
+    router = compatible == [ROUTER_COMPATIBLE, "hi3798mv100-series"]
+    if compatible != [COMPATIBLE, "hi3798mv100-series"] and not router:
+        if ({COMPATIBLE, ROUTER_COMPATIBLE} & set(compatible) or
+                any(name.startswith("linux,initrd-") for name in chosen)):
             raise ValueError("External initrd outside the explicit application RAM profile")
         return None
-    if set(props) != BASE_PATHS:
+    if set(props) != BASE_PATHS | (NETWORK_NODES if router else set()):
         raise ValueError("Unreviewed peripheral in application RAM profile")
+    if router and not openwrt_router_ethernet_profile(tree, config):
+        raise ValueError("Integrated application profile lacks its measured Ethernet drivers")
     expected = (
         ("/memory@0", "reg", "cells", [0, 0x10000000]),
         ("/cpus/cpu@0", "reg", "cells", [0]),
@@ -112,8 +124,11 @@ def applications_ram_profile(tree, config, artifacts):
                   "MMC_DW_HI3798MV100_IDENT", "HI3798MV100_ETHERNET_AUDIT",
                   "HI3798MV100_ETHERNET_CLOCK_ID", "TY1208Z_ETHERNET_INHERITED",
                   "POWER_RESET_TY1208Z_SP805"}
+    release = "-ty1208z-openwrt-router" if router else "-ty1208z-openwrt-ram"
+    if router:
+        prohibited -= {"HISI_FEMAC", "TY1208Z_ETHERNET_INHERITED"}
     if (not required <= active or active & prohibited or
-            'CONFIG_LOCALVERSION="-ty1208z-openwrt-ram"\n' not in config or
+            f'CONFIG_LOCALVERSION="{release}"\n' not in config or
             'CONFIG_INITRAMFS_SOURCE=""\n' not in config):
         raise ValueError("Invalid native application RAM kernel configuration")
     data, unpacked_bytes = validate_pair(artifacts)

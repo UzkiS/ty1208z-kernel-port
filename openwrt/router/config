@@ -1,0 +1,14 @@
+# This separate source/build keeps the application feeds and enables the
+# measured Ethernet driver. It does not add storage, USB or a DHCP server.
+CONFIG_PACKAGE_iperf3=y
+# CONFIG_PACKAGE_iperf3-ssl is not set
+CONFIG_PACKAGE_ethtool=y
+CONFIG_PACKAGE_ip-full=y
+# CONFIG_PACKAGE_ip-tiny is not set
+CONFIG_PACKAGE_kmod-veth=y
+CONFIG_KERNEL_NAMESPACES=y
+CONFIG_KERNEL_NET_NS=y
+# CONFIG_KERNEL_DEBUG_FS is not set
+CONFIG_BUSYBOX_CONFIG_FEATURE_FANCY_PING=y
+CONFIG_BUSYBOX_CONFIG_SHA256SUM=y
+CONFIG_BUSYBOX_CONFIG_TIMEOUT=y

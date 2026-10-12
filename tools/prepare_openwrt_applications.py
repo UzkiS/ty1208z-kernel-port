@@ -59,10 +59,31 @@ def pinned_feeds(project, taskbase):
     return "".join(lines), lock
 
 
-def prepare_applications(project, taskbase):
+def application_variant(source):
+    marker = source / ".ty1208z-application-variant.json"
+    if not marker.exists():
+        return "qemu"
+    record = json.loads(marker.read_text())
+    if record not in ({"schema": 1, "variant": "qemu"}, {"schema": 1, "variant": "ethernet"}):
+        raise ValueError("Unrecognized application source variant")
+    return record["variant"]
+
+
+def merge_kernel_fragment(original, extra):
+    # Resolve duplicate symbols before OpenWrt merges its target fragments.
+    # Keep the plain application's authoritative fragment unchanged.
+    def symbol(line):
+        return line.split("=", 1)[0] if line.startswith("CONFIG_") else (
+            line.split()[1] if line.startswith("# CONFIG_") else None)
+    replacements = {symbol(line) for line in extra.splitlines() if symbol(line)}
+    kept = [line for line in original.splitlines() if symbol(line) not in replacements]
+    return "\n".join(kept) + "\n" + extra
+
+
+def prepare_applications(project, taskbase, ethernet=False):
     toolchain, identity = toolchain_from_native(project, taskbase)
     feeds_config, lock = pinned_feeds(project, taskbase)
-    appbase = taskbase / "applications"
+    appbase = taskbase / ("router" if ethernet else "applications")
     appbase.mkdir(parents=True, exist_ok=True)
     downloads = appbase / "downloads"
     if not downloads.exists():
@@ -80,6 +101,18 @@ def prepare_applications(project, taskbase):
         output.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(path, output)
         manifest[str(relative)] = sha256(output)
+
+    if ethernet:
+        relative = "target/linux/hi3798mv100/apps/config-6.12"
+        path = source / relative
+        path.write_text(merge_kernel_fragment(
+            path.read_text(), (project / "openwrt/router/kernel.config").read_text()))
+        manifest[relative] = sha256(path)
+        # The separate candidate is a DHCP client only. Reuse the reviewed
+        # netifd probe selection; routing configuration is a later runtime gate.
+        relative = "target/linux/hi3798mv100/base-files/etc/config/network"
+        shutil.copyfile(project / "openwrt/ethernet/overlay" / relative, source / relative)
+        manifest[relative] = sha256(source / relative)
 
     relative = Path("target/linux/hi3798mv100/Makefile")
     makefile = source / relative
@@ -105,8 +138,12 @@ def prepare_applications(project, taskbase):
     (source / ".ty1208z-overlay.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (source / ".ty1208z-application-lock.json").write_text(json.dumps(lock, indent=2) + "\n")
     (source / ".ty1208z-toolchain.json").write_text(json.dumps(identity, indent=2) + "\n")
+    (source / ".ty1208z-application-variant.json").write_text(json.dumps(
+        {"schema": 1, "variant": "ethernet" if ethernet else "qemu"}, indent=2) + "\n")
     config = (project / "openwrt/config/ram.config").read_text()
     config += (project / "openwrt/applications/config").read_text()
+    if ethernet:
+        config += (project / "openwrt/router/config").read_text()
     config += (
         "CONFIG_EXTERNAL_TOOLCHAIN=y\n"
         f"CONFIG_TOOLCHAIN_ROOT={json.dumps(str(toolchain))}\n"
@@ -123,8 +160,9 @@ def prepare_applications(project, taskbase):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--taskbase", type=Path, required=True)
+    parser.add_argument("--ethernet", action="store_true", help="Use separate router build with measured Ethernet support")
     args = parser.parse_args()
-    prepare_applications(Path(__file__).resolve().parents[1], args.taskbase.resolve())
+    prepare_applications(Path(__file__).resolve().parents[1], args.taskbase.resolve(), args.ethernet)
 
 
 if __name__ == "__main__":

@@ -9,6 +9,7 @@ import re
 import selectors
 import subprocess
 import time
+from prepare_openwrt_applications import application_variant
 
 
 def unique(paths, description):
@@ -19,6 +20,7 @@ def unique(paths, description):
 
 
 def test(source, memory_mib=512):
+    ethernet = application_variant(source) == "ethernet"
     if memory_mib not in (256, 512):
         raise ValueError("Application memory experiment must be 256 or 512 MiB")
     kernel = unique((source / "build_dir").glob(
@@ -41,6 +43,11 @@ def test(source, memory_mib=512):
     # complete command below 256 bytes. The minimal BusyBox has no stty applet.
     commands = [b"printf %s '" + encoded[i:i+192] + b"' >> /tmp/application-test.b64\n"
                 for i in range(0, len(encoded), 192)]
+    if ethernet:
+        encoded_router = base64.b64encode(Path(__file__).with_name("openwrt-router-guest.sh").read_bytes())
+        commands += [b"printf %s '" + encoded_router[i:i+192] + b"' >> /tmp/router-test.b64\n"
+                     for i in range(0, len(encoded_router), 192)]
+        commands.append(b"base64 -d /tmp/router-test.b64 > /tmp/router-runtime-test.sh\n")
     commands.append(b"base64 -d /tmp/application-test.b64 > /tmp/application-test.sh; "
                     b"sh /tmp/application-test.sh\n")
     # No disk, host network, port forwarding or external server is exposed.
@@ -96,6 +103,8 @@ def test(source, memory_mib=512):
             b"PASSWALL_XRAY_TLS_TIME64_PASS",
             b"NFT_EXPRESSIONS_AND_COUNTER_PASS", b"OPENWRT_APPLICATIONS_QEMU_PASS",
         )
+        if ethernet:
+            markers += (b"OPENWRT_ROUTER_FORWARDING_TIME64_PASS", b"PASSWALL_TPROXY_TCP_TIME64_PASS")
         if (process.returncode != 0 or sent != len(commands)
                 or any(b"\n" + marker + b"\n" not in report for marker in markers)
                 or b"Kernel panic" in report or b"OPENWRT_APPLICATIONS_QEMU_FAIL" in report
@@ -111,6 +120,7 @@ def test(source, memory_mib=512):
                                    "sha256": hashlib.file_digest(source_file, "sha256").hexdigest()}
         provenance = {
             "schema": 1, "result": "OPENWRT_APPLICATIONS_QEMU_PASS",
+            "application_variant": "ethernet" if ethernet else "qemu",
             "machine": "virt,cortex-a7,single-core", "memory_mib": memory_mib,
             "memory_limit_mib": memory_limit_mib,
             "host_network": False, "disks": False, "clock_year": 2040,
@@ -122,6 +132,8 @@ def test(source, memory_mib=512):
         provenance_path.write_text(json.dumps(provenance, indent=2) + "\n")
         print("OPENWRT_APPLICATIONS_QEMU_PASS: actual ARM DNS/TLS/LuCI/rpcd/Passwall SOCKS and VLESS TLS at 2040")
         print("nft counters and TPROXY expressions passed; physical forwarding/TPROXY/Wi-Fi remain untested")
+        if ethernet:
+            print("Actual netifd/fw4 forwarding and Passwall TCP TPROXY passed in isolated network namespaces")
     finally:
         selector.close()
         if process.poll() is None:

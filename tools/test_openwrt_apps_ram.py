@@ -64,9 +64,30 @@ class ApplicationProfileTests(unittest.TestCase):
             node["properties"][property_name]["cells"][0] ^= 1
             with self.subTest(path=path, property=property_name), self.assertRaises(ValueError):
                 applications_ram_profile(tree, self.config, ARTIFACTS)
-        for option in ("BLOCK", "MMC", "USB_SUPPORT", "SMP", "HISI_FEMAC", "INITRAMFS_FORCE"):
+        router = any(node["path"] == "/soc/ethernet@f9840000" for node in self.tree["nodes"])
+        options = {"BLOCK", "MMC", "USB_SUPPORT", "SMP", "INITRAMFS_FORCE"}
+        if not router:
+            options.add("HISI_FEMAC")
+        for option in options:
             with self.subTest(option=option), self.assertRaises(ValueError):
                 applications_ram_profile(self.tree, self.config + f"CONFIG_{option}=y\n", ARTIFACTS)
+        if router:
+            for node in self.tree["nodes"]:
+                if node["path"] not in {"/soc/clock-controller@f8a220cc", "/soc/mdio@f9841100",
+                                        "/soc/mdio@f9841100/ethernet-phy@1", "/soc/ethernet@f9840000"}:
+                    continue
+                for key in node["properties"]:
+                    tree = copy.deepcopy(self.tree)
+                    changed = next(item for item in tree["nodes"] if item["path"] == node["path"])
+                    value = changed["properties"][key]
+                    # Zero-valued cells also decode as empty FDT strings.
+                    # Mutate the type used by the actual resource policy.
+                    kind = "strings" if key in {"compatible", "phy-mode"} else "cells"
+                    value[kind] = ["changed"] if kind == "strings" else [0xdeadbeef]
+                    with self.subTest(path=node["path"], property=key), self.assertRaises(ValueError):
+                        applications_ram_profile(tree, self.config, ARTIFACTS)
+            with self.assertRaises(ValueError):
+                applications_ram_profile(self.tree, self.config.replace("CONFIG_HISI_FEMAC=y\n", ""), ARTIFACTS)
         tree = copy.deepcopy(self.tree)
         next(node for node in tree["nodes"] if node["path"] == "/")["properties"]["compatible"]["strings"][0] = "other,board"
         with self.assertRaises(ValueError):

@@ -12,6 +12,10 @@ from serial_cli import console_text, open_receiver
 from ymodem_sender import TransferError
 
 PROMPT = re.compile(rb"(?:^|[\r\n])root@[^\r\n ]+:[^\r\n]*# $")
+PROFILES = {
+    "net": (b"6.12.112-ty1208z-openwrt-net", b"hi3798mv100/net"),
+    "router": (b"6.12.112-ty1208z-openwrt-router", b"hi3798mv100/apps"),
+}
 REPORT = (
     b"ubus call network.interface.probe status >/tmp/ty1208z-network.json && "
     b"cat /tmp/ty1208z-network.json && "
@@ -93,16 +97,17 @@ def run(args, serial_module):
         raise ValueError("Output exists; choose a fresh prefix")
     operation = "iperf-start" if args.iperf_start else "iperf-collect" if args.iperf_collect else "report"
     result = {"schema": 1, "port": args.port, "started_utc": started.isoformat(),
-              "operation": operation, "status": "starting", "kernel_verified": False}
+              "profile": args.profile, "operation": operation, "status": "starting", "kernel_verified": False}
     with open_receiver(serial_module, args.port, 115200, 0.02) as port:
         with paths["raw"].open("xb") as raw, paths["journal"].open("x", encoding="utf-8") as journal:
             exchange = ShellExchange(port, raw, journal)
             try:
                 command(exchange, b"")
                 identity = command(exchange, b"uname -r; cat /etc/openwrt_release")
-                if (not re.search(rb"(?:^|[\r\n])6\.12\.112-ty1208z-openwrt-net[\r\n]", identity) or
+                release, target = PROFILES[args.profile]
+                if (not re.search(rb"(?:^|[\r\n])" + re.escape(release) + rb"[\r\n]", identity) or
                         not re.search(rb"(?:^|[\r\n])DISTRIB_ID='OpenWrt'[\r\n]", identity) or
-                        not re.search(rb"(?:^|[\r\n])DISTRIB_TARGET='hi3798mv100/net'[\r\n]", identity)):
+                        not re.search(rb"(?:^|[\r\n])DISTRIB_TARGET='" + re.escape(target) + rb"'[\r\n]", identity)):
                     raise TransferError("Native kernel/rootfs identity differs; experiment not sent")
                 result["kernel_verified"] = True
                 data, marker = {
@@ -138,6 +143,7 @@ def run(args, serial_module):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
+    parser.add_argument("--profile", choices=PROFILES, default="net")
     parser.add_argument("--output", type=Path)
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--iperf-start", action="store_true")

@@ -11,6 +11,7 @@ import sys
 from check_openwrt_applications import check
 from inspect_images import inspect_image, parse_fdt
 from openwrt_apps_ram_profile import INITRD_ADDRESS, applications_ram_profile, digest, validate_pair
+from prepare_openwrt_applications import application_variant
 
 PROJECT = Path(__file__).resolve().parents[1]
 
@@ -24,6 +25,10 @@ def unique(paths, label):
 
 def make(source, output):
     check(source, built=True)
+    ethernet = application_variant(source) == "ethernet"
+    layer = "router" if ethernet else "applications"
+    if output is None:
+        output = PROJECT / ("artifacts/openwrt-router1" if ethernet else "artifacts/openwrt-apps-ram1")
     kernel = unique((source / "build_dir").glob("target-*/linux-hi3798mv100_apps/linux-6.12.112"), "application kernel")
     images = source / "bin/targets/hi3798mv100/apps"
     output.mkdir(parents=True, exist_ok=True)
@@ -40,9 +45,18 @@ def make(source, output):
     for name in ("applications-qemu-256.json", "qemu-applications-256.log"):
         shutil.copyfile(images / "checks" / name, checks / name)
     rootfs, _ = validate_pair(output)
-    for name in ("arch/arm/mach-hisi/hi3798mv100.c", "drivers/clocksource/timer-hi3798mv100.c"):
+    board_sources = ["arch/arm/mach-hisi/hi3798mv100.c", "drivers/clocksource/timer-hi3798mv100.c"]
+    if ethernet:
+        board_sources += ["drivers/clk/hisilicon/clk-ty1208z-ethernet.c",
+                          "drivers/clk/hisilicon/ty1208z-ethernet-gate.h",
+                          "drivers/net/phy/festa-ty1208z.c",
+                          "drivers/net/ethernet/hisilicon/hi3798mv100-femac.h"]
+    for name in board_sources:
         if (kernel / name).read_bytes() != (PROJECT / "overlay" / name).read_bytes():
             raise ValueError(f"Native application kernel board source differs: {name}")
+    if ethernet:
+        subprocess.run([sys.executable, str(PROJECT / "tools/test_femac_datapath.py"),
+                        "--linux", str(kernel)], check=True)
     subprocess.run([sys.executable, str(PROJECT / "tools/inspect_kernel_layout.py"),
                     "--build", str(kernel), "--output", str(checks / "kernel-layout.json")], check=True)
     cpp = subprocess.run([
@@ -50,7 +64,7 @@ def make(source, output):
         f"-DTY1208Z_INITRD_START=0x{INITRD_ADDRESS:x}",
         f"-DTY1208Z_INITRD_END=0x{INITRD_ADDRESS + len(rootfs):x}",
         "-I", str(PROJECT / "overlay/arch/arm/boot/dts/hisilicon"), "-I", str(kernel / "include"),
-        str(PROJECT / "openwrt/applications/ram-rootfs.dts"),
+        str(PROJECT / "openwrt" / layer / "ram-rootfs.dts"),
     ], stdout=subprocess.PIPE, check=True).stdout
     preprocessed = checks / "applications-ram.dts"
     preprocessed.write_bytes(cpp)
@@ -73,6 +87,7 @@ def make(source, output):
         raise ValueError("Invalid application RAM uImage")
     (checks / "image-validation.json").write_text(json.dumps(image, indent=2) + "\n")
     manifest = {"status": "native application RAM placement candidate; hardware untested; no install recipe",
+                "application_variant": "ethernet" if ethernet else "qemu",
                 "external_initrd": initrd,
                 "files": {name: digest((output / name).read_bytes()) for name in (
                     "uImage-UNTESTED.bin", "zImage", "ty1208z-diagnostic.dtb", "linux.config",
@@ -84,9 +99,9 @@ def make(source, output):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--output", type=Path, default=PROJECT / "artifacts/openwrt-apps-ram1")
+    parser.add_argument("--output", type=Path)
     args = parser.parse_args()
-    make(args.source.resolve(), args.output.resolve())
+    make(args.source.resolve(), args.output.resolve() if args.output else None)
 
 
 if __name__ == "__main__":
