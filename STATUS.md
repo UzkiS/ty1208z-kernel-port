@@ -14,7 +14,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Linux 6.12.112 candidate | Cross-compiled; board descriptor, UART/GIC DTB, single-core timer and embedded initramfs |
 | Structural checks | Passed: CRC, ARM uImage/zImage, appended DTB, static ARM ELF, required/disabled config |
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
-| GitHub CI | Passed for code commit `cfba617`: guarded serial/YMODEM/shell tests, collector LF/CRLF regression, PowerShell syntax, clean kernel build, QEMU time64, RAM CRC/DDR gates and independent RDA USB object; [run 38210743877](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38210743877) |
+| GitHub CI | Passed for code commit `3df7efc`: guarded serial/YMODEM/shell tests, collector LF/CRLF regression, PowerShell syntax, clean kernel build, QEMU time64, RAM CRC/DDR gates, independent RDA USB object and separate eMMC register audit; [run 38212760978](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38212760978) |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
 | Serial CLI | Replacing the TTL adapter resolved console input; CLI attached to the stopped CA bootloader on COM9 and completed command/environment queries without another reboot; see [inspection record](verification/bootloader-inspection-20261012.md) |
 | Original Hinas TTL boot | Complete from Boot ROM to login; bootloader and allocation evidence recorded in [TTL report](verification/ttl-boot-20261012.md) |
@@ -22,7 +22,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | CA authentication / RAM placement | Current CA bootloader accepted this ordinary unsigned uImage at the measured Hinas address; host/device CRC matched; bounded low-256-MiB diagnostic boot succeeded. This does not establish other loaders/images or persistent installation |
 | Hinas startup under new kernel | Not tested; eMMC driver and legacy modules need separate work |
 | Wired network / storage / USB / SMP | Not integrated into this minimal diagnostic image |
-| eMMC register audit | Separate RAM candidate built and structurally/QEMU checked; reads controller identity/clock registers with MMC/BLOCK disabled; hardware untested; [scope](docs/emmc.md) |
+| eMMC register audit | Passed on hardware: separate RAM candidate, MMC/BLOCK disabled, DW revision `0x270a`, HCON `0x00e44c81`, inherited source 100 MHz; no card commands; [measurement](verification/emmc-audit-20261012.md) |
 | Wi-Fi | RDA USB `1e04:8888`; pinned compatible-descriptor source found and USB object compiled against a separate Linux 6.12 config; full module, chip revision, firmware and hardware operation remain unverified |
 | OpenWrt/Kwrt / Passwall | Planned; no working target or router image yet |
 | Whole-system Y2038 | Not established; diagnostic time64 passed, application-level testing remains |
@@ -49,7 +49,7 @@ is storage and wired-network support with separate validation, followed by
 Hinas compatibility and the OpenWrt/Kwrt target.
 
 The actual CI result above covers the RAM boot tooling, corrected diagnostic
-DTB and independent RDA USB audit. It reproduces the software checks; physical
+DTB, independent RDA USB audit and separate eMMC register audit. It reproduces the software checks; physical
 acceptance and shell observations are recorded separately for the local image.
 
 The first Windows collection reached its END marker but exited 127 because
