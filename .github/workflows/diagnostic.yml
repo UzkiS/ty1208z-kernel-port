@@ -35,9 +35,12 @@ jobs:
             shellcheck python3-venv
           python3 -m venv .work/lint-venv
           .work/lint-venv/bin/pip install ruff==0.11.13
+          .work/lint-venv/bin/pip install --require-hashes -r tools/requirements-serial.txt
           echo "$PWD/.work/lint-venv/bin" >> "$GITHUB_PATH"
       - name: Repository and script checks
         run: make lint
+      - name: RX-only serial CLI integration without board hardware
+        run: make test-serial
       - name: Parse local PowerShell SSH wrapper
         shell: pwsh
         run: |

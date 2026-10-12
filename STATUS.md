@@ -16,6 +16,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
 | GitHub CI | Passed for code commit `0f9332f`: collector LF/CRLF regression, PowerShell syntax, clean kernel build and QEMU time64; [run 38188649931](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38188649931) |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
+| Serial CLI | RX-only tool opens the local CH340 at 115200 8N1; six Linux PTY integration tests passed; complete early boot capture still pending |
 | Candidate boot on physical TY1208Z | Not attempted |
 | CA authentication / RAM placement | Unverified; DT memory range and load address require hardware confirmation |
 | Hinas startup under new kernel | Not tested; eMMC driver and legacy modules need separate work |
@@ -45,3 +46,7 @@ are in [verification/baseline-20261012.md](verification/baseline-20261012.md).
 
 See `docs/hardware.md`, `docs/wifi.md` and `docs/validation.md` for evidence and
 limits. No flash commands are provided at this stage.
+
+Serial collection now uses [the CLI workflow](docs/ttl-baseline.md), without
+HiTool for routine UART access. Local validation is recorded in
+[verification/serial-cli-20261012.md](verification/serial-cli-20261012.md).
