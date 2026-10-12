@@ -51,6 +51,15 @@ identify the cause or establish console recovery. A fresh guarded listener
 was armed before requesting a board power cycle; native OpenWrt transfer
 must wait for an identified bootloader and successful bidirectional queries.
 
+The pinned kernel's default serial termios includes `IXON`, and the diagnostic
+init script does not disable it. A further bounded host XON (Ctrl+Q), then
+empty-line attempt checked whether output might merely be flow-stopped.
+Capture `console-xon-20261012T214836.902368Z.rx` was also empty. Two subsequent
+host pings still received replies at 2 and 4 ms, with zero loss. Host control
+character submission is not proof that the board received it; the cause
+remains unestablished. The guarded listener was restored without boot, reset
+or storage commands. No fresh board startup has yet been observed.
+
 ## Local evidence identities
 
 Raw logs and experimental runners remain in ignored local storage.
