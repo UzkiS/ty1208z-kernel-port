@@ -36,6 +36,8 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 - `tools/make_busybox_patch.py` 从原版 BusyBox 生成时间输出修复。
 - `reference/wifi-rda-usb.lock.json` 固定可选 RDA 来源与逐文件哈希；下载器不下载固件。
 - `tools/make_wifi_usb_patch.py` 生成单独的 USB API 审计补丁。
+- `tools/make_wifi_port_patch.py` 从锁定来源生成完整模块补丁；无线新增文件在
+  `wifi/overlay/`，现有控制协议函数的替换实现维护在 `wifi/replacements/`。
 - `patches/` 提交可审查的生成结果；CI 再生成并要求 Git 无差异。
 - `reference/` 提交来源清单，`reference/sdk/` 下载内容被忽略。
 - `evidence/` 保留本地固件解析结果，避免把用户原固件内容发布到仓库。

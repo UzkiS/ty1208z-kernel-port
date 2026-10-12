@@ -59,6 +59,17 @@ def remove_function(text, name, count=1):
     return text
 
 
+def replace_definition(text, name):
+    spans = function_spans(text, name)
+    if len(spans) != 1:
+        raise ValueError(f"Unexpected protocol definition count: {name}")
+    replacement = (ROOT / "wifi/replacements" / (name + ".c")).read_text()
+    if len(function_spans(replacement, name)) != 1:
+        raise ValueError(f"Invalid project protocol replacement: {name}")
+    start, _, end = spans[0]
+    return text[:start] + replacement + text[end:]
+
+
 def transform(files):
     result = dict(files)
     result["rdawlan/wland_bus.c"] = replace(files["rdawlan/wland_bus.c"],
@@ -68,7 +79,38 @@ def transform(files):
     result["rdawlan/wland_utils.h"] = replace(files["rdawlan/wland_utils.h"],
                                               "prandom_u32", "get_random_u32")
     result["rdawlan/wland_fwsmgr.c"] = replace(files["rdawlan/wland_fwsmgr.c"], "strlcpy(", "strscpy(")
-    result["rdawlan/wland_rx.c"] = replace(files["rdawlan/wland_rx.c"], "netif_rx_ni(skb);", "netif_rx(skb);", 2)
+    text = replace(files["rdawlan/wland_rx.c"], "netif_rx_ni(skb);", "netif_rx(skb);", 2)
+    text = replace(text, '''\t\tbuf = skb->data;
+\t\t// pull hdr from the skb''', '''\t\tif (skb->len < WID_HEADER_LEN) {
+\t\t\twland_pkt_buf_free_skb(skb);
+\t\t\treturn -EMSGSIZE;
+\t\t}
+\t\tbuf = skb->data;
+\t\t// pull hdr from the skb''')
+    text = replace(text, "\t\tif (rx_len > size) {", "\t\tif (rx_len < WID_HEADER_LEN || rx_len > size) {")
+    text = replace(text, '''\t\t\tmsg_type = buf[2];''', '''\t\t\tif (rx_len < sizeof(struct wland_dcmd)) {
+\t\t\t\twland_pkt_buf_free_skb(skb);
+\t\t\t\treturn -EMSGSIZE;
+\t\t\t}
+\t\t\tmsg_type = buf[2];''')
+    text = replace(text, '''\t\t\t\tspin_lock_bh(&rx_info->rxctl_lock);
+\t\t\t\trx_info->rxctl = rx_info->rxbuf;''', '''\t\t\t\tif (!rx_info->rxbuf || rx_len > rx_info->rxblen) {
+\t\t\t\t\twland_pkt_buf_free_skb(skb);
+\t\t\t\t\treturn -EMSGSIZE;
+\t\t\t\t}
+\t\t\t\tspin_lock_bh(&rx_info->rxctl_lock);
+\t\t\t\trx_info->rxctl = rx_info->rxbuf;''')
+    result["rdawlan/wland_rx.c"] = text
+    # Applied after the USB-only API patch; these anchors are unaffected by it.
+    text = files["rdawlan/wland_usb.c"]
+    text = replace(text, '''\t\tmemcpy(buf, rx_info->rxctl, min(len, rxlen));''', '''\t\tif (rxlen > len || rxlen > rx_info->rxblen || !rx_info->rxctl)
+\t\t\terr = -EMSGSIZE;
+\t\telse {
+\t\t\tmemcpy(buf, rx_info->rxctl, rxlen);
+\t\t\terr = rxlen;
+\t\t}''')
+    text = replace(text, "\terr = rxlen>0 ? (int)rxlen : -ETIMEDOUT;", "\tif (!rxlen)\n\t\terr = -ETIMEDOUT;")
+    result["rdawlan/wland_usb.c"] = text
     text = files["rdawlan/wland_nvram.c"]
     text = body(text, "wland_nvram_read", '''\tstruct file *file;
 \tloff_t position = offset;
@@ -127,6 +169,8 @@ def transform(files):
 \t\treturn -EPERM;
 
 \tif (drvr->bus_if->state''')
+    for name in ("wland_pull_wid", "wland_wid_hdrpull", "wland_proto_cdc_cmplt"):
+        text = replace_definition(text, name)
     result["rdawlan/wland_cmds.c"] = text
     text = files["rdawlan/wland_trap.c"]
     text = replace(text, '''\trdlen = kernel_read(fp, fp->f_pos, buf, len);

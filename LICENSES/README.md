@@ -11,6 +11,9 @@ This repository is not relicensed under a single blanket license.
 - `tools/time64-probe.c` uses **MIT**. Other project Python/shell/build scripts,
   diagnostic shell scripts and CI files use **MIT**, with the license text below.
 - Project documentation and configuration use **MIT** unless otherwise marked.
+- Project control-protocol replacements in `wifi/replacements/` use **ISC**,
+  matching the surrounding vendor source; see [ISC.txt](ISC.txt). Generated
+  patches retain the original Rdamicro permission notices.
 - Vendor references are fetched from a pinned public SDK commit with per-file
   hashes. They keep their original licenses (including GPL and Apache notices).
   Downloaded reference files are not redistributed by this Git repository.

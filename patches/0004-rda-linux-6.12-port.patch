@@ -649,19 +649,327 @@
  	u8* offset = buf;
  	enum wid_type type = wland_get_wid_type(WID);
  	u16 wid_length = wland_get_wid_size(type, data_len);
-@@ -314,6 +320,11 @@
+@@ -202,104 +208,59 @@
+  *@data buf to return data. must be !NULL
+  *@data_len return data_len. must be !NULL
+  */
+-s32 wland_pull_wid(const u8 *buf, u16 buf_len, u16 *WID, const u8 **data, u16 *data_len)
+-{
+-	const u8 *offset = buf;
++/* SPDX-License-Identifier: ISC */
++s32 wland_pull_wid(const u8 *buf, u16 buf_len, u16 *WID,
++		   const u8 **data, u16 *data_len)
++{
+ 	enum wid_type type;
+-	u16 wid_length;
++	u16 wid, length, header = 3, trailer = 0;
+ 	u8 checksum = 0;
+-
+-	if (buf==NULL || WID==NULL || data==NULL || data_len==NULL) {
+-		WLAND_ERR("input paramters error\n");
+-		return -1;
+-	}
+-	*WID = *data_len = 0;
++	unsigned int i, total;
++
++	if (!WID || !data || !data_len)
++		return -EINVAL;
++	*WID = 0;
+ 	*data = NULL;
+-
+-	*WID = get_le16(buf);
+-	buf += 2;
+-	type = wland_get_wid_type(*WID);
+-
+-	if (buf > offset + buf_len) {
+-		WLAND_ERR("data outof buf_len\n");
+-		return (offset+buf_len) - buf;
+-	} else if (buf == offset + buf_len)
+-		return buf_len;
+-
+-	WLAND_DBG(DCMD, TRACE, "WID:0x%04x type:%d\n",
+-		*WID, type);
+-
+-	switch (type) {
+-	case WID_CHAR:
+-		wid_length = (u16)(*buf);
+- 		if (wid_length != 1) {
+-			WLAND_ERR("WID(0x%04x) data_length(%d) error\n",	*WID, wid_length);
+-			return -1;
+-		}
+-		*data_len = wid_length;
+-		*data = buf + 1;
+-		buf += 2;
+-		break;
+-	case WID_SHORT:
+-		wid_length = (u16)(*buf);
+- 		if (wid_length != 1) {
+-			WLAND_ERR("WID(0x%04x) data_length(%d) error\n",	*WID, wid_length);
+-			return -1;
+-		}
+-		*data_len = wid_length;
+-		*data = buf + 1;
+-		buf += 3;
+-		break;
+-	case WID_INT:
+-		wid_length = (u16)(*buf);
+-		*data_len = wid_length;
+- 		if (wid_length != 4) {
+-			WLAND_ERR("WID(0x%04x) data_length(%d) error\n",	*WID, wid_length);
+-			return -1;
+-		}
+-		*data = buf + 1;
+-		buf += 5;
+-		break;
+-	case WID_STR:
+-		wid_length = (u16)(*buf);
+-		*data_len = wid_length;
+-		*data = buf+1;
+-		//memcpy(data, buf+1, wid_length);
+-		buf += (1+wid_length);
+-		break;
+-	case WID_BIN:
+-		//buf += 2;//only for binary_wid. word alignment
+-		//wid_length = get_le16(buf);
+-		wid_length = get_le16(buf) & 0x3fff;
+-		*data_len = wid_length;
+-		*data = buf+2;
+-		WLAND_DBG(DCMD, TRACE, "%zu:%d\n", buf-offset+2+1+wid_length, buf_len);
+-		if (buf-offset+2+1+wid_length > buf_len) {
+-			WLAND_ERR("data outof buf_len\n");
+-			return (buf_len - (buf-offset+2+1+wid_length));
+-		}
+-
+-		while(wid_length--)
+-			checksum += *(buf+2+wid_length);
+-		wid_length = *data_len;
+-		if ( *(buf+2+wid_length) != checksum)  {
+-			WLAND_ERR("BINARY WID(0x%04x) checksum error. fw ret(%u) driver ret(%u)\n",
+-				*WID, *(buf+2+wid_length), checksum);
+-			return -1;
+-		}
+-		buf += (2+1+wid_length);
+-		break;
+-	case WID_UNKNOW:
+-	default:
+-		return -1;
+-	}
+-
+-	if (buf > offset + buf_len) {
+-		WLAND_ERR("data outof buf_len\n");
+-		return (offset+buf_len) - buf;
+-	} else
+-		return buf - offset;
+-}
++	*data_len = 0;
++	if (!buf || buf_len < 2)
++		return -EMSGSIZE;
++	wid = get_le16(buf);
++	type = wland_get_wid_type(wid);
++	if (type == WID_UNKNOW)
++		return -EINVAL;
++	/* Standalone query records contain only their WID. */
++	if (buf_len == 2) {
++		*WID = wid;
++		return 2;
++	}
++	if (type == WID_BIN) {
++		if (buf_len < 4)
++			return -EMSGSIZE;
++		header = 4;
++		trailer = 1;
++		length = get_le16(buf + 2) & 0x3fff;
++	} else {
++		length = buf[2];
++		if ((type == WID_CHAR && length != 1) ||
++		    (type == WID_SHORT && length != 2) ||
++		    (type == WID_INT && length != 4))
++			return -EINVAL;
++	}
++	total = header + length + trailer;
++	if (total > buf_len)
++		return -EMSGSIZE;
++	if (type == WID_BIN) {
++		for (i = 0; i < length; i++)
++			checksum += buf[header + i];
++		if (checksum != buf[header + length])
++			return -EBADMSG;
++	}
++	*WID = wid;
++	*data = buf + header;
++	*data_len = length;
++	return total;
++}
++
+ 
+ /*
+  * hdrpush wid.
+@@ -313,6 +274,11 @@
+ 	u16 wid_msg_len = FMW_HEADER_LEN, wid_pkt_len = 0;
  	struct wland_proto *prot = drvr->prot;
  	u8 *wid_msg = prot->buf;
- 
++
 +	if (rw && (wid == WID_SET_EFUSE_ONE_PAGE ||
 +		   wid == WID_EFUSE_XTAL_CAL_VAL ||
 +		   wid == WID_EFUSE_PHY_TXPOW_VAL))
 +		return -EPERM;
-+
+ 
  	if (drvr->bus_if->state != WLAND_BUS_DATA) {
  		WLAND_ERR("bus is down. we have nothing to do.\n");
- 		return -EINVAL;
-@@ -2385,8 +2396,8 @@
+@@ -369,65 +335,48 @@
+ 	return (wid_msg_len - FMW_HEADER_LEN);
+ }
+ 
++/* SPDX-License-Identifier: ISC */
+ static int wland_wid_hdrpull(struct wland_private *drvr, u8 *val, u16 val_len)
+ {
+-	int ret = -EBADE;
+-	u8 flag = 0;
+ 	struct wland_proto *prot = drvr->prot;
+-	u8 *wid = prot->buf;
+-	enum wid_type type = WID_UNKNOW;
+-
+-	if ((drvr->bus_if->state != WLAND_BUS_DATA)
+-		|| (val_len < FMWID_HEADER_LEN)) {
+-		WLAND_ERR("invalid. we have nothing to do.\n");
+-		return -EINVAL;
+-	}
++	const u8 *data;
++	u16 wire, packet_len, message_len, wid, data_len, payload_len;
++	int used;
+ 
+ 	prot->rsplen = 0;
+ 	prot->offset = 0;
+-	prot->msg.wid_pkg_length = cpu_to_le16(prot->msg.wid_pkg_length);
+-	prot->msg.wid_msg_length = cpu_to_le16(prot->msg.wid_msg_length);
+-
+-	flag = (prot->msg.wid_pkg_length & ~CDC_DCMD_LEN_MASK)
+-		>> CDC_DCMD_LEN_SHIFT;
+-
+-	if (PKT_TYPE_CFG_RSP == flag) {
+-		u16 rsp = (u16) (wid[0] | (wid[1] << 8));
+-		type = wland_get_wid_type(rsp);
+-
+-		if (WLAND_WID_MSG_RESP == prot->msg.wid_msg_type) {
+-			if (rsp == WID_STATUS) {
+-				ret = (wid[3] != STATUS_SUCCESS) ? -EINVAL : 0;
+-			} else {
+-				ret = 0;
+-				if (type == WID_BIN) {
+-					prot->rsplen = wid[2] | wid[3] << 8;
+-
+-					prot->offset =
+-						FMWID_HEADER_LEN - FMW_HEADER_LEN + 1;
+-				}else{
+-					prot->rsplen = wid[2];
+-
+-					prot->offset =
+-						FMWID_HEADER_LEN - FMW_HEADER_LEN;
+-				}
+-			}
+-		}
+-
+-		WLAND_DBG(EVENT, TRACE,
+-			"cfgrsp_len:0x%x,cmd:0x%x,rsp:0x%x,rsplen:0x%x,status:0x%x,prot->rsplen:%d,prot->offset:%d\n",
+-			val_len, prot->cmd, rsp, wid[2], wid[3], prot->rsplen,
+-			prot->offset);
+-	} else if (PKT_TYPE_IND == flag) {
+-		WLAND_DBG(EVENT, TRACE, "data indication val_len:%d\n",
+-			val_len);
+-	} else if (PKT_TYPE_ASYNC == flag) {
+-		WLAND_DBG(EVENT, TRACE, "sync frame indication val_len:%d\n",
+-			val_len);
+-	}
+-
+-	return ret;
+-}
++	if (drvr->bus_if->state != WLAND_BUS_DATA)
++		return -EIO;
++	if (val != (u8 *)&prot->msg || val_len < sizeof(prot->msg) ||
++	    val_len > sizeof(prot->msg) + sizeof(prot->buf))
++		return -EMSGSIZE;
++
++	/* Inspect wire bytes without mutating little-endian header fields. */
++	wire = get_le16(val);
++	packet_len = wire & CDC_DCMD_LEN_MASK;
++	message_len = get_le16(val + 4);
++	if ((wire >> CDC_DCMD_LEN_SHIFT) != PKT_TYPE_CFG_RSP ||
++	    val[2] != WLAND_WID_MSG_RESP)
++		return -EPROTO;
++	if (message_len < FMW_HEADER_LEN || packet_len > val_len ||
++	    packet_len != message_len + WID_HEADER_LEN)
++		return -EMSGSIZE;
++	payload_len = packet_len - sizeof(prot->msg);
++	used = wland_pull_wid(val + sizeof(prot->msg), payload_len,
++			      &wid, &data, &data_len);
++	if (used < 0)
++		return used;
++	if (used <= 2 || used != payload_len)
++		return -EPROTO;
++	if (wid == WID_STATUS)
++		return data_len == 1 && data[0] == STATUS_SUCCESS ? 0 : -EREMOTEIO;
++	if (wid != prot->cmd)
++		return -EPROTO;
++	prot->offset = data - (val + sizeof(prot->msg));
++	prot->rsplen = data_len;
++	return 0;
++}
++
+ 
+ static int wland_proto_cdc_msg(struct wland_private *drvr)
+ {
+@@ -451,31 +400,28 @@
+ 	return wland_bus_txctl(bus, payload, len);
+ }
+ 
++/* SPDX-License-Identifier: ISC */
+ static int wland_proto_cdc_cmplt(struct wland_private *drvr, u8 id, u16 len)
+ {
+-	int ret;
+ 	struct wland_proto *prot = drvr->prot;
+-
+-#if 0
+-	if (wland_check_test_mode()) {
+-		WLAND_DBG(SDIO, INFO, "In Test Mode and do not send msg!\n");
+-		return 0;
+-	}
+-#endif
+-
+-	do {
+-		ret = wland_bus_rxctl(drvr->bus_if, (u8 *) & prot->msg, len);
+-		if (ret < 0) {
+-			WLAND_ERR("***response failed, ret:%d***\n",ret);
+-			break;
+-		}
+-	} while (prot->msg.wid_msg_id != id);
+-
+-	WLAND_DBG(EVENT, TRACE,
+-		"Done(SendMsgId:%d, ReceivedMsgId:%d, RespLen:%d)\n", id,
+-		prot->msg.wid_msg_id, ret);
+-	return ret;
+-}
++	int attempt, ret;
++
++	if (len < sizeof(prot->msg) ||
++	    len > sizeof(prot->msg) + sizeof(prot->buf))
++		return -EMSGSIZE;
++	for (attempt = 0; attempt < RETRIES; attempt++) {
++		ret = wland_bus_rxctl(drvr->bus_if, (u8 *)&prot->msg, len);
++		if (ret < 0)
++			return ret;
++		/* Do not compare the stale request ID after a short bus response. */
++		if (ret < sizeof(prot->msg) || ret > len)
++			return -EMSGSIZE;
++		if (prot->msg.wid_msg_id == id)
++			return ret;
++	}
++	return -EPROTO;
++}
++
+ 
+ /*
+  * @wid_msg_len length include msg_information
+@@ -2385,8 +2331,8 @@
  s32 wland_set_power_config(struct wland_if *ifp)
  {
  #ifdef WLAND_FIRMWARE_PATH
@@ -672,7 +980,7 @@
  	char filename[256];
  #elif defined WLAND_DOWNLOAD_FIRMWARE_FROM_HEX
  	/*no need value*/
-@@ -2430,16 +2441,15 @@
+@@ -2430,16 +2376,15 @@
  	};
  #endif
  #ifdef WLAND_FIRMWARE_PATH
@@ -698,7 +1006,7 @@
  	buf = kzalloc(config_size+1, GFP_KERNEL);
  	if(!buf) {
  		WLAND_ERR("no more space!\n");
-@@ -2452,7 +2462,7 @@
+@@ -2452,7 +2397,7 @@
  		WLAND_DBG(DEFAULT, WARNING, "read power save config file failed!\n");
  		goto out;
  	}
@@ -707,7 +1015,7 @@
  
  #elif defined WLAND_DOWNLOAD_FIRMWARE_FROM_HEX
  	config_size = POWER_CONFIG_HEX_SIZE;
-@@ -2483,7 +2493,7 @@
+@@ -2483,7 +2428,7 @@
  			return -1;
  		}
  		memcpy(buf, config_firmware->data, config_size);
@@ -1875,6 +2183,47 @@
  	}
  }
  
+@@ -2127,13 +2127,17 @@
+ 		//WLAND_DBG(BUS, TRACE, "Enter,%s,count:%u\n", dev_name(dev), skb->len);
+ 
+ 
++		if (skb->len < WID_HEADER_LEN) {
++			wland_pkt_buf_free_skb(skb);
++			return -EMSGSIZE;
++		}
+ 		buf = skb->data;
+ 		// pull hdr from the skb
+ 		size = skb->len;
+ 		rx_len = (u16) (buf[0] | ((buf[1] & 0x0F) << 8));
+ 
+ 		//printk("size=%d, rx_len=%d, addr:%x\n", size, rx_len, (unsigned int)buf);
+-		if (rx_len > size) {
++		if (rx_len < WID_HEADER_LEN || rx_len > size) {
+ 			WLAND_ERR("read payload_len invalid! rx_len:%d size:%d\n"
+ 				, rx_len, size);
+ 			wland_pkt_buf_free_skb(skb);
+@@ -2264,6 +2268,10 @@
+ 
+ 		} else if ((rx_type == PKT_TYPE_CFG_RSP) || (rx_type == PKT_TYPE_CFG_MAC1)){
+ 
++			if (rx_len < sizeof(struct wland_dcmd)) {
++				wland_pkt_buf_free_skb(skb);
++				return -EMSGSIZE;
++			}
+ 			msg_type = buf[2];
+ 			memset(&event_packet, 0, sizeof(event_packet));
+ 
+@@ -2279,6 +2287,10 @@
+ 					skb->len, rx_len, rx_type);
+ 				WLAND_DUMP(RX_WIDRSP, skb->data, skb->len,
+ 					"RX Data (WID_MSG_RESP), len:%u\n", skb->len);
++				if (!rx_info->rxbuf || rx_len > rx_info->rxblen) {
++					wland_pkt_buf_free_skb(skb);
++					return -EMSGSIZE;
++				}
+ 				spin_lock_bh(&rx_info->rxctl_lock);
+ 				rx_info->rxctl = rx_info->rxbuf;
+ 				rx_info->rxlen = rx_len;
 --- a/rdawlan/wland_trap.c
 +++ b/rdawlan/wland_trap.c
 @@ -246,9 +246,7 @@
@@ -1942,6 +2291,28 @@
  	}
  
  	if (filename)
+--- a/rdawlan/wland_usb.c
++++ b/rdawlan/wland_usb.c
+@@ -449,11 +449,17 @@
+ 	} else if ((rx_info->rxlen > 0) && (devinfo->bus_pub.state == USB_STATE_UP)) {
+ 		spin_lock_bh(&rx_info->rxctl_lock);
+ 		rxlen = rx_info->rxlen;
+-		memcpy(buf, rx_info->rxctl, min(len, rxlen));
++		if (rxlen > len || rxlen > rx_info->rxblen || !rx_info->rxctl)
++			err = -EMSGSIZE;
++		else {
++			memcpy(buf, rx_info->rxctl, rxlen);
++			err = rxlen;
++		}
+ 		rx_info->rxlen = 0;
+ 		spin_unlock_bh(&rx_info->rxctl_lock);
+ 	}
+-	err = rxlen>0 ? (int)rxlen : -ETIMEDOUT;
++	if (!rxlen)
++		err = -ETIMEDOUT;
+ 	return err;
+ #else
+ 	err = wland_usb_recv_ctl(devinfo, buf, len);
 --- a/rdawlan/wland_utils.h
 +++ b/rdawlan/wland_utils.h
 @@ -21,7 +21,7 @@
