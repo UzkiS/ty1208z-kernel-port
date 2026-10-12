@@ -56,3 +56,20 @@ is included. The later directed-scan and bounded-SSID logging changes in
 This is remote software acceptance. Physical TFTP, native OpenWrt startup,
 sustained Ethernet traffic and Wi-Fi remain unverified. Application UDP/NTP
 checks belong to their separate workflow and are not established by this run.
+
+## Directed-scan dispatch and logging accepted remotely
+
+The later [run 38310319501](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38310319501)
+completed successfully on `9e5bd2b68a7681c3a0d5fa6b7d3003d459c1cc77`.
+The diagnostic job ran from 21:23:24 to 21:51:56 UTC on 2026-10-12;
+the actual job and every step succeeded, including all independent profiles
+and artifact upload. This establishes remote acceptance of the directed-scan
+failure/early-completion and formatted-SSID logging fixes through `8be80e0`.
+
+The downloaded Wi-Fi artifact's six manifest files were verified by length
+and SHA-256. Its patch matches the recorded scan-dispatch version, and the
+actual build log contains standalone `RDA_SCAN_FAILURE_PASS`,
+`RDA_STARTUP_ROLLBACK_PASS` and `RDA_CONTROL_PASS` markers. The later
+[result-parser changes](wifi-scan-results-20261013.md) are excluded from this
+run. Physical Wi-Fi/native OpenWrt and application UDP/NTP acceptance remain
+separate and unestablished by these diagnostic checks.
