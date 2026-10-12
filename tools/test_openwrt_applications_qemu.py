@@ -104,7 +104,8 @@ def test(source, memory_mib=512):
             b"NFT_EXPRESSIONS_AND_COUNTER_PASS", b"OPENWRT_APPLICATIONS_QEMU_PASS",
         )
         if ethernet:
-            markers += (b"OPENWRT_ROUTER_FORWARDING_TIME64_PASS", b"PASSWALL_TPROXY_TCP_TIME64_PASS")
+            markers += (b"OPENWRT_ROUTER_FORWARDING_TIME64_PASS", b"PASSWALL_TPROXY_TCP_TIME64_PASS",
+                        b"PASSWALL_TPROXY_UDP_TIME64_PASS")
         if (process.returncode != 0 or sent != len(commands)
                 or any(b"\n" + marker + b"\n" not in report for marker in markers)
                 or b"Kernel panic" in report or b"OPENWRT_APPLICATIONS_QEMU_FAIL" in report
@@ -133,7 +134,7 @@ def test(source, memory_mib=512):
         print("OPENWRT_APPLICATIONS_QEMU_PASS: actual ARM DNS/TLS/LuCI/rpcd/Passwall SOCKS and VLESS TLS at 2040")
         print("nft counters and TPROXY expressions passed; physical forwarding/TPROXY/Wi-Fi remain untested")
         if ethernet:
-            print("Actual netifd/fw4 forwarding and Passwall TCP TPROXY passed in isolated network namespaces")
+            print("Actual netifd/fw4 forwarding and Passwall TCP/UDP TPROXY passed in isolated network namespaces")
     finally:
         selector.close()
         if process.poll() is None:

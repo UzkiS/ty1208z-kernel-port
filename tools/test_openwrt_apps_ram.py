@@ -104,6 +104,12 @@ class ApplicationProfileTests(unittest.TestCase):
             record.write_text(json.dumps(changed))
             with self.assertRaisesRegex(ValueError, "bounded-memory"):
                 validate_pair(root)
+            for marker in report["passed_markers"]:
+                changed = copy.deepcopy(report)
+                changed["passed_markers"].remove(marker)
+                record.write_text(json.dumps(changed))
+                with self.subTest(missing_marker=marker), self.assertRaisesRegex(ValueError, "bounded-memory"):
+                    validate_pair(root)
             record.write_text(json.dumps(report))
             (root / "zImage").write_bytes(b"wrong kernel")
             with self.assertRaisesRegex(ValueError, "identity differs: kernel"):

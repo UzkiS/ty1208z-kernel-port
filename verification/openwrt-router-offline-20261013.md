@@ -2,7 +2,8 @@
 
 Result: a separate native OpenWrt kernel/rootfs with Passwall/Xray/LuCI and the
 measured Ethernet drivers built successfully. Actual netifd/fw4 forwarding and
-Passwall TCP TPROXY HTTPS pass in isolated ARM QEMU at 2040, under both 512 MiB
+Passwall TCP TPROXY HTTPS and bidirectional UDP delivery pass in isolated ARM
+QEMU at 2040, under both 512 MiB
 and 240 MiB usable-memory budgets. RAM packaging, resource/provenance mutations,
 actual FEMAC sanitizer and UART CRC/identity checks pass locally.
 **No physical boot or routing acceptance of this integrated candidate exists.**
@@ -17,7 +18,7 @@ actual FEMAC sanitizer and UART CRC/identity checks pass locally.
 | rootfs.cpio.gz | 21044278 | `bca90c4678b8623446dcaf914a2dcb7d4e3409c2ef43e1e9dcc9248210310b0d` |
 | Kernel config | 64994 | `c4cfccaaa15c6bc57e03713c822331728d529d53abf3a9ab00931edfd9e8ff96` |
 | Package manifest | 4423 | `339fc1e806f1574275ba0e7aed3f5fc1a70b7a9c8f13ce4dda76625e25ea3f59` |
-| 240-MiB QEMU console | 43695 | `1a8a5f0f21d0c371578c2a48956e70039dae0a0d68e6048a56a0333cb9a876b1` |
+| 240-MiB QEMU console | 47012 | `9f7a9828949ebd8c8d5ab319e40fbccd1d6d137180bd08e0dc21a87eba1f1b43` |
 
 Kernel: `6.12.112-ty1208z-openwrt-router`, with measured CPU0/UART/timer/Ethernet
 and its own native modules. Storage, USB, wireless, SMP, debugfs and untested
@@ -44,9 +45,18 @@ pass. Additional acceptance:
   and the same request succeeds without SOCKS configuration. After service
   stop it fails again. Actual TPROXY counters increment. The proxy server is
   the fixture's isolated valid VLESS/TLS server.
+- `PASSWALL_TPROXY_UDP_TIME64_PASS`: a real iperf3 server in the origin namespace
+  receives bounded UDP through ordinary fw4 forwarding first. With forwarding
+  removed, its TCP control connection fails. The installed Passwall service then
+  enables UDP TPROXY to that origin through the valid VLESS/TLS node. Forward and
+  reverse UDP transfers each report over 4096 received bytes and ten packets;
+  the actual generated UDP TPROXY rule has a nonzero packet counter. After
+  service stop, the control connection fails again. UDP load is limited to
+  128 Kbit/s, 512-byte datagrams and three seconds per transfer. This establishes
+  delivery through both proxy directions, not emulated or physical throughput.
 
 Provenance binds exact kernel/config/rootfs/packages/console hashes, variant
-and all markers. Both new markers are required for the Ethernet variant;
+and all markers. All three router markers are required for the Ethernet variant;
 plain application acceptance cannot authorize an Ethernet kernel. Exact
 hardware resources/connections use the same Ethernet policy, with modules/
 netfilter/IPv6 permitted only for this separate application identity.
@@ -67,19 +77,19 @@ profile and Ethernet helper/profile checks, `make lint`, serial checks, core
 
 CI now declares locked pyserial and preserves its interpreter across the
 restricted host PATH. Plain/integrated builds have separate matrix jobs. This
-integration has no completed CI acceptance yet. Earlier native Ethernet CI
-passed on `4c14898` in [run 38266070065](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38266070065),
-and application CI on that commit in
-[run 38266070101](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38266070101).
-Diagnostic CI passed on `b563d60` in
-[run 38278345274](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38278345274).
-Those runs do not cover the new integration/matrix changes.
+integration has no completed CI acceptance yet. Native core/Ethernet CI passed
+on `8415dec` in [run 38272805257](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38272805257).
+Plain application build/512-MiB QEMU CI passed on `b563d60` in
+[run 38278345386](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38278345386);
+that workflow did not run external-initrd packaging. Diagnostic CI passed on
+`62db42b` in [run 38287462061](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38287462061).
+These results do not cover the new native integration/matrix or UDP fixture.
 
 ## Remaining acceptance
 
 The pending physical boot remains the independent native Ethernet image. It
 needs startup, sustained TCP/counters and cable recovery; the integrated image
-then needs its own hardware boot/application/network checks. Emulated TCP TPROXY
-does not establish physical speed, UDP, NTP/correct physical clock, whole-system
+then needs its own hardware boot/application/network checks. Emulated TCP/UDP
+TPROXY does not establish physical speed/proxy behavior, NTP/correct physical clock, whole-system
 Y2038, Hinas startup, full RAM/SMP, storage or RDA USB/radio operation. No flash,
 persistent environment or security writes occurred.

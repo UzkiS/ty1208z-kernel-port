@@ -85,6 +85,24 @@ grep -Eq 'counter packets [1-9][0-9]*' router-forward-counters.txt
 cat router-forward-counters.txt
 echo OPENWRT_ROUTER_FORWARDING_TIME64_PASS
 
+# A real UDP endpoint also verifies the reply path. Small bounded iperf
+# transfers establish data delivery, never an emulated throughput claim.
+ip netns exec qemu_origin iperf3 -s -B 198.19.0.2 -p 19553 \
+    > router-udp-origin.log 2>&1 &
+udp_origin_pid=$!
+udp_transfer() {
+    ip netns exec qemu_client iperf3 -c 198.19.0.2 -p 19553 -u \
+        -b 128K -l 512 -t 3 --connect-timeout 2000 --rcv-timeout 4000 -J "$@"
+}
+attempts=0
+until udp_transfer > router-udp-forward.json 2> router-udp-forward.log; do
+    attempts=$((attempts+1))
+    [ "$attempts" -lt 10 ] || exit 1
+    sleep 1
+done
+test "$(jsonfilter -i router-udp-forward.json -e '@.end.sum_received.bytes')" -gt 4096
+test "$(jsonfilter -i router-udp-forward.json -e '@.end.sum_received.packets')" -gt 10
+
 # Remove forwarding. Direct HTTPS must fail before and after the proxy run;
 # success while Passwall is enabled therefore cannot be ordinary forwarding.
 uci delete firewall.qemu_forward
@@ -96,6 +114,10 @@ if ip netns exec qemu_client curl --noproxy '*' -fsS --max-time 4 \
     echo 'Unexpected direct forwarding before transparent proxy'
     exit 1
 fi
+if udp_transfer > router-udp-bypass.json 2> router-udp-bypass.log; then
+    echo 'Unexpected direct UDP/control forwarding before transparent proxy'
+    exit 1
+fi
 
 # Use the installed Passwall service, its generated Xray redir config, nft
 # rules and policy routing. The existing fixture's VLESS/TLS server is local.
@@ -104,7 +126,7 @@ uci set 'passwall.@global[0].node=qemu_vless_valid'
 uci set 'passwall.@global[0].client_proxy=1'
 uci set 'passwall.@global[0].localhost_proxy=0'
 uci set 'passwall.@global[0].tcp_proxy_mode=proxy'
-uci set 'passwall.@global[0].udp_proxy_mode=disable'
+uci set 'passwall.@global[0].udp_proxy_mode=proxy'
 uci set 'passwall.@global[0].use_direct_list=0'
 uci set 'passwall.@global[0].use_proxy_list=0'
 uci set 'passwall.@global[0].use_block_list=0'
@@ -113,8 +135,10 @@ uci set 'passwall.@global[0].chn_list=0'
 uci set 'passwall.@global[0].dns_redirect=0'
 uci set 'passwall.@global[0].remote_dns=127.0.0.1'
 uci set 'passwall.@global_forwarding[0].tcp_proxy_way=tproxy'
-uci set 'passwall.@global_forwarding[0].tcp_redir_ports=19443'
+uci set 'passwall.@global_forwarding[0].tcp_redir_ports=19443,19553'
 uci set 'passwall.@global_forwarding[0].tcp_no_redir_ports=disable'
+uci set 'passwall.@global_forwarding[0].udp_redir_ports=19553'
+uci set 'passwall.@global_forwarding[0].udp_no_redir_ports=disable'
 uci set 'passwall.@global_forwarding[0].ipv6_tproxy=0'
 uci commit passwall
 /etc/init.d/passwall start > router-passwall-start.log 2>&1
@@ -127,8 +151,15 @@ until ip netns exec qemu_client curl --noproxy '*' -fsS --max-time 3 \
     sleep 1
 done
 grep -qx TY1208Z_LOCAL_PAYLOAD_2040 router-tproxy.txt
+udp_transfer > router-udp-tproxy.json 2> router-udp-tproxy.log
+test "$(jsonfilter -i router-udp-tproxy.json -e '@.end.sum_received.bytes')" -gt 4096
+test "$(jsonfilter -i router-udp-tproxy.json -e '@.end.sum_received.packets')" -gt 10
+udp_transfer -R > router-udp-reverse.json 2> router-udp-reverse.log
+test "$(jsonfilter -i router-udp-reverse.json -e '@.end.sum_received.bytes')" -gt 4096
+test "$(jsonfilter -i router-udp-reverse.json -e '@.end.sum_received.packets')" -gt 10
 nft list table inet passwall > router-passwall-rules.txt
 grep -Eq 'counter packets [1-9][0-9]*.*tproxy ip to' router-passwall-rules.txt
+grep -Eq 'udp.*counter packets [1-9][0-9]*.*tproxy ip to' router-passwall-rules.txt
 ip rule > router-policy-rules.txt
 grep -q 'lookup 999' router-policy-rules.txt
 ip route show table 999 | grep -q 'local default dev lo'
@@ -141,5 +172,11 @@ if ip netns exec qemu_client curl --noproxy '*' -fsS --max-time 4 \
     echo 'Unexpected forwarding after transparent proxy stopped'
     exit 1
 fi
+if udp_transfer > router-udp-after-stop.json 2> router-udp-after-stop.log; then
+    echo 'Unexpected UDP/control forwarding after transparent proxy stopped'
+    exit 1
+fi
+kill "$udp_origin_pid"
 test "$(date -u +%Y)" = 2040
 echo PASSWALL_TPROXY_TCP_TIME64_PASS
+echo PASSWALL_TPROXY_UDP_TIME64_PASS

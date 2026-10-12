@@ -22,16 +22,20 @@ create a client and origin through veth pairs; netifd configures router-side
 links/routes and fw4 generates forwarding rules. Actual HTTPS traffic and
 forward counters must pass.
 
-The fixture removes forwarding and requires the same HTTPS request to fail.
-It starts the installed Passwall service with its real VLESS TLS node, TCP
+The fixture also verifies bounded UDP delivery through a real namespace-origin
+iperf3 server. It removes forwarding and requires direct HTTPS and the UDP
+test's TCP control connection to fail. It starts the installed Passwall service
+with its real VLESS TLS node, TCP/UDP
 TPROXY mode and generated nft/policy-routing/Xray setup. Client HTTPS must
-succeed without a SOCKS option. Actual TPROXY counters and routing table 999
-must be populated. After stopping Passwall, the same request must fail again.
+succeed without a SOCKS option. Forward and reverse UDP transfers must each
+report more than 4096 received bytes and ten packets. Actual UDP TPROXY counters
+and routing table 999 must be populated. After stopping Passwall, HTTPS and the
+UDP test's control connection must fail again.
 No host networking or disks are exposed to QEMU.
 
 Both 512-MiB and `mem=240M` trials pass the same fixture. Provenance binds exact
 kernel/config/rootfs/packages/console hashes and variant. These are emulated
-forwarding/TCP TPROXY checks; they do not measure physical Ethernet, UDP TPROXY,
+forwarding/TCP/UDP TPROXY checks; they do not measure physical Ethernet,
 routing speed, cable recovery, NTP, Wi-Fi or whole-system Y2038 behavior.
 
 ## Checked RAM output
