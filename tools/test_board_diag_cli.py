@@ -50,10 +50,15 @@ class DiagnosticTests(unittest.TestCase):
                     self.assertEqual(read_command(), b"diag; echo TY1208Z_DIAG_COMPLETE\r")
                     time64 = b"TIME64_FAIL" if mode == "probe-failure" else b"TIME64_PASS sizeof(time_t)=8 file=2208988800"
                     audit = b"EMMC_AUDIT_READ_ONLY_COMPLETE" if mode != "missing-audit" else b"No audit driver"
+                    ident = b"No card" if mode == "missing-ident" else (
+                        b"EMMC_IDENT_GUARD_PASS\r\nUsing PIO mode.\r\nnew MMC card\r\n"
+                        b"name=008G30\r\ntype=MMC\r\nBLOCK_DISABLED\r\n"
+                        b"EMMC_IDENT_COMPLETE sectors=15269888 bytes=7818182656")
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
                                  b"\r\n" + audit,
+                                 b"\r\n" + ident,
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -105,6 +110,12 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_emmc_profile_captures_completed_audit(self):
         self.exercise("success", profile="emmc-audit1")
+
+    def test_identification_requires_card_and_capacity(self):
+        self.exercise("missing-ident", profile="emmc-ident1")
+
+    def test_identification_captures_card_and_capacity(self):
+        self.exercise("success", profile="emmc-ident1")
 
 
 if __name__ == "__main__":

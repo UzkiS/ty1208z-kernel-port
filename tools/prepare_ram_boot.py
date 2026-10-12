@@ -9,6 +9,7 @@ import struct
 import zlib
 
 from inspect_images import parse_fdt
+from emmc_profiles import identification_profile
 
 ADDRESS = 0x01FFFFC0
 DDR_START = 0x01000000
@@ -71,7 +72,10 @@ def prepare(artifacts, inspection):
             or not layout["physical_start"] < layout["physical_image_end"] <= layout["physical_bss_end"] < DDR_START):
         raise ValueError("Kernel layout does not match this image or exceeds the low bound")
     config = (artifacts / "linux.config").read_text()
+    ident = identification_profile(tree, config)
     for name in ("BLOCK", "MMC", "MTD", "ATA", "SCSI", "NET", "USB_SUPPORT", "MODULES", "SMP"):
+        if name == "MMC" and ident:
+            continue
         if re.search(rf"^CONFIG_{name}=[ym]$", config, re.MULTILINE):
             raise ValueError(f"Unexpected diagnostic subsystem enabled: {name}")
     return {

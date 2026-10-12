@@ -43,9 +43,34 @@ HCON 的 FIFO 接口为 32 位；当前源频率为 100 MHz，CLKDIV=1 对应 50
 CTYPE 表示继承的 8 位总线。具体镜像、日志身份和限制见
 [实机审计记录](../verification/emmc-audit-20261012.md)。尚未在新内核枚举卡或读取扇区。
 
-下一候选评估复用主线 DesignWare，先继承实测 CRG/pinmux 状态，限制为 PIO、单线、
+`make emmc-ident` 已建立独立的卡识别候选，输出 `artifacts/emmc-ident1/`。
+它复用主线 DesignWare，先继承实测 CRG/pinmux 状态，限制为 PIO、单线、
 最高 25 MHz，并在硬件排队之前限制 MMC 请求。CMD6 卡设置修改、数据写入、擦除、
 安全/未知命令均拒绝；关闭 BLOCK/MMC_BLOCK，不提供原始块访问。
 首个卡访问候选只做识别和 EXT_CSD 读取，禁用高速/电压切换；
-不挂载原 Hinas，先对照型号、容量和固定范围读取的结果。
+不挂载原 Hinas，先对照型号和 EXT_CSD 解码容量；扇区读取另行验收。
 完整 Hinas 启动还依赖分区解析、ext4、用户空间及模块兼容；安装前另行建立备份和恢复路径。
+
+### 识别候选的实际边界
+
+这与前面的寄存器审计不同：主线驱动会重置控制器、修改控制器的时钟分频、
+总线宽度、中断/FIFO 设置，并发送 CMD0/1/2/3/7/8/9/10/13 的受限识别请求。
+它只读卡元数据，不写卡设置或存储内容。CRG40/pinmux 状态继承，CRG40、控制器
+VERID/HCON、物理资源和 SPI 35 不符即拒绝探测；不调用时钟、复位、电源 provider。
+仅允许 3.3 V 的现有信号电压，不执行电压切换。
+
+请求过滤在 `dw_mci_request()` 的卡检测/排队之前执行；拒绝 CMD6 返回 `-EBADMSG`，
+让主线把这些可选初始化设置视为不支持。任何数据请求都必须是 arg=0 的 CMD8、
+单块 512 字节、纯 READ，且不带 sbc/stop。CMD0 的 pre-idle/boot 参数和 CMD13 的
+HPI 参数也被拒绝。PIO hook 位于 DMA 分配/初始化之前；slot 限制在 `mmc_add_host()`
+之前安装。BLOCK/MMC_BLOCK/MMC_TEST/debugfs/模块关闭，避免绕过这些约束。
+
+`test_emmc_ident.py` 使用固定 Linux 的 MMC 结构/命令常量、实际 policy header 和
+补丁后的请求函数，在模拟 host 上执行 64 个命令号、数据方向、异常参数和附带命令。
+它核对被拒绝请求不会到达卡检测/硬件排队，同时检查 PIO/slot/init 的源码顺序。
+`test_emmc_profiles.py` 检查真实构建 DT/config，拒绝放宽总线/频率、增加电源属性或
+启用块设备等配置。QEMU 仍只验证 RAM 用户空间，不能代替实机的卡识别。
+
+诊断输出只读取 sysfs 中已解码的非唯一字段和容量，不主动输出 CID/serial。
+CLI 使用 `--profile emmc-ident1`，要求型号 `008G30`、容量 7818182656 字节、
+PIO/guard/完整报告/time64 标记都存在；缺少任一项不得报告实机通过。

@@ -34,6 +34,7 @@ changes = {
         '# SPDX-License-Identifier: GPL-2.0\n',
         '# SPDX-License-Identifier: GPL-2.0\n'
         'dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb\n'
+        'dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb\n'),
     "drivers/soc/hisilicon/Kconfig": (
         'config KUNPENG_HCCS\n',
@@ -59,12 +60,81 @@ changes = {
         'obj-$(CONFIG_HI3798MV100_TIMER) += timer-hi3798mv100.o\n'
         'obj-$(CONFIG_ARM_TIMER_SP804)'),
 }
+changes.update({
+    "drivers/mmc/core/mmc.c": [
+        ('static struct attribute *mmc_std_attrs[] = {\n',
+         '#include "ty1208z-ident.h"\n\n'
+         'static struct attribute *mmc_std_attrs[] = {\n'
+         '#ifdef CONFIG_MMC_DW_HI3798MV100_IDENT\n'
+         '\t&dev_attr_ty1208z_ident.attr,\n'
+         '#endif\n'),
+    ],
+    "drivers/mmc/host/Kconfig": (
+        'config MMC_DW_HI3798CV200\n',
+        'config MMC_DW_HI3798MV100_IDENT\n'
+        '\tbool "TY1208Z restricted eMMC identification diagnostic"\n'
+        '\tdepends on MMC_DW && ARCH_HI3798MV100 && !BLOCK\n'
+        '\tselect MMC_DW_PLTFM\n'
+        '\thelp\n'
+        '\t  PIO, 1-bit, legacy identification only. Blocks card settings,\n'
+        '\t  data writes, sector I/O and unknown card commands.\n\n'
+        'config MMC_DW_HI3798CV200\n'),
+    "drivers/mmc/host/Makefile": (
+        'obj-$(CONFIG_MMC_DW_HI3798CV200)',
+        'obj-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += dw_mmc-hi3798mv100-ident.o\n'
+        'obj-$(CONFIG_MMC_DW_HI3798CV200)'),
+    "drivers/mmc/host/dw_mmc.h": [
+        (' * @init: early implementation specific initialization.\n',
+         ' * @init: early implementation specific initialization.\n'
+         ' * @init_slot: final slot constraints before host registration.\n'
+         ' * @validate_request: reject a request before hardware queueing.\n'
+         ' * @force_pio: skip all DMA allocation and initialization.\n'),
+        ('\tint\t\t(*init)(struct dw_mci *host);\n',
+         '\tint\t\t(*init)(struct dw_mci *host);\n'
+         '\tint\t\t(*init_slot)(struct dw_mci_slot *slot);\n'
+         '\tint\t\t(*validate_request)(struct dw_mci *host,\n'
+         '\t\t\t\t\t    struct mmc_request *mrq);\n'
+         '\tbool\t\tforce_pio;\n'),
+    ],
+    "drivers/mmc/host/dw_mmc.c": [
+        ('\tWARN_ON(slot->mrq);\n',
+         '\t/* Reject restricted diagnostic requests before any hardware queue. */\n'
+         '\tif (host->drv_data && host->drv_data->validate_request) {\n'
+         '\t\tint ret = host->drv_data->validate_request(host, mrq);\n\n'
+         '\t\tif (ret) {\n'
+         '\t\t\tmrq->cmd->error = ret;\n'
+         '\t\t\tif (mrq->data)\n'
+         '\t\t\t\tmrq->data->error = ret;\n'
+         '\t\t\tmmc_request_done(mmc, mrq);\n'
+         '\t\t\treturn;\n'
+         '\t\t}\n'
+         '\t}\n\n'
+         '\tWARN_ON(slot->mrq);\n'),
+        ('\tdw_mci_get_cd(mmc);\n\n\tret = mmc_add_host(mmc);\n',
+         '\tif (host->drv_data && host->drv_data->init_slot) {\n'
+         '\t\tret = host->drv_data->init_slot(slot);\n'
+         '\t\tif (ret)\n'
+         '\t\t\tgoto err_host_allocated;\n'
+         '\t}\n\n'
+         '\tdw_mci_get_cd(mmc);\n\n\tret = mmc_add_host(mmc);\n'),
+        ('\tstruct device *dev = host->dev;\n\n\t/*\n\t* Check tansfer mode',
+         '\tstruct device *dev = host->dev;\n\n'
+         '\tif (host->drv_data && host->drv_data->force_pio)\n'
+         '\t\tgoto no_dma;\n\n'
+         '\t/*\n\t* Check tansfer mode'),
+    ],
+})
+
 diffs = []
 with tarfile.open(args.archive) as archive:
-    for path, (old, new) in changes.items():
+    for path, replacements in changes.items():
         before = archive.extractfile(f'linux-{lock["linux"]["version"]}/{path}').read().decode()
-        assert before.count(old) == 1, f"Patch anchor not unique: {path}"
-        after = before.replace(old, new)
+        after = before
+        if isinstance(replacements, tuple):
+            replacements = [replacements]
+        for old, new in replacements:
+            assert after.count(old) == 1, f"Patch anchor not unique: {path}"
+            after = after.replace(old, new)
         diffs.extend(difflib.unified_diff(before.splitlines(True), after.splitlines(True), f"a/{path}", f"b/{path}"))
 for source in sorted((project / "overlay").rglob("*")):
     if source.is_file():

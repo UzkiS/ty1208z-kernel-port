@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA restricted eMMC identification";
+};
+
+&{/soc} {
+	mmc@f9830000 {
+		compatible = "tianyi,ty1208z-emmc-identification";
+		reg = <0xf9830000 0x1000>, <0xf8a220a0 4>;
+		reg-names = "controller", "crg40";
+		interrupts = <0 35 4>;
+		clock-frequency = <100000000>;
+		fifo-depth = <256>;
+		bus-width = <1>;
+		max-frequency = <25000000>;
+		non-removable;
+		no-sd;
+		no-sdio;
+	};
+};

@@ -23,6 +23,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Hinas startup under new kernel | Not tested; eMMC driver and legacy modules need separate work |
 | Wired network / storage / USB / SMP | Not integrated into this minimal diagnostic image |
 | eMMC register audit | Passed on hardware: separate RAM candidate, MMC/BLOCK disabled, DW revision `0x270a`, HCON `0x00e44c81`, inherited source 100 MHz; no card commands; [measurement](verification/emmc-audit-20261012.md) |
+| eMMC card identification | Independent restricted PIO/1-bit/25-MHz candidate built; real request-policy/queue-entry tests, image/resource gates and QEMU passed locally; hardware untested, no block devices or sector I/O; [scope](docs/emmc.md) |
 | Wi-Fi | RDA USB `1e04:8888`; pinned compatible-descriptor source found and USB object compiled against a separate Linux 6.12 config; full module, chip revision, firmware and hardware operation remain unverified |
 | OpenWrt/Kwrt / Passwall | Planned; no working target or router image yet |
 | Whole-system Y2038 | Not established; diagnostic time64 passed, application-level testing remains |

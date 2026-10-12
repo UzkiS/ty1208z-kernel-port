@@ -15,5 +15,23 @@ cat /proc/interrupts
 cat /proc/uptime
 echo '=== time64 read and RAM-file timestamp ==='
 /bin/time64-probe
+if [ -d /sys/bus/mmc/devices ]; then
+    echo '=== eMMC identification (no block devices) ==='
+    for card in /sys/bus/mmc/devices/mmc*:*/name; do
+        [ -f "$card" ] || continue
+        carddir=${card%/name}
+        # Do not publish CID/serial. Only non-unique identification fields.
+        for field in type name manfid oemid date fwrev hwrev ty1208z_ident; do
+            [ -f "$carddir/$field" ] || continue
+            printf '%s=' "$field"
+            cat "$carddir/$field"
+        done
+    done
+    if [ -d /sys/class/block ]; then
+        ls /sys/class/block
+    else
+        echo 'BLOCK_DISABLED'
+    fi
+fi
 echo '=== kernel log ==='
 dmesg
