@@ -26,6 +26,7 @@ help:
 	@echo 'make openwrt-net - build independent native Ethernet RAM candidate with traffic tools'
 	@echo 'make usb-audit - build standalone read-only host0 control/capability RAM audit'
 	@echo 'make restart - build isolated SP805 explicit restart RAM experiment'
+	@echo 'make openwrt-app-ram - validate applications with a 240-MiB usable budget and package separate RAM initrd'
 
 lint:
 	python3 tools/check_repository.py
@@ -111,3 +112,7 @@ usb-audit:
 .PHONY: restart
 restart:
 	bash tools/build-restart.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"
+
+.PHONY: openwrt-app-ram
+openwrt-app-ram:
+	bash tools/build-openwrt-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" ram

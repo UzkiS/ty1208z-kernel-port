@@ -13,7 +13,7 @@ if [ "$(id -u)" -eq 0 ]; then
     echo 'Run the application build as a regular user.' >&2
     exit 1
 fi
-case "$stage" in config|build) ;; *) echo 'Unknown application stage' >&2; exit 1 ;; esac
+case "$stage" in config|build|ram) ;; *) echo 'Unknown application stage' >&2; exit 1 ;; esac
 export SOURCE_DATE_EPOCH=1791676800
 export TZ=UTC
 export LC_ALL=C
@@ -43,3 +43,8 @@ make "${make_args[@]}" -j"$jobs" toolchain/install V=s
 make "${make_args[@]}" -j"$jobs" V=s
 python3 "$project/tools/check_openwrt_applications.py" --source "$source_tree" --built
 python3 "$project/tools/test_openwrt_applications_qemu.py" --source "$source_tree"
+if [ "$stage" = ram ]; then
+    python3 "$project/tools/test_openwrt_applications_qemu.py" --source "$source_tree" --memory-mib 256
+    python3 "$project/tools/make_openwrt_apps_ram.py" --source "$source_tree"
+    python3 "$project/tools/test_openwrt_apps_ram.py"
+fi

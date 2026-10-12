@@ -1,9 +1,11 @@
 # Independent OpenWrt application validation
 
 The `apps` subtarget builds actual ARMv7 musl packages and exercises Passwall
-under a 2040 wall clock in isolated QEMU. It emits a separate initrd and raw
-kernel, with no CA uImage, sysupgrade or installation recipe. The plain `ram`
-target and standalone Linux diagnostic remain independent.
+under a 2040 wall clock in isolated QEMU. The ordinary application build emits
+a separate initrd and raw kernel. An additional `openwrt-app-ram` stage packages
+that exact tested pair for experimental RAM transfer; it supplies no sysupgrade
+or installation recipe. The plain `ram` target and standalone Linux diagnostic
+remain independent.
 
 ## Fixed inputs
 
@@ -36,6 +38,8 @@ Use a regular Linux user and a Linux filesystem. Install the dependencies in
 make openwrt-toolchain TASKBASE=/absolute/linux/build-root
 make openwrt-app-config TASKBASE=/absolute/linux/build-root
 make openwrt-applications TASKBASE=/absolute/linux/build-root
+# Also exercise a 240-MiB usable budget and package the checked RAM candidate:
+make openwrt-app-ram TASKBASE=/absolute/linux/build-root
 ```
 
 The application source/build lives under `TASKBASE/applications/`. Downloads
@@ -44,7 +48,7 @@ build checks feed/recipe identities, selected options, actual installed package
 manifest and storage/hardware exclusions. QEMU gets no disk or host network.
 Writes, the fixture password and future clock exist only in the RAM guest.
 
-`checks/applications-qemu.json` records the exact kernel, initrd, package
+`checks/applications-qemu.json` records the exact kernel, config, initrd, package
 manifest and console hashes, toolchain identity and passed runtime markers.
 The clean GitHub workflow repeats the native toolchain build and application
 acceptance. Check its actual result before describing CI as passed.
@@ -73,7 +77,33 @@ starting its instances, so a later service restart cannot erase their state.
 
 nftables must count actual loopback packets and accept socket/TPROXY rules.
 Inserting those expressions is not transparent-proxy forwarding acceptance.
-QEMU uses a Cortex-A7 with 512 MiB, which is not a board memory/performance
-measurement. Ethernet, cold boot, WAN/LAN routing, real Passwall TPROXY, NTP,
+The default QEMU test uses a Cortex-A7 with 512 MiB. The RAM stage repeats the
+same application acceptance with 256 MiB and `mem=240M`, conservatively
+accounting for the board's low-16-MiB allocation reservation. Neither trial is
+a board memory/performance measurement. Ethernet, cold boot, WAN/LAN routing,
+real Passwall TPROXY, NTP,
 persistent filesystems, Wi-Fi and whole-system Y2038 remain separate gates.
 See [the local result](../verification/openwrt-applications-20261012.md).
+
+## Separate RAM packaging
+
+The application archive is too large to embed while keeping the kernel's
+decompressed image/BSS below the low-16-MiB boundary. `make_openwrt_apps_ram.py`
+keeps the accepted raw kernel and its matching rootfs/modules unchanged and
+adds an explicit chosen initrd range to a standalone board DTB. The archive
+starts at `0x04000000`; its maximum compressed budget of 32 MiB ends below the
+unexplained bootloader Bound Addr `0x08e62000`. This conservative placement does
+not resolve the full memory map or establish a hardware boot.
+
+The wrapper verifies the actual 240-MiB QEMU provenance, archive bounds,
+critical board source identities, kernel layout and explicit peripheral-free
+profile. `prepare_ram_boot.py` checks it against the recorded loader identity
+and DDR response. The UART tool loads the kernel and initrd separately and
+requires both device CRCs before sending the one measured `bootm` command.
+Address/profile/provenance mutations and either CRC failure stop the flow.
+
+The output is `artifacts/openwrt-apps-ram1/`, distinct from the native Ethernet
+candidate. It has no board Ethernet/storage/USB or SMP support. The application
+CI runs both memory trials and uploads the wrapper as HARDWARE-UNTESTED. The
+actual local checks and limitations are recorded in the
+[RAM packaging report](../verification/openwrt-apps-ram-offline-20261013.md).

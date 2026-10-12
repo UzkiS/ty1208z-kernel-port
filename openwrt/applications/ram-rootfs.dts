@@ -1,0 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/* Standalone application RAM placement. This adds no board peripherals.
+ * Both addresses are supplied by the checked profile and exact byte count.
+ */
+/ {
+	model = "TY1208Z CA OpenWrt applications external-rootfs RAM experiment";
+	compatible = "tianyi,ty1208z-ca-openwrt-apps-ram", "hi3798mv100-series";
+	chosen {
+		bootargs = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=7 panic=0";
+		linux,initrd-start = <TY1208Z_INITRD_START>;
+		linux,initrd-end = <TY1208Z_INITRD_END>;
+	};
+};

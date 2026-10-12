@@ -10,7 +10,8 @@ import sys
 import time
 
 from bootloader_probe import BootloaderProbe
-from prepare_ram_boot import prepare
+from prepare_ram_boot import ADDRESS, prepare
+from openwrt_apps_ram_profile import INITRD_ADDRESS
 from serial_cli import console_text, open_receiver
 from ymodem_sender import TransferError, YmodemSender
 
@@ -64,8 +65,13 @@ class Exchange:
 
 
 def load_image(exchange, plan, data):
+    address = plan.get("address", plan.get("header_address"))
+    if (not isinstance(address, int) or address not in (ADDRESS, INITRD_ADDRESS) or
+            plan.get("load_command") != f"loady {address:x} 115200"):
+        raise TransferError("Validated transfer address/command differs; nothing sent")
     exchange.write(plan["load_command"].encode("ascii") + b"\r")
-    ready = exchange.until(lambda response: b"download to 0x01FFFFC0 at 115200 bps..." in response)
+    announcement = f"download to 0x{address:08X} at 115200 bps...".encode()
+    ready = exchange.until(lambda response: announcement in response)
     print(console_text(ready.decode("utf-8", "backslashreplace")), flush=True)
     last_progress = time.monotonic()
 
@@ -121,9 +127,21 @@ def run(args, serial_module):
                 match = re.search(rb"CRC32 for [^\r\n]*==>\s*([0-9a-fA-F]{8})", crc)
                 if not match or match[1].decode().lower() != plan["image_crc32"]:
                     raise TransferError("RAM CRC32 differs; no boot")
+                result["verified_files"] = [{"file": "uImage-UNTESTED.bin", "crc32": plan["image_crc32"]}]
+                for item in plan.get("additional_loads", []):
+                    rootfs = (args.artifacts / item["file"]).read_bytes()
+                    if len(rootfs) != item["bytes"] or hashlib.sha256(rootfs).hexdigest() != item["sha256"]:
+                        raise TransferError("External initrd changed after planning; no transfer or boot")
+                    if not args.boot_existing:
+                        load_image(exchange, item, rootfs)
+                    crc = exchange.command(item["crc_command"])
+                    match = re.search(rb"CRC32 for [^\r\n]*==>\s*([0-9a-fA-F]{8})", crc)
+                    if not match or match[1].decode().lower() != item["image_crc32"]:
+                        raise TransferError("External initrd RAM CRC32 differs; no boot")
+                    result["verified_files"].append({"file": item["file"], "crc32": item["image_crc32"]})
                 result["ram_crc_verified"] = True
                 result["status"] = "ram-verified"
-                print("RAM IMAGE CRC VERIFIED", flush=True)
+                print("RAM IMAGE CRC VERIFIED" + ("; EXTERNAL INITRD VERIFIED" if plan.get("additional_loads") else ""), flush=True)
                 if args.boot:
                     exchange.write(plan["boot_command"].encode("ascii") + b"\r")
                     result["boot_sent"] = True

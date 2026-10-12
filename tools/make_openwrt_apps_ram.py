@@ -1,0 +1,93 @@
+#!/usr/bin/env python3
+"""Package an unchanged tested native application kernel and separate initrd for RAM only."""
+import argparse
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+
+from check_openwrt_applications import check
+from inspect_images import inspect_image, parse_fdt
+from openwrt_apps_ram_profile import INITRD_ADDRESS, applications_ram_profile, digest, validate_pair
+
+PROJECT = Path(__file__).resolve().parents[1]
+
+
+def unique(paths, label):
+    paths = list(paths)
+    if len(paths) != 1:
+        raise ValueError(f"Expected exactly one {label}")
+    return paths[0]
+
+
+def make(source, output):
+    check(source, built=True)
+    kernel = unique((source / "build_dir").glob("target-*/linux-hi3798mv100_apps/linux-6.12.112"), "application kernel")
+    images = source / "bin/targets/hi3798mv100/apps"
+    output.mkdir(parents=True, exist_ok=True)
+    checks = output / "checks"
+    checks.mkdir(exist_ok=True)
+    # A failed rerun must not leave a stale wrapped image/acceptance manifest.
+    for name in ("uImage-UNTESTED.bin", "manifest.json"):
+        (output / name).unlink(missing_ok=True)
+    for path, name in (
+            (kernel / "arch/arm/boot/zImage", "zImage"), (kernel / ".config", "linux.config"),
+            (unique(images.glob("*rootfs.cpio.gz"), "application rootfs"), "rootfs.cpio.gz"),
+            (unique(images.glob("*.manifest"), "application package manifest"), "packages.manifest")):
+        shutil.copyfile(path, output / name)
+    for name in ("applications-qemu-256.json", "qemu-applications-256.log"):
+        shutil.copyfile(images / "checks" / name, checks / name)
+    rootfs, _ = validate_pair(output)
+    for name in ("arch/arm/mach-hisi/hi3798mv100.c", "drivers/clocksource/timer-hi3798mv100.c"):
+        if (kernel / name).read_bytes() != (PROJECT / "overlay" / name).read_bytes():
+            raise ValueError(f"Native application kernel board source differs: {name}")
+    subprocess.run([sys.executable, str(PROJECT / "tools/inspect_kernel_layout.py"),
+                    "--build", str(kernel), "--output", str(checks / "kernel-layout.json")], check=True)
+    cpp = subprocess.run([
+        "cc", "-E", "-nostdinc", "-undef", "-D__DTS__", "-x", "assembler-with-cpp",
+        f"-DTY1208Z_INITRD_START=0x{INITRD_ADDRESS:x}",
+        f"-DTY1208Z_INITRD_END=0x{INITRD_ADDRESS + len(rootfs):x}",
+        "-I", str(PROJECT / "overlay/arch/arm/boot/dts/hisilicon"), "-I", str(kernel / "include"),
+        str(PROJECT / "openwrt/applications/ram-rootfs.dts"),
+    ], stdout=subprocess.PIPE, check=True).stdout
+    preprocessed = checks / "applications-ram.dts"
+    preprocessed.write_bytes(cpp)
+    dtb = output / "ty1208z-diagnostic.dtb"
+    subprocess.run(["dtc", "-I", "dts", "-O", "dtb", "-o", str(dtb), str(preprocessed)], check=True)
+    tree = parse_fdt(dtb.read_bytes())
+    initrd = applications_ram_profile(tree, (output / "linux.config").read_text(), output)
+    if initrd is None:
+        raise ValueError("Compiled application RAM profile missing")
+    payload = output / "zImage-appended-dtb"
+    payload.write_bytes((output / "zImage").read_bytes() + dtb.read_bytes())
+    subprocess.run(["mkimage", "-A", "arm", "-O", "linux", "-T", "kernel", "-C", "none",
+                    "-a", "0x02000000", "-e", "0x02000000", "-n", "TY1208Z apps external initrd RAM",
+                    "-d", str(payload), str(output / "uImage-UNTESTED.bin")], check=True,
+                   env={**os.environ, "SOURCE_DATE_EPOCH": "1791676800", "TZ": "UTC"})
+    image = inspect_image(output / "uImage-UNTESTED.bin", checks)
+    header = image["uimages"][0]
+    if (len(image["uimages"]) != 1 or not header["header_crc_valid"] or
+            not header["payload_crc_valid"] or image["bytes"] >= 20 * 1024 * 1024):
+        raise ValueError("Invalid application RAM uImage")
+    (checks / "image-validation.json").write_text(json.dumps(image, indent=2) + "\n")
+    manifest = {"status": "native application RAM placement candidate; hardware untested; no install recipe",
+                "external_initrd": initrd,
+                "files": {name: digest((output / name).read_bytes()) for name in (
+                    "uImage-UNTESTED.bin", "zImage", "ty1208z-diagnostic.dtb", "linux.config",
+                    "rootfs.cpio.gz", "packages.manifest")}}
+    (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    print("OPENWRT_APPS_RAM_PACKAGED: unchanged matched kernel/modules/rootfs, separate bounded initrd; hardware untested")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", type=Path, required=True)
+    parser.add_argument("--output", type=Path, default=PROJECT / "artifacts/openwrt-apps-ram1")
+    args = parser.parse_args()
+    make(args.source.resolve(), args.output.resolve())
+
+
+if __name__ == "__main__":
+    main()

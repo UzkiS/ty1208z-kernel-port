@@ -14,6 +14,7 @@ from ethernet_profiles import ethernet_audit_profile, ethernet_clock_id_profile
 from ethernet_net_profile import ethernet_net_profile, openwrt_ethernet_profile
 from usb_audit_profile import usb_audit_profile
 from restart_profile import restart_profile
+from openwrt_apps_ram_profile import BOOTLOADER_BOUND_ADDRESS, applications_ram_profile
 
 ADDRESS = 0x01FFFFC0
 DDR_START = 0x01000000
@@ -81,6 +82,7 @@ def prepare(artifacts, inspection):
     ethernet_clock_id_profile(tree, config)
     usb_audit_profile(tree, config)
     restart_profile(tree, config)
+    application_initrd = applications_ram_profile(tree, config, artifacts)
     if properties["/"]["compatible"].get("strings", [None])[0] == "tianyi,ty1208z-ca-openwrt-net":
         network = openwrt_ethernet_profile(tree, config)
         if not network:
@@ -92,9 +94,11 @@ def prepare(artifacts, inspection):
             continue
         if name == "NET" and network:
             continue
+        if name in ("NET", "MODULES") and application_initrd is not None:
+            continue
         if re.search(rf"^CONFIG_{name}=[ym]$", config, re.MULTILINE):
             raise ValueError(f"Unexpected diagnostic subsystem enabled: {name}")
-    return {
+    plan = {
         "schema": 1, "status": "validated placement candidate; hardware boot untested",
         "image_bytes": len(data), "image_sha256": hashlib.sha256(data).hexdigest(),
         "image_crc32": f"{zlib.crc32(data):08x}", "header_address": ADDRESS,
@@ -105,6 +109,17 @@ def prepare(artifacts, inspection):
         "boot_command": f"bootm {ADDRESS:x}",
         "persistent_writes": False,
     }
+    if application_initrd is not None:
+        start = application_initrd["address"]
+        end = start + application_initrd["bytes"]
+        if not ADDRESS + len(data) + 0x100000 < start < end < BOOTLOADER_BOUND_ADDRESS < DIAGNOSTIC_END:
+            raise ValueError("External initrd overlaps the kernel load/workspace or bounded RAM end")
+        initrd_bytes = (artifacts / application_initrd["file"]).read_bytes()
+        plan["additional_loads"] = [{**application_initrd,
+            "load_command": f"loady {start:x} 115200",
+            "crc_command": f"crc32 {start:x} {len(initrd_bytes):x}",
+            "image_crc32": f"{zlib.crc32(initrd_bytes):08x}"}]
+    return plan
 
 
 def main():
