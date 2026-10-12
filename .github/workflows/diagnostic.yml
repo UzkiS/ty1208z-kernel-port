@@ -38,6 +38,18 @@ jobs:
           echo "$PWD/.work/lint-venv/bin" >> "$GITHUB_PATH"
       - name: Repository and script checks
         run: make lint
+      - name: Parse local PowerShell SSH wrapper
+        shell: pwsh
+        run: |
+          $parseTokens = $null
+          $parseErrors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $PWD 'tools/collect-baseline.ps1'),
+            [ref]$parseTokens, [ref]$parseErrors) | Out-Null
+          if ($parseErrors.Count) {
+            $parseErrors | Out-String | Write-Error
+            exit 1
+          }
       - name: Build pinned Linux and BusyBox candidate
         run: |
           mkdir -p logs

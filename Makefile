@@ -13,6 +13,7 @@ lint:
 	python3 tools/check_repository.py
 	shellcheck tools/*.sh initramfs/init initramfs/diag
 	python3 -m ruff check tools
+	python3 tools/test_baseline_collector.py
 
 build:
 	bash tools/build-diagnostic.sh $(if $(TASKBASE),"$(TASKBASE)")

@@ -56,6 +56,10 @@ CI 在干净环境执行相同构建，并提供名称含 `HARDWARE-UNTESTED` �
 当前内核构建独立于其他两层。目录和依赖见 [architecture.md](docs/architecture.md)，
 硬件依据见 [hardware.md](docs/hardware.md)，Wi-Fi 线索见 [wifi.md](docs/wifi.md)。
 
+已有 Hinas 的只读 SSH 基线见 [baseline.md](docs/baseline.md)。本机已确认
+RDA USB `1e04:8888` 无驱动绑定；下一步先按 [TTL 记录步骤](docs/ttl-baseline.md)
+核实当前引导器和 RAM 加载条件，再选择诊断候选的实际启动方法。
+
 源码和研究说明可提交；原始固件、fastboot、DTB、源码下载和大体积编译产物
 保存在本地。厂商参考只提交出处和哈希，可执行 `make references` 重新获取。
 

@@ -1,0 +1,79 @@
+{
+    "schema":  1,
+    "purpose":  "Read-only source reference; not integrated or build/hardware verified",
+    "audited_on":  "2026-10-12",
+    "repository":  "https://github.com/orangepi-xunlong/OrangePiRDA_kernel",
+    "commit":  "0844fd6fb5851d644b7af8380975f425c64428e6",
+    "directory_tree_sha":  "df8be46aa1ea98ac36f5e6ac678b9971152b8fb0",
+    "usb_id_in_reference":  "1e04:8888",
+    "files":  [
+                  {
+                      "path":  "drivers/net/wireless/rdaw80211/Kconfig",
+                      "url":  "https://raw.githubusercontent.com/orangepi-xunlong/OrangePiRDA_kernel/0844fd6fb5851d644b7af8380975f425c64428e6/drivers/net/wireless/rdaw80211/Kconfig",
+                      "sha256":  "20d2b70c3b6ca60098d655d3654ef607badff016ad7be4dd60e488b461d13b7e",
+                      "bytes":  1810
+                  },
+                  {
+                      "path":  "drivers/net/wireless/rdaw80211/rdawlan/Makefile",
+                      "url":  "https://raw.githubusercontent.com/orangepi-xunlong/OrangePiRDA_kernel/0844fd6fb5851d644b7af8380975f425c64428e6/drivers/net/wireless/rdaw80211/rdawlan/Makefile",
+                      "sha256":  "e77d1715fc408553eb82ca7532d319798ed287b52ac12699253ae8cc5601d2bb",
+                      "bytes":  1653
+                  },
+                  {
+                      "path":  "drivers/net/wireless/rdaw80211/rdawlan/wland_usb.c",
+                      "url":  "https://raw.githubusercontent.com/orangepi-xunlong/OrangePiRDA_kernel/0844fd6fb5851d644b7af8380975f425c64428e6/drivers/net/wireless/rdaw80211/rdawlan/wland_usb.c",
+                      "sha256":  "4aea687f20ac57b2d4926b58837e41a84e3b527fcaddc951da73b6cbab723811",
+                      "bytes":  34666
+                  },
+                  {
+                      "path":  "drivers/net/wireless/rdaw80211/rdawlan/wland_usb.h",
+                      "url":  "https://raw.githubusercontent.com/orangepi-xunlong/OrangePiRDA_kernel/0844fd6fb5851d644b7af8380975f425c64428e6/drivers/net/wireless/rdaw80211/rdawlan/wland_usb.h",
+                      "sha256":  "ba9a43f92760c9108a842a643fe03f97270b00f555d947363f206289bec94d1f",
+                      "bytes":  5584
+                  },
+                  {
+                      "path":  "drivers/net/wireless/rdaw80211/rdawlan/wland_defs.h",
+                      "url":  "https://raw.githubusercontent.com/orangepi-xunlong/OrangePiRDA_kernel/0844fd6fb5851d644b7af8380975f425c64428e6/drivers/net/wireless/rdaw80211/rdawlan/wland_defs.h",
+                      "sha256":  "8fedeba1af01f58f6a912320b57374d5b369925731679e6c29029900644e3799",
+                      "bytes":  8833
+                  },
+                  {
+                      "path":  "drivers/net/wireless/rdaw80211/rdawlan/wland_fwsmgr.c",
+                      "url":  "https://raw.githubusercontent.com/orangepi-xunlong/OrangePiRDA_kernel/0844fd6fb5851d644b7af8380975f425c64428e6/drivers/net/wireless/rdaw80211/rdawlan/wland_fwsmgr.c",
+                      "sha256":  "b2a8425b9041461d8daa459ab5332bf2fb181e61fb76645af928b44a91b77620",
+                      "bytes":  10329
+                  },
+                  {
+                      "path":  "drivers/net/wireless/rdaw80211/rdawlan/wland_cfg80211.c",
+                      "url":  "https://raw.githubusercontent.com/orangepi-xunlong/OrangePiRDA_kernel/0844fd6fb5851d644b7af8380975f425c64428e6/drivers/net/wireless/rdaw80211/rdawlan/wland_cfg80211.c",
+                      "sha256":  "d7f425ff61bfa6d2238c232c61d00d4d1eb316cd8b9b0cb2b6b6fc195e535b4f",
+                      "bytes":  181529
+                  },
+                  {
+                      "path":  "drivers/net/wireless/rdaw80211/rdawlan/wland_linux.c",
+                      "url":  "https://raw.githubusercontent.com/orangepi-xunlong/OrangePiRDA_kernel/0844fd6fb5851d644b7af8380975f425c64428e6/drivers/net/wireless/rdaw80211/rdawlan/wland_linux.c",
+                      "sha256":  "f68b86db0cc4875df28fd7d0fe828fc20a3062be4d9a5b0e2c0df8ea42d2e0b5",
+                      "bytes":  26697
+                  },
+                  {
+                      "path":  "drivers/net/wireless/rdaw80211/rdawlan/wland_bus.h",
+                      "url":  "https://raw.githubusercontent.com/orangepi-xunlong/OrangePiRDA_kernel/0844fd6fb5851d644b7af8380975f425c64428e6/drivers/net/wireless/rdaw80211/rdawlan/wland_bus.h",
+                      "sha256":  "5cf1177f392be735d330aea663f0ea7abe9d8744a27efa6910da9800beaa62c3",
+                      "bytes":  4883
+                  }
+              ],
+    "other_checks":  [
+                         {
+                             "repository":  "https://github.com/07bug/HiSTBLinuxV100R005C00SPC060",
+                             "commit":  "a9f05973129d738e175416dd4a91b2c264ffcdd4",
+                             "path":  "source/component/wifi/drv",
+                             "tree_sha":  "bca68faa6befe0b076bc999172ae5be0764f5eb3",
+                             "result":  "Complete subtree metadata returned; no RDA/5995/rdawfmac paths found"
+                         },
+                         {
+                             "repository":  "https://github.com/RDA5981/RDA5995",
+                             "commit":  "cf7c360ece0d8e1334a88743970ce522f6be8db5",
+                             "result":  "Repository tree contains datasheet/images/README, not Linux driver sources"
+                         }
+                     ]
+}

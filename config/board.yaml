@@ -29,14 +29,46 @@ reference_partition_layout:
   kernel_size_mib: 20
   rootfs_start_mib: 610
   rootfs_device: /dev/mmcblk0p9
+observed_runtime:
+  collected_on: '2026-10-12'
+  method: read-only-SSH-on-existing-Hinas
+  kernel_version: 4.4.35_ecoo_81082668
+  userspace: Ubuntu-24.04.4-armhf
+  glibc_version: '2.39'
+  online_cores: 4
+  linux_reported_ram_base: 0x00000000
+  linux_reported_ram_bytes: 1073741824
+  memtotal_kib: 737352
+  cma_total_kib: 266240
+  emmc_bytes: 7818182656
+  kernel_partition_start_mib: 14
+  kernel_partition_size_mib: 20
+  rootfs_partition_start_mib: 610
+  ethernet_phy_address: 1
+  ethernet_link_mbps: 100
+  ethernet_duplex: full
+  wifi_usb_id: '1e04:8888'
+  wifi_usb_interface: 'ff:ff:ff'
+  wifi_interface_driver: none
+  wifi_chip_revision: unverified
+  clocksource: hisp804
+  timer_reported_hz: 24000000
+  uart0_fdt_clock_hz: 83300000
+  # Unlabelled boot-time reservations; not a complete secure-memory map.
+  fdt_reservations:
+    - {address: 0x3f87b000, size: 0x00080000}
+    - {address: 0x3f878000, size: 0x00002000}
+    - {address: 0x3f73e000, size: 0x00003000}
+    - {address: 0x3ef54000, size: 0x007e9000}
+    - {address: 0x3edbe000, size: 0x00195000}
 unverified:
-  - Actual board RAM size and reserved/secure regions
+  - Bootloader-usable RAM and complete reserved/secure regions
   - Current bootloader identity and runtime commands
   - Candidate image authentication/encoding requirements
   - Recovery backups belong to this physical board
-  - Exact timer and UART clocks in hardware
+  - New timer and UART drivers work on physical hardware
   - Safe temporary image/DTB placement in RAM
-  - Physical Wi-Fi USB/SDIO identity, power/reset and station/AP capabilities
+  - RDA Wi-Fi revision, matching source/firmware, power/reset and station/AP capabilities
 policy:
   keep_known_successful_bootloader: true
   candidate_stage: RAM-initramfs-only
