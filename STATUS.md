@@ -14,7 +14,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | Linux 6.12.112 candidate | Cross-compiled; board descriptor, UART/GIC DTB, single-core timer and embedded initramfs |
 | Structural checks | Passed: CRC, ARM uImage/zImage, appended DTB, static ARM ELF, required/disabled config |
 | QEMU virt | Passed: same raw zImage + initramfs; shell, 2040 clock read/write, RAM file times and BusyBox stat |
-| GitHub CI | Passed for code commit `57ed846`: guarded serial PTY tests, collector LF/CRLF regression, PowerShell syntax, clean kernel build and QEMU time64; [run 38203563998](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38203563998) |
+| GitHub CI | Passed for code commit `cfba617`: guarded serial/YMODEM/shell tests, collector LF/CRLF regression, PowerShell syntax, clean kernel build, QEMU time64, RAM CRC/DDR gates and independent RDA USB object; [run 38210743877](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38210743877) |
 | Existing Hinas SSH baseline | Complete: Ubuntu 24.04.4 armhf/glibc 2.39, original 4.4 kernel, four CPUs, 1 GiB reported RAM and current eMMC layout |
 | Serial CLI | Replacing the TTL adapter resolved console input; CLI attached to the stopped CA bootloader on COM9 and completed command/environment queries without another reboot; see [inspection record](verification/bootloader-inspection-20261012.md) |
 | Original Hinas TTL boot | Complete from Boot ROM to login; bootloader and allocation evidence recorded in [TTL report](verification/ttl-boot-20261012.md) |
@@ -47,9 +47,9 @@ then verified timer/uptime progress and the time64 probe. The next board work
 is storage and wired-network support with separate validation, followed by
 Hinas compatibility and the OpenWrt/Kwrt target.
 
-The current local changes also pass RAM CRC/DDR gate tests and diagnostic-shell
-identity tests. CI listed above covers the earlier commit only; the new RAM
-boot and separate RDA USB audit changes still need their pushed CI result.
+The actual CI result above covers the RAM boot tooling, corrected diagnostic
+DTB and independent RDA USB audit. It reproduces the software checks; physical
+acceptance and shell observations are recorded separately for the local image.
 
 The first Windows collection reached its END marker but exited 127 because
 PowerShell appended CRLF to the script. The collector now exits explicitly and
