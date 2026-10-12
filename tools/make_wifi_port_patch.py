@@ -70,6 +70,66 @@ def replace_definition(text, name):
     return text[:start] + replacement + text[end:]
 
 
+def scan_result_handler(text):
+    start, _, end = function_spans(text, "wland_notify_escan_handler")[0]
+    operation = text[start:end]
+    operation = replace(operation, '''\tstruct wland_cfg80211_info *cfg = ifp->drvr->config;
+
+\tstruct cfg80211_scan_request *request = cfg->scan_request;
+\tstruct wland_cfg80211_vif *vif = cfg->scan_info.ifp->vif;''',
+                        '''\tstruct wland_cfg80211_info *cfg;
+\tstruct cfg80211_scan_request *request;
+\tstruct wland_cfg80211_vif *vif;''')
+    operation = replace(operation, '\tstruct wland_bss_info_le bss_info_le;',
+                        '\tstruct wland_bss_info_le bss_info_le = {};')
+    operation = replace(operation, '\tifp = vif->ifp;', '''\tif (!ifp || !e || !ifp->drvr || !ifp->drvr->config)
+\t\treturn -EINVAL;
+\tcfg = ifp->drvr->config;
+\tif (!cfg->scan_info.ifp || !cfg->scan_info.ifp->vif)
+\t\treturn -EINVAL;
+\trequest = cfg->scan_request;
+\tvif = cfg->scan_info.ifp->vif;
+\tif (!vif->ifp)
+\t\treturn -EINVAL;
+\tifp = vif->ifp;''')
+    operation = replace(operation, '\t\tif (!data) {',
+                        '\t\tif (!data) {\n\t\t\terr = -EINVAL;')
+    operation = replace(operation, "\t\tmemset(&bss_info_le, '\\0', sizeof(struct wland_bss_info_le));\n"
+                        '\t\twland_parse_network_info(&bss_info_le, (u8 *) data);',
+                        '''\t\terr = wland_parse_network_info(&bss_info_le, data, e->datalen);
+\t\tif (err)
+\t\t\tgoto exit;''')
+    operation = replace(operation, "\t\t\tmemset(&bss_info_le, '\\0', sizeof(struct wland_bss_info_le));\n", '')
+    operation = replace(operation,
+                        '\t\t\tWLAND_DBG(CFG80211, INFO, "receive an ap out of scan period\\n");\n'
+                        '\t\t\treturn 0;',
+                        '\t\t\tWLAND_DBG(CFG80211, INFO, "receive an ap out of scan period\\n");\n'
+                        '\t\t\tgoto exit;')
+    operation = replace(operation, '\t\t\t\tbss->time = jiffies;',
+                        '''\t\t\t\t/* The existing list entry now owns the replacement IEs. */
+\t\t\t\tbss_info_le.ie = NULL;
+\t\t\t\tbss->time = jiffies;''')
+    operation = replace(operation, '\t\t\terr = PTR_ERR(new_bss);\n\t\t}',
+                        '''\t\t\terr = PTR_ERR(new_bss);
+\t\t} else {
+\t\t\t/* The new list entry owns the shallow-copied IE buffer. */
+\t\t\tbss_info_le.ie = NULL;
+\t\t}''')
+    operation = replace(operation, 'exit:\n\treturn err;',
+                        'exit:\n\tkfree(bss_info_le.ie);\n\treturn err;')
+    operation = replace(operation, 'Ignoring IBSS result(SSID: %s).',
+                        'Ignoring IBSS result(SSID: %.*s).')
+    operation = replace(operation, '\t\t\t\t\tbss_info_le.SSID);',
+                        '\t\t\t\t\t(int)bss_info_le.SSID_len, bss_info_le.SSID);')
+    operation = replace(operation, 'SSID:\\"%s\\"', 'SSID:\\"%.*s\\"', 2)
+    operation = replace(operation, '\t\t\tbss_info_le.BSSID, bss_info_le.RSSI, bss_info_le.SSID);',
+                        '\t\t\tbss_info_le.BSSID, bss_info_le.RSSI,\n'
+                        '\t\t\t(int)bss_info_le.SSID_len, bss_info_le.SSID);')
+    operation = replace(operation, '\t\t\tbss_info_le.RSSI, bss_info_le.SSID,',
+                        '\t\t\tbss_info_le.RSSI, (int)bss_info_le.SSID_len, bss_info_le.SSID,')
+    return text[:start] + operation + text[end:]
+
+
 def transform(files):
     result = dict(files)
     result["rdawlan/wland_bus.c"] = replace(files["rdawlan/wland_bus.c"],
@@ -80,6 +140,26 @@ def transform(files):
                                               "prandom_u32", "get_random_u32")
     result["rdawlan/wland_fwsmgr.c"] = replace(files["rdawlan/wland_fwsmgr.c"], "strlcpy(", "strscpy(")
     text = replace(files["rdawlan/wland_rx.c"], "netif_rx_ni(skb);", "netif_rx(skb);", 2)
+    text = replace(text, '#include "wland_wid.h"',
+                   '#include "wland_wid.h"\n#include "wland_port_scan.h"')
+    start, _, end = function_spans(text, "wland_handle_async_info")[0]
+    operation = text[start:end]
+    operation = replace(operation, '\tint i;', '\tint i;\n\tsize_t network_frame_length;')
+    operation = replace(operation, '\twid_id = p_buffer[4] | p_buffer[5]<<8;',
+                        '''\tif (!event_packet || !p_buffer)
+\t\treturn -EINVAL;
+\tif (event_packet->datalen < 8 ||
+\t    (MAKE_WORD16(p_buffer[2], p_buffer[3])) < 8 ||
+\t    (MAKE_WORD16(p_buffer[2], p_buffer[3])) > event_packet->datalen)
+\t\treturn -EMSGSIZE;
+\twid_id = p_buffer[4] | p_buffer[5]<<8;
+\tif (wid_id == WID_NETWORK_INFO) {
+\t\tret = wland_port_network_frame_length(p_buffer,
+\t\t\tevent_packet->datalen, &network_frame_length);
+\t\tif (ret)
+\t\t\treturn ret;
+\t}''')
+    text = text[:start] + operation + text[end:]
     text = replace(text, '''\t\tbuf = skb->data;
 \t\t// pull hdr from the skb''', '''\t\tif (skb->len < WID_HEADER_LEN) {
 \t\t\twland_pkt_buf_free_skb(skb);
@@ -464,6 +544,10 @@ scan_failed:
                    '\t\t\tmin_t(int, ssids->ssid_len, sizeof(ssids->ssid)), ssids->ssid);')
     text = replace(text, '\t\t\tcfg->ctrl_scan_wait = false;',
                    '\t\t\tWRITE_ONCE(cfg->ctrl_scan_wait, false);')
+    text = replace(text, '#include "wland_wid.h"',
+                   '#include "wland_wid.h"\n#include "wland_port_scan.h"')
+    text = replace_definition(text, "wland_parse_network_info")
+    text = scan_result_handler(text)
     result["rdawlan/wland_cfg80211.c"] = text
     return result
 
