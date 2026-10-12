@@ -28,10 +28,12 @@ python3 "$project/tools/make_wifi_port_patch.py" --source "$pristine" \
 cp -a "$pristine/." "$port/"
 # This project-owned generated header is absent from the pristine vendor tree.
 rm -f -- "$port/rdawlan/wland_port_key.h"
+rm -f -- "$port/rdawlan/wland_port_key_validate.h"
 patch --forward --batch -d "$port" -p1 < "$project/patches/0003-rda-usb-api-audit.patch"
 patch --forward --batch -d "$port" -p1 < "$project/patches/0004-rda-linux-6.12-port.patch"
 python3 "$project/tools/test_wifi_port.py" --source "$port"
 python3 "$project/tools/test_wifi_control.py" --source "$port"
+python3 "$project/tools/test_wifi_keys.py" --source "$port" --linux "$linuxsrc"
 cat > "$port/rdawlan/Kbuild" <<'KBUILD'
 obj-m += rdawfmac.o
 rdawfmac-y := wland_p2p.o wland_dbg.o wland_d11.o wland_nvram.o wland_utils.o \

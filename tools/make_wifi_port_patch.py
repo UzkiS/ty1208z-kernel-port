@@ -237,7 +237,8 @@ def transform(files):
 
     text = files["rdawlan/wland_cfg80211.c"]
     text = replace(text, '#include "wland_android.h"',
-                   '#include <linux/math64.h>\n#include "wland_port_key.h"\n#include "wland_android.h"')
+                   '#include <linux/math64.h>\n#include "wland_port_key.h"\n'
+                   '#include "wland_port_key_validate.h"\n#include "wland_android.h"')
     text = body(text, "wland_get_systime_us", "\treturn div_u64(ktime_get_boottime_ns(), NSEC_PER_USEC);\n")
     for name in ("add_key", "del_key", "get_key"):
         text = replace(text, f"static s32 wland_cfg80211_{name}(struct wiphy *wiphy, struct net_device *ndev,\n\tu8 key_idx,",
@@ -294,10 +295,59 @@ def transform(files):
         text = replace(text, f'''{indent}WLAND_ERR("Set WID_ADD_{kind} error (%d)\\n", err);
 {indent}return 0;''', f'''{indent}WLAND_ERR("Set WID_ADD_{kind} error (%d)\\n", err);
 {indent}return err;''')
+    text = replace(text, '''\tif (params->key_len)
+\t\tWLAND_DUMP(TX_CTRL, params->key, params->key_len, "Key:\\n");''',
+                   '\t/* Key material must not enter cfg80211 debug logs. */')
     for name in ("add_key", "del_key", "get_key", "config_default_key", "config_default_mgmt_key", "stop_ap"):
         _, start, _ = function_spans(text, "wland_cfg80211_" + name)[0]
         insertion = text.index('\tWLAND_DBG(', start)
         text = text[:insertion] + '\tif (link_id > 0)\n\t\treturn -EOPNOTSUPP;\n\n' + text[insertion:]
+    for name in ("wland_cfg80211_add_key", "wland_add_ptkey", "wland_add_gtkey"):
+        _, start, end = function_spans(text, name)[0]
+        insertion = text.index('\tWLAND_DBG(', start, end)
+        guard = '''\terr = wland_port_validate_key(params, key_idx);
+\tif (err)
+\t\treturn err;
+\tif (!wland_port_key_role(ifp->vif->wdev.iftype))
+\t\treturn -EOPNOTSUPP;
+\tif (ifp->ndev->ieee80211_ptr->iftype != ifp->vif->wdev.iftype)
+\t\treturn -EINVAL;
+
+'''
+        if name == "wland_add_ptkey":
+            guard += '''\tif (!mac_addr || !is_valid_ether_addr(mac_addr))
+\t\treturn -EINVAL;
+\t/* This wire format has no key-index field for extended PTK slots. */
+\tif (key_idx)
+\t\treturn -EOPNOTSUPP;
+
+'''
+        if name == "wland_add_gtkey":
+            guard += '''\tif ((ifp->vif->wdev.iftype == NL80211_IFTYPE_STATION ||
+\t     ifp->vif->wdev.iftype == NL80211_IFTYPE_P2P_CLIENT) &&
+\t    !is_valid_ether_addr(profile->bssid))
+\t\treturn -EINVAL;
+
+'''
+        text = text[:insertion] + guard + text[insertion:]
+    text = replace(text, '''#ifdef WLAND_AP_RESET
+\t\tap_gtk_len = MIN(sizeof(gtkey)-offsetof(struct wland_rx_gtkey, key_idx),
+\t\t\tparams->key_len+2);
+#endif''', '')
+    start, _, end = function_spans(text, "wland_add_gtkey")[0]
+    operation = text[start:end]
+    operation = replace(operation, '''\tdefault:
+\t\tbreak;
+\t}''', '''\tdefault:
+\t\treturn -EOPNOTSUPP;
+\t}''')
+    operation = replace(operation, '''\tWLAND_DBG(CFG80211, TRACE, "Done.\\n");''', '''#ifdef WLAND_AP_RESET
+\t/* Publish cached AP key state only after a successful firmware reply. */
+\tif (ifp->vif->wdev.iftype == NL80211_IFTYPE_AP)
+\t\tap_gtk_len = params->key_len + 2;
+#endif
+\tWLAND_DBG(CFG80211, TRACE, "Done.\\n");''')
+    text = text[:start] + operation + text[end:]
     result["rdawlan/wland_cfg80211.c"] = text
     return result
 

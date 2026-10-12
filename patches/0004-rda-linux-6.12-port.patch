@@ -340,16 +340,17 @@
  		if (wland_set_mac_address(mac_addr) < 0) {
 --- a/rdawlan/wland_cfg80211.c
 +++ b/rdawlan/wland_cfg80211.c
-@@ -41,6 +41,8 @@
+@@ -41,6 +41,9 @@
  #include "wland_p2p.h"
  #include "wland_amsdu.h"
  #include "wland_cfg80211.h"
 +#include <linux/math64.h>
 +#include "wland_port_key.h"
++#include "wland_port_key_validate.h"
  #include "wland_android.h"
  #include "wland_rx.h"
  #include "wland_usb.h"
-@@ -2023,11 +2025,14 @@
+@@ -2023,11 +2026,14 @@
  }
  
  static s32 wland_cfg80211_config_default_key(struct wiphy *wiphy,
@@ -365,7 +366,28 @@
  
  	WLAND_DBG(CFG80211, TRACE, "key index (%d), Enter\n", key_idx);
  
-@@ -2080,18 +2085,11 @@
+@@ -2062,6 +2068,20 @@
+ 	struct wland_ptkey ptkey;
+ 	s32 err = 0;
+ 
++	err = wland_port_validate_key(params, key_idx);
++	if (err)
++		return err;
++	if (!wland_port_key_role(ifp->vif->wdev.iftype))
++		return -EOPNOTSUPP;
++	if (ifp->ndev->ieee80211_ptr->iftype != ifp->vif->wdev.iftype)
++		return -EINVAL;
++
++	if (!mac_addr || !is_valid_ether_addr(mac_addr))
++		return -EINVAL;
++	/* This wire format has no key-index field for extended PTK slots. */
++	if (key_idx)
++		return -EOPNOTSUPP;
++
+ 	WLAND_DBG(CFG80211, INFO, "Enter key_idx=%d, params->key_len=%d, params->cipher=0x%x\n",
+ 		key_idx, params->key_len, params->cipher);
+ 
+@@ -2080,18 +2100,11 @@
  
  		WLAND_DBG(CFG80211, TRACE, "Setting the key index %d\n", key_idx);
  		ptkey.ken_len = params->key_len;
@@ -389,7 +411,7 @@
  		if (ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_STATION ||
  			ifp->ndev->ieee80211_ptr->iftype == NL80211_IFTYPE_P2P_CLIENT) {
  			wland_netdev_wait_pend8021x(ndev);
-@@ -2100,7 +2098,7 @@
+@@ -2100,7 +2113,7 @@
  			MIN(sizeof(ptkey), params->key_len+ETH_ALEN+1));
  		if (err < 0) {
  			WLAND_ERR("Set WID_ADD_PTK error (%d)\n", err);
@@ -398,7 +420,25 @@
  		}
  
  	}
-@@ -2121,20 +2119,18 @@
+@@ -2116,32 +2129,40 @@
+ 	struct wland_rx_gtkey gtkey;
+ 	s32 err = 0;
+ 
++	err = wland_port_validate_key(params, key_idx);
++	if (err)
++		return err;
++	if (!wland_port_key_role(ifp->vif->wdev.iftype))
++		return -EOPNOTSUPP;
++	if (ifp->ndev->ieee80211_ptr->iftype != ifp->vif->wdev.iftype)
++		return -EINVAL;
++
++	if ((ifp->vif->wdev.iftype == NL80211_IFTYPE_STATION ||
++	     ifp->vif->wdev.iftype == NL80211_IFTYPE_P2P_CLIENT) &&
++	    !is_valid_ether_addr(profile->bssid))
++		return -EINVAL;
++
+ 	WLAND_DBG(CFG80211, INFO, "Enter, iftype:%d, key_idx=%d, params->key_len=%d, params->cipher=0x%x\n",
+ 		ifp->ndev->ieee80211_ptr->iftype, key_idx, params->key_len, params->cipher);
  
  	memset(&gtkey, 0, sizeof(gtkey));
  	memcpy(gtkey.ea, profile->bssid, ETH_ALEN);
@@ -429,16 +469,39 @@
  
  	switch(ifp->ndev->ieee80211_ptr->iftype) {
  	case NL80211_IFTYPE_AP:
-@@ -2166,7 +2162,7 @@
+-#ifdef WLAND_AP_RESET
+-		ap_gtk_len = MIN(sizeof(gtkey)-offsetof(struct wland_rx_gtkey, key_idx),
+-			params->key_len+2);
+-#endif
++
+ 		err = wland_fil_set_cmd_data(ifp, WID_ADD_TX_GTK, &(gtkey.key_idx),
+ 			MIN(sizeof(gtkey)-offsetof(struct wland_rx_gtkey, key_idx),
+ 			params->key_len+2));
+@@ -2161,14 +2182,19 @@
+ 			MIN(sizeof(gtkey), params->key_len+ETH_ALEN+10));
+ 		break;
+ 	default:
+-		break;
++		return -EOPNOTSUPP;
+ 	}
  
  	if (err < 0) {
  		WLAND_ERR("Set WID_ADD_RX_GTK error (%d)\n", err);
 -		return 0;
+-	}
+-
 +		return err;
- 	}
- 
++	}
++
++#ifdef WLAND_AP_RESET
++	/* Publish cached AP key state only after a successful firmware reply. */
++	if (ifp->vif->wdev.iftype == NL80211_IFTYPE_AP)
++		ap_gtk_len = params->key_len + 2;
++#endif
  	WLAND_DBG(CFG80211, TRACE, "Done.\n");
-@@ -2198,7 +2194,7 @@
+ 	return 0;
+ }
+@@ -2198,7 +2224,7 @@
  #endif /* STRUCT_REF */
  
  static s32 wland_cfg80211_add_key(struct wiphy *wiphy, struct net_device *ndev,
@@ -447,17 +510,35 @@
  	struct key_params *params)
  {
  	struct wland_if *ifp = netdev_priv(ndev);
-@@ -2209,6 +2205,9 @@
+@@ -2209,6 +2235,17 @@
  	s32 val, wsec;
  	u8 keybuf[8] = { 0 };
  #endif
 +	if (link_id > 0)
 +		return -EOPNOTSUPP;
 +
++	err = wland_port_validate_key(params, key_idx);
++	if (err)
++		return err;
++	if (!wland_port_key_role(ifp->vif->wdev.iftype))
++		return -EOPNOTSUPP;
++	if (ifp->ndev->ieee80211_ptr->iftype != ifp->vif->wdev.iftype)
++		return -EINVAL;
++
  	WLAND_DBG(CFG80211, DEBUG, "key index (%d),Enter\n", key_idx);
  	WLAND_DBG(CFG80211, INFO,
  		"Add Key(%pM):\n"
-@@ -2246,11 +2245,14 @@
+@@ -2227,8 +2264,7 @@
+ 	if (mac_addr)
+ 		WLAND_DUMP(TX_CTRL, mac_addr, 6, "MAddr:\n");
+ 
+-	if (params->key_len)
+-		WLAND_DUMP(TX_CTRL, params->key, params->key_len, "Key:\n");
++	/* Key material must not enter cfg80211 debug logs. */
+ 
+ 	if (params->seq_len)
+ 		WLAND_DUMP(TX_CTRL, params->seq, params->seq_len, "Seq:\n");
+@@ -2246,11 +2282,14 @@
  }
  
  static s32 wland_cfg80211_del_key(struct wiphy *wiphy, struct net_device *ndev,
@@ -473,7 +554,7 @@
  
  	WLAND_DBG(CFG80211, TRACE, "Enter\n");
  
-@@ -2285,7 +2287,7 @@
+@@ -2285,7 +2324,7 @@
  }
  
  static s32 wland_cfg80211_get_key(struct wiphy *wiphy, struct net_device *ndev,
@@ -482,7 +563,7 @@
  	void (*callback) (void *cookie, struct key_params * params))
  {
  	struct key_params params;
-@@ -2294,6 +2296,9 @@
+@@ -2294,6 +2333,9 @@
  	struct wland_cfg80211_security *sec;
  	s32 wsec = 0;
  	s32 err = 0;
@@ -492,7 +573,7 @@
  
  	WLAND_DBG(CFG80211, INFO, "ifd:%d, key index (%d),Enter\n", ifp->bssidx, key_idx);
  
-@@ -2347,8 +2352,11 @@
+@@ -2347,8 +2389,11 @@
  }
  
  static s32 wland_cfg80211_config_default_mgmt_key(struct wiphy *wiphy,
@@ -506,7 +587,7 @@
  	WLAND_DBG(CFG80211, TRACE, "Not supported\n");
  
  	return -EOPNOTSUPP;
-@@ -2857,16 +2865,9 @@
+@@ -2857,16 +2902,9 @@
  
  static u64 wland_get_systime_us(void)
  {
@@ -526,7 +607,7 @@
  
  static s32 wland_inform_single_bss(struct wland_cfg80211_info *cfg,
  	struct wland_bss_info_le *bi)
-@@ -5533,10 +5534,13 @@
+@@ -5533,10 +5571,13 @@
  	return err;
  }
  
@@ -541,7 +622,7 @@
  
  	WLAND_DBG(CFG80211, INFO, "Enter:id:%d, type:%d\n", ifp->bssidx, ifp->vif->wdev.iftype);
  
-@@ -5554,8 +5558,9 @@
+@@ -5554,8 +5595,9 @@
  }
  
  static s32 wland_cfg80211_change_beacon(struct wiphy *wiphy, struct net_device *ndev,
@@ -553,7 +634,7 @@
  	s32 err = 0;
  	struct wland_if *ifp = netdev_priv(ndev);
  	struct wland_tlv *rsn_ie;
-@@ -5750,31 +5755,15 @@
+@@ -5750,31 +5792,15 @@
  }
  //#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) */
  
@@ -592,7 +673,7 @@
  
  static s32 wland_cfg80211_change_bss(struct wiphy *wiphy, struct net_device *dev,
  	struct bss_parameters *params)
-@@ -6273,7 +6262,7 @@
+@@ -6273,7 +6299,7 @@
  	.sched_scan_start = wland_cfg80211_sched_scan_start,
  	.sched_scan_stop = wland_cfg80211_sched_scan_stop,
  #endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0) */
@@ -601,7 +682,7 @@
  	.change_bss = wland_cfg80211_change_bss,
  	.mgmt_tx = wland_cfg80211_mgmt_tx,
  #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 5, 0)
-@@ -6954,18 +6943,18 @@
+@@ -6954,18 +6980,18 @@
  		conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
  
  #else
@@ -625,7 +706,7 @@
  				.req_ie = conn_info->req_ie,
  				.req_ie_len = conn_info->req_ie_len,
  				.resp_ie = conn_info->resp_ie,
-@@ -7026,7 +7015,7 @@
+@@ -7026,7 +7052,7 @@
  	bool find = false;
  	int ret = 0;
  
@@ -2371,6 +2452,52 @@
 +		memcpy(out + 24, key + 16, 8);
 +	}
 +	return 0;
++}
++
++#endif
+--- /dev/null
++++ b/rdawlan/wland_port_key_validate.h
+@@ -0,0 +1,43 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef WLAND_PORT_KEY_VALIDATE_H
++#define WLAND_PORT_KEY_VALIDATE_H
++
++/* Only ordinary data keys fit the legacy PTK/GTK command formats. */
++static inline int wland_port_validate_key(const struct key_params *params,
++					 u8 key_idx)
++{
++	int length;
++
++	if (!params || !params->key || key_idx >= DOT11_MAX_DEFAULT_KEYS ||
++	    params->seq_len < 0 || params->seq_len > 8 ||
++	    (params->seq_len && !params->seq))
++		return -EINVAL;
++
++	switch (params->cipher) {
++	case WLAN_CIPHER_SUITE_WEP40:
++		length = 5;
++		break;
++	case WLAN_CIPHER_SUITE_WEP104:
++		length = 13;
++		break;
++	case WLAN_CIPHER_SUITE_TKIP:
++		length = 32;
++		break;
++	case WLAN_CIPHER_SUITE_CCMP:
++		length = 16;
++		break;
++	default:
++		/* BIP/WAPI require their own proven firmware command, not GTK. */
++		return -EOPNOTSUPP;
++	}
++
++	return params->key_len == length ? 0 : -EINVAL;
++}
++
++static inline bool wland_port_key_role(enum nl80211_iftype type)
++{
++	return type == NL80211_IFTYPE_STATION || type == NL80211_IFTYPE_AP ||
++	       type == NL80211_IFTYPE_P2P_CLIENT || type == NL80211_IFTYPE_P2P_GO;
 +}
 +
 +#endif
