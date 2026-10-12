@@ -448,7 +448,20 @@ scan_failed:
 \tWRITE_ONCE(cfg->ctrl_scan_wait, false);
 \treturn err;
 }''')
+    operation = replace(operation,
+                        'scanning ssid =\\"%s\\"\\n",\n'
+                        '\t\t\t\t\t\tcfg->scannum,request->n_ssids,request->ssids[cfg->scannum].ssid);',
+                        'scanning ssid =\\"%.*s\\"\\n",\n'
+                        '\t\t\t\t\t\tcfg->scannum,request->n_ssids,\n'
+                        '\t\t\t\t\t\trequest->ssids[cfg->scannum].ssid_len,\n'
+                        '\t\t\t\t\t\trequest->ssids[cfg->scannum].ssid);')
     text = text[:start] + operation + text[end:]
+    text = replace(text,
+                   'request->n_ssids:%d, ssids->ssid=%s\\n",\n'
+                   '\t\t\tifp->bssidx, escan_req, ssids->ssid_len, request->n_ssids, ssids->ssid);',
+                   'request->n_ssids:%d, ssids->ssid=%.*s\\n",\n'
+                   '\t\t\tifp->bssidx, escan_req, ssids->ssid_len, request->n_ssids,\n'
+                   '\t\t\tmin_t(int, ssids->ssid_len, sizeof(ssids->ssid)), ssids->ssid);')
     text = replace(text, '\t\t\tcfg->ctrl_scan_wait = false;',
                    '\t\t\tWRITE_ONCE(cfg->ctrl_scan_wait, false);')
     result["rdawlan/wland_cfg80211.c"] = text

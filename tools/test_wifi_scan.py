@@ -46,12 +46,18 @@ code = r'''
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
 typedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32; typedef int32_t s32;
 typedef uint32_t __le32;
-#define WLAND_DBG(...) ((void)0)
-#define WLAND_ERR(...) ((void)0)
+enum { CFG80211, DEBUG, TRACE };
+static void debug_log(int area, int level, const char *format, ...) {
+    char output[512]; va_list args; va_start(args, format);
+    assert(vsnprintf(output, sizeof(output), format, args) >= 0); va_end(args);
+}
+#define WLAND_DBG(...) debug_log(__VA_ARGS__)
+#define WLAND_ERR(...) debug_log(0, 0, __VA_ARGS__)
 #define cpu_to_le32(value) ((u32)(value))
 #define READ_ONCE(value) (value)
 #define WRITE_ONCE(target, value) ((target) = (value))
