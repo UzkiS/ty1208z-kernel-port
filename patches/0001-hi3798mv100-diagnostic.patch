@@ -26,7 +26,7 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,12 @@
+@@ -1,4 +1,13 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
@@ -35,6 +35,7 @@
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb
 +dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb
++dtb-$(CONFIG_POWER_RESET_TY1208Z_SP805) += hi3798mv100-ty1208z-restart.dtb
 +dtb-$(CONFIG_TY1208Z_ETHERNET_INHERITED) += hi3798mv100-ty1208z-ethernet-net.dtb
  dtb-$(CONFIG_ARCH_HI3xxx) += \
  	hi3620-hi4511.dtb
@@ -113,6 +114,32 @@
  obj-$(CONFIG_ARM_TIMER_SP804)		+= timer-sp804.o
  obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
  obj-$(CONFIG_KEYSTONE_TIMER)		+= timer-keystone.o
+--- a/drivers/power/reset/Kconfig
++++ b/drivers/power/reset/Kconfig
+@@ -8,6 +8,15 @@
+ 	  Say Y here to enable board reset and power off
+ 
+ if POWER_RESET
++
++config POWER_RESET_TY1208Z_SP805
++	bool "TY1208Z explicit SP805 system restart experiment"
++	depends on ARCH_HI3798MV100 && !WATCHDOG && !BLOCK && !NET
++	depends on !USB_SUPPORT && !MMC && !MODULES && !SMP
++	help
++	  Read real SP805 IDs and require disabled inherited control.
++	  Register a restart handler without startup writes or a watchdog
++	  device. Only explicit system restart arms this short watchdog.
+ 
+ config POWER_RESET_AS3722
+ 	bool "ams AS3722 power-off driver"
+--- a/drivers/power/reset/Makefile
++++ b/drivers/power/reset/Makefile
+@@ -1,4 +1,5 @@
+ # SPDX-License-Identifier: GPL-2.0
++obj-$(CONFIG_POWER_RESET_TY1208Z_SP805) += ty1208z-sp805-restart.o
+ obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
+ obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
+ obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
 --- a/drivers/mmc/core/mmc.c
 +++ b/drivers/mmc/core/mmc.c
 @@ -838,7 +838,12 @@
@@ -848,6 +875,22 @@
 +		clocks = <&ethclk>;
 +		phy-mode = "mii";
 +		phy-handle = <&phy1>;
++	};
++};
+--- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-restart.dts
+@@ -0,0 +1,13 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-diagnostic.dts"
++
++/ {
++	model = "TY1208Z CA SP805 explicit restart RAM experiment";
++};
++
++&{/soc} {
++	restart-controller@f8a2c000 {
++		compatible = "tianyi,ty1208z-sp805-restart";
++		reg = <0xf8a2c000 0x1000>;
 +	};
 +};
 --- /dev/null
@@ -1628,6 +1671,134 @@
 +	{ }
 +};
 +MODULE_DEVICE_TABLE(mdio, ty1208z_festa_ids);
+--- /dev/null
++++ b/drivers/power/reset/ty1208z-sp805-restart.c
+@@ -0,0 +1,66 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Opt-in RAM experiment: SP805 system restart without a watchdog device. */
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++
++#include "ty1208z-sp805-restart.h"
++
++static int ty1208z_restart_callback(struct sys_off_data *data)
++{
++	if (!ty1208z_sp805_restart(data->cb_data)) {
++		pr_err("TY1208Z_RESTART_REFUSED watchdog identity/state changed\n");
++		return NOTIFY_DONE;
++	}
++	mdelay(1000);
++	pr_err("TY1208Z_RESTART_TIMEOUT SP805 did not reset within one second\n");
++	return NOTIFY_DONE;
++}
++
++static int ty1208z_restart_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct ty1208z_sp805_state state;
++	struct resource *res;
++	void __iomem *base;
++	int ret;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic"))
++		return -ENODEV;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res || res->start != 0xf8a2c000 || resource_size(res) != 0x1000 ||
++	    platform_get_resource(pdev, IORESOURCE_MEM, 1))
++		return -EINVAL;
++	base = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(base))
++		return PTR_ERR(base);
++	ty1208z_sp805_observe(base, &state);
++	dev_info(dev, "TY1208Z_RESTART_OBSERVED pid=%08x cid=%08x control=%08x\n",
++		 state.peripheral_id, state.cell_id, state.control);
++	if (!ty1208z_sp805_restart_ready(&state))
++		return dev_err_probe(dev, -ENODEV, "Unexpected or active watchdog; no writes\n");
++	ret = devm_register_sys_off_handler(dev, SYS_OFF_MODE_RESTART,
++					   SYS_OFF_PRIO_DEFAULT, ty1208z_restart_callback, base);
++	if (ret)
++		return ret;
++	dev_info(dev, "TY1208Z_RESTART_READY no-startup-writes explicit-restart-only\n");
++	return 0;
++}
++
++static const struct of_device_id ty1208z_restart_match[] = {
++	{ .compatible = "tianyi,ty1208z-sp805-restart" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ty1208z_restart_match);
++
++static struct platform_driver ty1208z_restart_driver = {
++	.probe = ty1208z_restart_probe,
++	.driver = {
++		.name = "ty1208z-sp805-restart",
++		.of_match_table = ty1208z_restart_match,
++	},
++};
++builtin_platform_driver(ty1208z_restart_driver);
++MODULE_LICENSE("GPL");
+--- /dev/null
++++ b/drivers/power/reset/ty1208z-sp805-restart.h
+@@ -0,0 +1,56 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef TY1208Z_SP805_RESTART_H
++#define TY1208Z_SP805_RESTART_H
++
++#include <linux/io.h>
++#include <linux/types.h>
++
++struct ty1208z_sp805_state {
++	u32 peripheral_id;
++	u32 cell_id;
++	u32 control;
++};
++
++static inline void ty1208z_sp805_observe(void __iomem *base,
++				       struct ty1208z_sp805_state *state)
++{
++	unsigned int i;
++
++	state->peripheral_id = 0;
++	state->cell_id = 0;
++	for (i = 0; i < 4; i++)
++		state->peripheral_id |= (readl(base + 0xfe0 + i * 4) & 0xff) << (i * 8);
++	for (i = 0; i < 4; i++)
++		state->cell_id |= (readl(base + 0xff0 + i * 4) & 0xff) << (i * 8);
++	state->control = readl(base + 0x008);
++}
++
++static inline bool ty1208z_sp805_restart_ready(const struct ty1208z_sp805_state *state)
++{
++	/* Real AMBA identity, never a DT ID override. Require the inherited
++	 * watchdog to be disabled; this driver never takes over a running one.
++	 */
++	return (state->peripheral_id & 0x00ffffff) == 0x00141805 &&
++		state->cell_id == 0xb105f00d && state->control == 0;
++}
++
++static inline bool ty1208z_sp805_restart(void __iomem *base)
++{
++	struct ty1208z_sp805_state state;
++
++	ty1208z_sp805_observe(base, &state);
++	if (!ty1208z_sp805_restart_ready(&state))
++		return false;
++	/* SP805 unlock/load/control, as used by the upstream SP805 restart
++	 * handler. The pinned MV100 restart recipe uses a short 0x100 load.
++	 * Only an explicit kernel restart reaches these writes.
++	 */
++	writel(0x1acce551, base + 0xc00);
++	writel(0, base + 0x008);
++	writel(0x100, base + 0x000);
++	writel(3, base + 0x008);
++	readl(base + 0xc00); /* Flush posted writes before waiting for reset. */
++	return true;
++}
++
++#endif
 --- /dev/null
 +++ b/drivers/soc/hisilicon/hi3798mv100-emmc-audit.c
 @@ -0,0 +1,67 @@

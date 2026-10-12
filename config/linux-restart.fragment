@@ -1,0 +1,12 @@
+CONFIG_LOCALVERSION="-ty1208z-restart1"
+CONFIG_POWER_RESET=y
+CONFIG_POWER_RESET_TY1208Z_SP805=y
+# CONFIG_WATCHDOG is not set
+# CONFIG_USB_SUPPORT is not set
+# CONFIG_NET is not set
+# CONFIG_MMC is not set
+# CONFIG_BLOCK is not set
+# CONFIG_MTD is not set
+# CONFIG_MODULES is not set
+# CONFIG_SMP is not set
+# CONFIG_DEBUG_FS is not set

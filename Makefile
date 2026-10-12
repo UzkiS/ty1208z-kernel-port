@@ -25,6 +25,7 @@ help:
 	@echo 'make openwrt-applications - build and emulate applications (no board image)'
 	@echo 'make openwrt-net - build independent native Ethernet RAM candidate with traffic tools'
 	@echo 'make usb-audit - build standalone read-only host0 control/capability RAM audit'
+	@echo 'make restart - build isolated SP805 explicit restart RAM experiment'
 
 lint:
 	python3 tools/check_repository.py
@@ -39,6 +40,7 @@ test-serial:
 	python3 tools/test_board_diag_cli.py
 	python3 tools/test_ethernet_board_cli.py
 	python3 tools/test_openwrt_ethernet_board_cli.py
+	python3 tools/test_board_restart_cli.py
 
 build:
 	bash tools/build-diagnostic.sh $(if $(TASKBASE),"$(TASKBASE)")
@@ -105,3 +107,7 @@ openwrt-net:
 .PHONY: usb-audit
 usb-audit:
 	bash tools/build-usb-audit.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"
+
+.PHONY: restart
+restart:
+	bash tools/build-restart.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"

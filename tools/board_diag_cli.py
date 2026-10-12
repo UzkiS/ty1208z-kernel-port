@@ -21,6 +21,7 @@ PROFILES = {
     "ethernet-clock-id1": b"6.12.112-ty1208z-ethernet-clock-id1",
     "ethernet-net1": b"6.12.112-ty1208z-ethernet-net1",
     "usb-audit1": b"6.12.112-ty1208z-usb-audit1",
+    "restart1": b"6.12.112-ty1208z-restart1",
 }
 
 
@@ -106,6 +107,10 @@ def run(args, serial_module):
                         b"USB_AUDIT CRG46=", b"USB_AUDIT USB0=",
                         b"USB_AUDIT_READ_ONLY_COMPLETE no-clock-reset-writes no-device-transactions")):
                     raise TransferError("Read-only USB host0 register audit is incomplete")
+                if args.profile == "restart1" and not all(marker in report for marker in (
+                        b"TY1208Z_RESTART_OBSERVED pid=", b"cid=b105f00d control=00000000",
+                        b"TY1208Z_RESTART_READY no-startup-writes explicit-restart-only")):
+                    raise TransferError("SP805 restart identity/registration is incomplete")
                 result["report_complete"] = True
                 result["status"] = "diagnostic-captured"
             except (TransferError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:

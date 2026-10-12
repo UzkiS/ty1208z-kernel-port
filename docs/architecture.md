@@ -20,6 +20,9 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 `make usb-audit` 单独只读观察 host0 时钟/PHY 控制和 SYSID0；仅在继承状态符合
 来源条件时读取 EHCI/OHCI capability，不启用 USB 栈、不进行设备事务或控制写入。
 它有独立配置、产物和验收，见 [USB](usb.md)。
+`make restart` 单独验证 SP805 显式系统重启；启动时仅检查真实硬件 ID/禁用状态，
+仅在系统重启回调中写复位寄存器，不提供看门狗服务。当前网口镜像没有接入此候选，
+实机重启仍未验证，见 [restart](restart.md)。
 `make wifi-usb-audit` 使用单独的内核输出目录和配置，不改变诊断镜像；目前只编译
 `wland_usb.o`，不链接模块、不加载固件。来源锁与适配范围见 [Wi-Fi 说明](wifi.md)。
 `make wifi-port` 另行编译完整模块并执行制造入口/密钥回归；同样不改变诊断镜像，

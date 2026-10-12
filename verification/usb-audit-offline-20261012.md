@@ -52,7 +52,9 @@ state. When they are not met, the audit skips EHCI/OHCI capability reads.
 
 Local build artifacts, raw logs and the RAM plan remain ignored. CI is
 extended to reproduce this separate profile and upload it as UNTESTED;
-an actual run must be checked before claiming CI acceptance.
+the actual diagnostic run on `cf63f56` completed successfully:
+[38269634107](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38269634107).
+This is fresh build/emulation acceptance and does not replace a board boot.
 
 ## Remaining physical work
 

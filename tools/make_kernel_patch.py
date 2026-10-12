@@ -103,6 +103,26 @@ changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
     changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +
     'dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb\n')
 
+changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][0],
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +
+    'dtb-$(CONFIG_POWER_RESET_TY1208Z_SP805) += hi3798mv100-ty1208z-restart.dtb\n')
+changes["drivers/power/reset/Kconfig"] = (
+    'config POWER_RESET_AS3722\n',
+    'config POWER_RESET_TY1208Z_SP805\n'
+    '\tbool "TY1208Z explicit SP805 system restart experiment"\n'
+    '\tdepends on ARCH_HI3798MV100 && !WATCHDOG && !BLOCK && !NET\n'
+    '\tdepends on !USB_SUPPORT && !MMC && !MODULES && !SMP\n'
+    '\thelp\n'
+    '\t  Read real SP805 IDs and require disabled inherited control.\n'
+    '\t  Register a restart handler without startup writes or a watchdog\n'
+    '\t  device. Only explicit system restart arms this short watchdog.\n\n'
+    'config POWER_RESET_AS3722\n')
+changes["drivers/power/reset/Makefile"] = (
+    '# SPDX-License-Identifier: GPL-2.0\n',
+    '# SPDX-License-Identifier: GPL-2.0\n'
+    'obj-$(CONFIG_POWER_RESET_TY1208Z_SP805) += ty1208z-sp805-restart.o\n')
+
 changes.update({
     "drivers/mmc/core/mmc.c": [
         ('static struct attribute *mmc_std_attrs[] = {\n',

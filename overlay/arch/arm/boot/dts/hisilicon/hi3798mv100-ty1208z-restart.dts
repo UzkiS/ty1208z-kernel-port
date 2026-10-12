@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA SP805 explicit restart RAM experiment";
+};
+
+&{/soc} {
+	restart-controller@f8a2c000 {
+		compatible = "tianyi,ty1208z-sp805-restart";
+		reg = <0xf8a2c000 0x1000>;
+	};
+};

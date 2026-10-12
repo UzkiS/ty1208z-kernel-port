@@ -76,6 +76,9 @@ class DiagnosticTests(unittest.TestCase):
                         b"USB_AUDIT CRG46=0000007f CRG47=00000003\r\n"
                         b"USB_AUDIT USB0=00000008 USB1=0000b01c SYSID0=37980110\r\n"
                         b"USB_AUDIT_READ_ONLY_COMPLETE no-clock-reset-writes no-device-transactions")
+                    restart = b"No restart handler" if mode == "missing-restart" else (
+                        b"TY1208Z_RESTART_OBSERVED pid=00141805 cid=b105f00d control=00000000\r\n"
+                        b"TY1208Z_RESTART_READY no-startup-writes explicit-restart-only")
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
@@ -86,6 +89,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\n" + (clock_id if profile == "ethernet-clock-id1" else b""),
                                  b"\r\n" + (network if profile == "ethernet-net1" else b""),
                                  b"\r\n" + (usb if profile == "usb-audit1" else b""),
+                                 b"\r\n" + (restart if profile == "restart1" else b""),
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -173,6 +177,12 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_usb_read_only_report_is_captured(self):
         self.exercise("success", profile="usb-audit1")
+
+    def test_restart_requires_actual_identity_and_registration(self):
+        self.exercise("missing-restart", profile="restart1")
+
+    def test_restart_read_only_report_is_captured(self):
+        self.exercise("success", profile="restart1")
 
 
 if __name__ == "__main__":
