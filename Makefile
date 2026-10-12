@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help lint test-serial build test verify references references-wifi wifi-usb-audit
+.PHONY: help lint test-serial build test verify references references-wifi wifi-usb-audit emmc-audit
 help:
 	@echo 'make lint       - Python/shell/config repository checks'
 	@echo 'make build      - download pinned sources and build RAM-only ARM candidate'
@@ -11,6 +11,7 @@ help:
 	@echo 'make references - download pinned SDK references for read-only source audit'
 	@echo 'make references-wifi - verify/download pinned optional RDA driver code (no firmware)'
 	@echo 'make wifi-usb-audit - compile one RDA USB object with a separate kernel config'
+	@echo 'make emmc-audit - build a separate read-only eMMC-register RAM diagnostic'
 
 lint:
 	python3 tools/check_repository.py
@@ -41,3 +42,6 @@ references-wifi:
 
 wifi-usb-audit:
 	bash tools/build-wifi-usb-audit.sh $(if $(TASKBASE),"$(TASKBASE)")
+
+emmc-audit:
+	bash tools/build-emmc-audit.sh $(if $(TASKBASE),"$(TASKBASE)")

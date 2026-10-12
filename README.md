@@ -58,9 +58,13 @@ CI 在干净环境执行相同构建，并提供名称含 `HARDWARE-UNTESTED` �
 
 已有 Hinas 的只读 SSH 基线见 [baseline.md](docs/baseline.md)。本机已确认
 RDA USB `1e04:8888` 无驱动绑定；下一步先按 [TTL 记录步骤](docs/ttl-baseline.md)
-核实当前引导器和 RAM 加载条件，再选择诊断候选的实际启动方法。
+了解已实测的引导器检查、YMODEM/CRC 内存启动和诊断采集流程。Linux 6.12 已在
+本机进入串口 shell，timer/IRQ 和 RAM 文件 time64 通过；详见
+[实机 RAM 报告](verification/ram-boot-20261012.md)。这仍是最小诊断环境。
 TTL 记录直接使用仓库中的 Python CLI，不依赖 HiTool。安装锁定的串口依赖后，
 `make test-serial` 可在 Linux 伪终端验证接收工具，不连接盒子。
+eMMC 下一阶段采用 [独立寄存器审计](docs/emmc.md)；`make emmc-audit` 不启用
+MMC/BLOCK。`make wifi-usb-audit` 独立编译 RDA USB 对象，完整无线模块仍待移植。
 
 源码和研究说明可提交；原始固件、fastboot、DTB、源码下载和大体积编译产物
 保存在本地。厂商参考只提交出处和哈希，可执行 `make references` 重新获取。

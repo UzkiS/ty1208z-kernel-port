@@ -2,7 +2,7 @@
 # Simulation of virt only: does not emulate TY1208Z peripherals/secure boot.
 set -euo pipefail
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
-artifacts="$project/artifacts/diag1"
+artifacts=${1:-"$project/artifacts/diag1"}
 cross=${CROSS_COMPILE:-arm-linux-gnueabihf-}
 mkdir -p "$artifacts/checks"
 "${cross}readelf" -h -A "$artifacts/time64-probe.armhf" > "$artifacts/checks/elf-probe.txt"

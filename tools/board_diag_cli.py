@@ -12,7 +12,10 @@ from serial_cli import console_text, open_receiver
 from ymodem_sender import TransferError
 
 PROMPT = re.compile(rb"(?:^|[\r\n])(?:/ )?# $")
-KERNEL = b"6.12.112-ty1208z-diag1"
+PROFILES = {
+    "diag1": b"6.12.112-ty1208z-diag1",
+    "emmc-audit1": b"6.12.112-ty1208z-emmc-audit1",
+}
 
 
 class ShellExchange(Exchange):
@@ -46,6 +49,7 @@ def run(args, serial_module):
     if any(path.exists() for path in paths.values()):
         raise ValueError("Output already exists; choose a fresh prefix")
     result = {"schema": 1, "started_utc": started.isoformat(), "port": args.port,
+              "profile": args.profile,
               "kernel_verified": False, "report_complete": False, "status": "starting"}
     with open_receiver(serial_module, args.port, 115200, 0.02) as port:
         with paths["raw"].open("xb") as raw, paths["journal"].open("x", encoding="utf-8") as journal:
@@ -53,7 +57,7 @@ def run(args, serial_module):
             try:
                 shell_command(exchange, b"")
                 identity = shell_command(exchange, b"uname -r")
-                if not re.search(rb"(?:^|[\r\n])" + re.escape(KERNEL) + rb"[\r\n]", identity):
+                if not re.search(rb"(?:^|[\r\n])" + re.escape(PROFILES[args.profile]) + rb"[\r\n]", identity):
                     raise TransferError("Kernel identity differs; diagnostic command not sent")
                 result["kernel_verified"] = True
                 report = shell_command(exchange, b"diag; echo TY1208Z_DIAG_COMPLETE", timeout=30)
@@ -61,6 +65,8 @@ def run(args, serial_module):
                     raise TransferError("Diagnostic report is incomplete")
                 if not re.search(rb"(?:^|[\r\n])TIME64_PASS sizeof\(time_t\)=8 ", report):
                     raise TransferError("Diagnostic time64 probe did not pass")
+                if args.profile == "emmc-audit1" and b"EMMC_AUDIT_READ_ONLY_COMPLETE" not in report:
+                    raise TransferError("eMMC register audit did not complete")
                 result["report_complete"] = True
                 result["status"] = "diagnostic-captured"
             except (TransferError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:
@@ -80,6 +86,7 @@ def run(args, serial_module):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
+    parser.add_argument("--profile", choices=PROFILES, default="diag1")
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     import serial

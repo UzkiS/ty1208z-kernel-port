@@ -1,0 +1,14 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA read-only eMMC register audit";
+};
+
+&{/soc} {
+	emmc-audit@f9830000 {
+		compatible = "tianyi,ty1208z-emmc-register-audit";
+		reg = <0xf9830000 0x1000>, <0xf8a220a0 4>;
+		reg-names = "controller", "crg40";
+	};
+};

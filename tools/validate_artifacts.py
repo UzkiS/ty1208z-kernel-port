@@ -24,6 +24,14 @@ tree = parse_fdt(dtb)
 assert tree["size"] == len(dtb)
 uart = next(node["properties"] for node in tree["nodes"] if node["path"] == "/soc/serial@f8b00000")
 assert "arm,primecell-periphid" not in uart, "Read the real UART ID; do not override with an unsupported ID"
+config = (artifacts / "linux.config").read_text()
+audits = [node for node in tree["nodes"] if node["path"] == "/soc/emmc-audit@f9830000"]
+if "CONFIG_HI3798MV100_EMMC_AUDIT=y\n" in config:
+    assert len(audits) == 1
+    assert audits[0]["properties"]["reg"]["cells"] == [0xf9830000, 0x1000, 0xf8a220a0, 4]
+    assert "# CONFIG_MMC is not set\n" in config and "# CONFIG_BLOCK is not set\n" in config
+else:
+    assert not audits, "Audit node must only appear in the explicit audit profile"
 assert (artifacts / "zImage-appended-dtb").read_bytes() == raw + dtb
 assert (artifacts / "uImage-UNTESTED.bin").read_bytes()[64:] == raw + dtb
 assert len(image["device_trees"]) == 1

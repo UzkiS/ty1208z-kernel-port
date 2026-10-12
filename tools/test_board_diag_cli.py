@@ -16,7 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @unittest.skipUnless(sys.platform.startswith("linux"), "PTY integration runs on Linux")
 class DiagnosticTests(unittest.TestCase):
-    def exercise(self, mode):
+    def exercise(self, mode, profile="diag1"):
         with tempfile.TemporaryDirectory() as directory:
             prefix = Path(directory) / "capture"
             master, slave = os.openpty()
@@ -43,15 +43,17 @@ class DiagnosticTests(unittest.TestCase):
                         return
                     os.write(master, b"\r\n# ")
                     self.assertEqual(read_command(), b"uname -r\r")
-                    kernel = b"4.4.35" if mode == "wrong-kernel" else b"6.12.112-ty1208z-diag1"
+                    kernel = b"4.4.35" if mode == "wrong-kernel" else b"6.12.112-ty1208z-" + profile.encode()
                     os.write(master, b"uname -r\r\n" + kernel + b"\r\n# ")
                     if mode == "wrong-kernel":
                         return
                     self.assertEqual(read_command(), b"diag; echo TY1208Z_DIAG_COMPLETE\r")
                     time64 = b"TIME64_FAIL" if mode == "probe-failure" else b"TIME64_PASS sizeof(time_t)=8 file=2208988800"
+                    audit = b"EMMC_AUDIT_READ_ONLY_COMPLETE" if mode != "missing-audit" else b"No audit driver"
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
+                                 b"\r\n" + audit,
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -61,6 +63,7 @@ class DiagnosticTests(unittest.TestCase):
             process = subprocess.Popen([
                 sys.executable, "-u", str(ROOT / "tools/board_diag_cli.py"),
                 "--port", os.ttyname(slave), "--output", str(prefix),
+                "--profile", profile,
             ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             thread = threading.Thread(target=peer, daemon=True)
             thread.start()
@@ -96,6 +99,12 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_complete_fragmented_report_is_captured(self):
         self.exercise("success")
+
+    def test_emmc_profile_requires_audit_completion(self):
+        self.exercise("missing-audit", profile="emmc-audit1")
+
+    def test_emmc_profile_captures_completed_audit(self):
+        self.exercise("success", profile="emmc-audit1")
 
 
 if __name__ == "__main__":

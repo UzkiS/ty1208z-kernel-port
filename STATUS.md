@@ -22,6 +22,7 @@ time64 behavior. The current milestone is a RAM-only, single-core diagnostic.
 | CA authentication / RAM placement | Current CA bootloader accepted this ordinary unsigned uImage at the measured Hinas address; host/device CRC matched; bounded low-256-MiB diagnostic boot succeeded. This does not establish other loaders/images or persistent installation |
 | Hinas startup under new kernel | Not tested; eMMC driver and legacy modules need separate work |
 | Wired network / storage / USB / SMP | Not integrated into this minimal diagnostic image |
+| eMMC register audit | Separate RAM candidate built and structurally/QEMU checked; reads controller identity/clock registers with MMC/BLOCK disabled; hardware untested; [scope](docs/emmc.md) |
 | Wi-Fi | RDA USB `1e04:8888`; pinned compatible-descriptor source found and USB object compiled against a separate Linux 6.12 config; full module, chip revision, firmware and hardware operation remain unverified |
 | OpenWrt/Kwrt / Passwall | Planned; no working target or router image yet |
 | Whole-system Y2038 | Not established; diagnostic time64 passed, application-level testing remains |

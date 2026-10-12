@@ -66,6 +66,10 @@ jobs:
           make wifi-usb-audit > logs/wifi-usb-audit.log 2>&1 || { tail -n 100 logs/wifi-usb-audit.log; exit 1; }
           tail -n 20 logs/wifi-usb-audit.log
           git diff --exit-code -- patches/0003-rda-usb-api-audit.patch
+      - name: Build separate read-only eMMC register diagnostic and run QEMU
+        run: |
+          make emmc-audit > logs/emmc-audit.log 2>&1 || { tail -n 100 logs/emmc-audit.log; exit 1; }
+          tail -n 20 logs/emmc-audit.log
       - name: Upload UNTESTED diagnostics and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -73,6 +77,7 @@ jobs:
           name: ty1208z-diag1-HARDWARE-UNTESTED-${{ github.sha }}
           path: |
             artifacts/diag1/
+            artifacts/emmc-audit1/
             logs/
           retention-days: 14
           if-no-files-found: warn
