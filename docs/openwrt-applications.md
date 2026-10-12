@@ -55,6 +55,12 @@ acceptance. Check its actual result before describing CI as passed.
 
 ## Runtime acceptance and limits
 
+The fixture first tests the installed BusyBox NTP client against a bounded,
+QEMU-only loopback server: 2036 era wrap, the signed 2038 boundary and correction
+from 2026 to 2040 must produce the actual expected clock. Neither test helper
+enters the delivered rootfs. Source/binary/shell hashes join the runtime
+provenance; see the [NTP result](../verification/openwrt-ntp-time64-20261013.md).
+
 The fixture checks libc/file time64, logging, real dnsmasq resolution, OpenSSL
 certificate validation and curl/mbedTLS HTTPS. It requires valid 2040 TLS to
 work and expired/untrusted certificates to fail. It checks LuCI's protected
@@ -81,7 +87,7 @@ The default QEMU test uses a Cortex-A7 with 512 MiB. The RAM stage repeats the
 same application acceptance with 256 MiB and `mem=240M`, conservatively
 accounting for the board's low-16-MiB allocation reservation. Neither trial is
 a board memory/performance measurement. Ethernet, cold boot, WAN/LAN routing,
-real Passwall TPROXY, NTP,
+real Passwall TPROXY, physical clock/NTP service operation,
 persistent filesystems, Wi-Fi and whole-system Y2038 remain separate gates.
 See [the local result](../verification/openwrt-applications-20261012.md).
 
@@ -110,6 +116,6 @@ actual local checks and limitations are recorded in the
 
 A distinct [applications/Ethernet variant](openwrt-router.md) integrates the
 measured drivers in its own source/build tree and exercises actual netifd/fw4
-forwarding and Passwall TCP TPROXY in isolated QEMU network namespaces. The
+forwarding and Passwall TCP/UDP TPROXY in isolated QEMU network namespaces. The
 plain application profile remains peripheral-free; physical integration
 acceptance is still required for the Ethernet variant.

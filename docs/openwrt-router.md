@@ -16,7 +16,8 @@ need hardware acceptance before normal use. There is no flash/install recipe.
 
 ## Application and forwarding acceptance
 
-The actual matched kernel/initrd first passes the existing isolated 2040
+The actual matched kernel/initrd first passes installed NTP-client correction
+across 2036/2038 and from 2026 to 2040, then the existing isolated 2040
 DNS/TLS/LuCI/rpcd/Passwall SOCKS and VLESS TLS fixture. Network namespaces then
 create a client and origin through veth pairs; netifd configures router-side
 links/routes and fw4 generates forwarding rules. Actual HTTPS traffic and
@@ -36,7 +37,9 @@ No host networking or disks are exposed to QEMU.
 Both 512-MiB and `mem=240M` trials pass the same fixture. Provenance binds exact
 kernel/config/rootfs/packages/console hashes and variant. These are emulated
 forwarding/TCP/UDP TPROXY checks; they do not measure physical Ethernet,
-routing speed, cable recovery, NTP, Wi-Fi or whole-system Y2038 behavior.
+routing speed, cable recovery, physical clock/NTP operation, Wi-Fi or
+whole-system Y2038 behavior. The loopback NTP fixture and its limits are
+recorded in the [NTP report](../verification/openwrt-ntp-time64-20261013.md).
 
 ## Checked RAM output
 

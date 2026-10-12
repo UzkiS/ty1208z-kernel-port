@@ -18,7 +18,7 @@ actual FEMAC sanitizer and UART CRC/identity checks pass locally.
 | rootfs.cpio.gz | 21044278 | `bca90c4678b8623446dcaf914a2dcb7d4e3409c2ef43e1e9dcc9248210310b0d` |
 | Kernel config | 64994 | `c4cfccaaa15c6bc57e03713c822331728d529d53abf3a9ab00931edfd9e8ff96` |
 | Package manifest | 4423 | `339fc1e806f1574275ba0e7aed3f5fc1a70b7a9c8f13ce4dda76625e25ea3f59` |
-| 240-MiB QEMU console | 47012 | `9f7a9828949ebd8c8d5ab319e40fbccd1d6d137180bd08e0dc21a87eba1f1b43` |
+| 240-MiB QEMU console | 125688 | `3a3f11f69c15323d298a35d0d1746671178ccaff55e46c099ccf369608d06958` |
 
 Kernel: `6.12.112-ty1208z-openwrt-router`, with measured CPU0/UART/timer/Ethernet
 and its own native modules. Storage, USB, wireless, SMP, debugfs and untested
@@ -37,6 +37,11 @@ Both trials use Cortex-A7/one CPU, no disks/host network; clock 2040 exists only
 in the guest. Existing DNS, certificate rejection, HTTPS, authenticated LuCI/
 Passwall/rpcd, generated Xray SOCKS/VLESS TLS and nft expression/counter markers
 pass. Additional acceptance:
+
+- `NTP_ERA_TIME64_PASS`: the actual installed one-shot BusyBox NTP client
+  corrects the guest clock across 2036/2038 and from 2026 to 2040 against a
+  QEMU-only loopback server. Both memory trials pass before the remaining
+  application/router tests. See [NTP evidence and limits](openwrt-ntp-time64-20261013.md).
 
 - `OPENWRT_ROUTER_FORWARDING_TIME64_PASS`: netifd links/routes, fw4 forwarding,
   actual namespace-client HTTPS traffic and nonzero forwarding counters.
@@ -90,6 +95,6 @@ These results do not cover the new native integration/matrix or UDP fixture.
 The pending physical boot remains the independent native Ethernet image. It
 needs startup, sustained TCP/counters and cable recovery; the integrated image
 then needs its own hardware boot/application/network checks. Emulated TCP/UDP
-TPROXY does not establish physical speed/proxy behavior, NTP/correct physical clock, whole-system
+TPROXY does not establish physical speed/proxy behavior, physical NTP/clock operation, whole-system
 Y2038, Hinas startup, full RAM/SMP, storage or RDA USB/radio operation. No flash,
 persistent environment or security writes occurred.

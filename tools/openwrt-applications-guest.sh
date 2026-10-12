@@ -70,6 +70,7 @@ until [ -f /var/lock/passwall_ready.lock ]; do
 done
 /etc/init.d/passwall stop > passwall-stop.log 2>&1
 echo PASSWALL_BOOT_READY
+sh /tmp/ntp-runtime-test.sh
 
 # A valid CA spans both dates. An old leaf certificate must expire in 2040.
 date -u -s @1791676800

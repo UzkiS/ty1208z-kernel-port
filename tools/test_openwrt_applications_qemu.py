@@ -4,6 +4,7 @@ import argparse
 import base64
 import hashlib
 import json
+import os
 from pathlib import Path
 import re
 import selectors
@@ -37,12 +38,27 @@ def test(source, memory_mib=512):
     transcript_path = output / f"qemu-applications{suffix}.log"
     # A failed rerun must not leave a stale successful provenance record.
     provenance_path.unlink(missing_ok=True)
+    ntp_source = Path(__file__).with_name("ntp-qemu-fixture.c")
+    ntp_binary = output / f"ntp-qemu-fixture{suffix}.armhf"
+    # Build against the same pinned native ARM/musl toolchain as this rootfs.
+    compiler = unique((source / "staging_dir").glob(
+        "toolchain-*/bin/arm-openwrt-linux-muslgnueabi-gcc"), "native test compiler")
+    subprocess.run([str(compiler), "-std=c11", "-Os", "-Wall", "-Wextra", "-Werror", "-static", "-s",
+                    str(ntp_source), "-o", str(ntp_binary)], check=True,
+                   env={**os.environ, "STAGING_DIR": str(compiler.parent.parent)})
     fixture = Path(__file__).with_name("openwrt-applications-guest.sh").read_bytes()
     encoded = base64.b64encode(fixture)
     # BusyBox ash's serial line editor truncates long input lines. Keep each
     # complete command below 256 bytes. The minimal BusyBox has no stty applet.
     commands = [b"printf %s '" + encoded[i:i+192] + b"' >> /tmp/application-test.b64\n"
                 for i in range(0, len(encoded), 192)]
+    for name, data in (("ntp-fixture", ntp_binary.read_bytes()),
+                       ("ntp-test", Path(__file__).with_name("openwrt-ntp-guest.sh").read_bytes())):
+        encoded_ntp = base64.b64encode(data)
+        commands += [b"printf %s '" + encoded_ntp[i:i+192] + b"' >> /tmp/" + name.encode() + b".b64\n"
+                     for i in range(0, len(encoded_ntp), 192)]
+    commands += [b"base64 -d /tmp/ntp-fixture.b64 > /tmp/ntp-qemu-fixture; chmod 700 /tmp/ntp-qemu-fixture\n",
+                 b"base64 -d /tmp/ntp-test.b64 > /tmp/ntp-runtime-test.sh\n"]
     if ethernet:
         encoded_router = base64.b64encode(Path(__file__).with_name("openwrt-router-guest.sh").read_bytes())
         commands += [b"printf %s '" + encoded_router[i:i+192] + b"' >> /tmp/router-test.b64\n"
@@ -97,7 +113,7 @@ def test(source, memory_mib=512):
                 raise ValueError(f"Application QEMU timeout; see {transcript_path.name}")
         report = bytes(transcript).replace(b"\r", b"")
         markers = (
-            b"CERTIFICATE_TIME64_PASS", b"DNS_TIME64_PASS", b"HTTPS_TIME64_PASS",
+            b"NTP_ERA_TIME64_PASS", b"CERTIFICATE_TIME64_PASS", b"DNS_TIME64_PASS", b"HTTPS_TIME64_PASS",
             b"PASSWALL_LUCI_AUTH_TIME64_PASS",
             b"LUCI_RPCD_TIME64_PASS", b"PASSWALL_XRAY_SOCKS_TIME64_PASS",
             b"PASSWALL_XRAY_TLS_TIME64_PASS",
@@ -119,6 +135,13 @@ def test(source, memory_mib=512):
             with path.open("rb") as source_file:
                 artifacts[name] = {"bytes": path.stat().st_size,
                                    "sha256": hashlib.file_digest(source_file, "sha256").hexdigest()}
+        test_inputs = {
+            "ntp_server_source": ntp_source, "ntp_server_binary": ntp_binary,
+            "ntp_guest": Path(__file__).with_name("openwrt-ntp-guest.sh"),
+            "applications_guest": Path(__file__).with_name("openwrt-applications-guest.sh"),
+        }
+        if ethernet:
+            test_inputs["router_guest"] = Path(__file__).with_name("openwrt-router-guest.sh")
         provenance = {
             "schema": 1, "result": "OPENWRT_APPLICATIONS_QEMU_PASS",
             "application_variant": "ethernet" if ethernet else "qemu",
@@ -126,12 +149,15 @@ def test(source, memory_mib=512):
             "memory_limit_mib": memory_limit_mib,
             "host_network": False, "disks": False, "clock_year": 2040,
             "artifacts": artifacts, "passed_markers": [marker.decode() for marker in markers],
+            "test_inputs": {name: {"bytes": path.stat().st_size,
+                                   "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
+                            for name, path in test_inputs.items()},
             "feeds": json.loads((source / ".ty1208z-application-lock.json").read_text()),
             "toolchain": json.loads((source / ".ty1208z-toolchain.json").read_text()),
             "limits": "No MV100 peripherals, hardware routing/TPROXY, performance or Wi-Fi acceptance",
         }
         provenance_path.write_text(json.dumps(provenance, indent=2) + "\n")
-        print("OPENWRT_APPLICATIONS_QEMU_PASS: actual ARM DNS/TLS/LuCI/rpcd/Passwall SOCKS and VLESS TLS at 2040")
+        print("OPENWRT_APPLICATIONS_QEMU_PASS: installed NTP crosses 2036/2038 and sets 2040; ARM DNS/TLS/LuCI/Passwall pass")
         print("nft counters and TPROXY expressions passed; physical forwarding/TPROXY/Wi-Fi remain untested")
         if ethernet:
             print("Actual netifd/fw4 forwarding and Passwall TCP/UDP TPROXY passed in isolated network namespaces")

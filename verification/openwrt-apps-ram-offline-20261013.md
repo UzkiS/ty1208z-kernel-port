@@ -16,7 +16,7 @@ candidate has occurred.** It is not a working router or an installable image.
 | rootfs.cpio.gz | 20925068 | `526cbe67000e957430746aa56300ac65705d4522120a4f01a4608d42e654d338` |
 | Kernel config | 63584 | `a8582e03e71a4d7d738149fecc6ae77716ef9e9c876363ba3d5b13967705f61f` |
 | Package manifest | 4344 | `d29c82e50d81d5e8d2cca567bc79ec99b3edce7740bd4a5623d43cdfc173e539` |
-| 240-MiB QEMU console | 30896 | `2301452cbfa8b929976ff21b3b93c16ae37ac93e041758232393c076902d4f70` |
+| 240-MiB QEMU console | 109927 | `15144e88881579db3b61bc2922b161c49a43203ae69c0389838722aa79fdb587` |
 
 The kernel release is `6.12.112-ty1208z-openwrt-ram`. Modules come from the
 same native application build. The wrapper changes only the appended board
@@ -49,7 +49,10 @@ The actual ARM application fixture passed on QEMU virt, Cortex-A7, one CPU,
 clock. The markers cover real DNS, OpenSSL/curl TLS (including certificate
 rejection), authenticated LuCI/Passwall/rpcd, actual Passwall-generated Xray
 SOCKS and VLESS TLS traffic, nft packet counters and socket/TPROXY expression
-acceptance. The original 512-MiB acceptance remains a separate record.
+acceptance. Both memory trials now also require real installed-client NTP
+correction across 2036/2038 and from 2026 to 2040; source/binary/shell identities
+are recorded in provenance. The delivered kernel/rootfs stay unchanged.
+See [NTP evidence and limits](openwrt-ntp-time64-20261013.md).
 
 The package gate ties the actual kernel/config/rootfs/packages/console hashes
 to that memory/clock acceptance and verifies the critical board C/timer source

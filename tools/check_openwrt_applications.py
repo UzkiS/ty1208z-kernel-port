@@ -77,6 +77,13 @@ def check(source, built=False):
         if len(roots) != 1:
             raise ValueError("Expected one actual application rootfs")
         rootfs = roots[0]
+        ntpd = rootfs / "usr/sbin/ntpd"
+        if (not ntpd.is_symlink() or ntpd.readlink() != Path("../../bin/busybox") or
+                not (rootfs / "bin/busybox").is_file() or
+                not (rootfs / "etc/init.d/sysntpd").is_file()):
+            raise ValueError("Actual application rootfs lacks the installed BusyBox NTP service")
+        if list(rootfs.rglob("ntp-qemu-fixture*")) or list(rootfs.rglob("ntp-runtime-test*")):
+            raise ValueError("QEMU-only NTP fixture must not enter the delivered rootfs")
         if ethernet:
             expected = (Path(__file__).resolve().parents[1] / "openwrt/ethernet/overlay/target/linux/"
                         "hi3798mv100/base-files/etc/config/network").read_bytes()
