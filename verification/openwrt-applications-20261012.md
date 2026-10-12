@@ -5,8 +5,10 @@ The final local application build and runtime gates passed. Clean application
 CI passed for the basic application flow at `5ded606`:
 [run 38243600371](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38243600371).
 That revision predates the custom-CA array fix and added Xray VLESS TLS
-validation below. CI for the newer TLS validation is running separately;
-the final local gates, not the older CI, establish that added runtime result.
+validation below. The later plain/integrated `62db42b` matrix has now passed
+TLS/application acceptance in both 512/240-MiB QEMU budgets, with separate RAM
+packaging. The [remote report](openwrt-applications-ci-20261013.md) verifies
+its downloaded outputs and records the remaining newer UDP/NTP CI boundary.
 
 ## Inputs and actual build
 

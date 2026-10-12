@@ -51,7 +51,9 @@ Writes, the fixture password and future clock exist only in the RAM guest.
 `checks/applications-qemu.json` records the exact kernel, config, initrd, package
 manifest and console hashes, toolchain identity and passed runtime markers.
 The clean GitHub workflow repeats the native toolchain build and application
-acceptance. Check its actual result before describing CI as passed.
+acceptance. The [completed matrix report](../verification/openwrt-applications-ci-20261013.md)
+records verified plain/integrated TCP and RAM-packaging acceptance on `62db42b`;
+later UDP/NTP fixtures still require their own complete remote result.
 
 ## Runtime acceptance and limits
 

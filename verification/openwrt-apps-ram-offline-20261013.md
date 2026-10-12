@@ -65,8 +65,12 @@ PTY. Either failed CRC sends no boot command; both matching CRCs boot once.
 `make lint`, serial checks, `make build` and `make test` passed after the change,
 including the ordinary single-image CRC/DDR serial regressions and core QEMU
 time64. The application workflow now invokes `make openwrt-app-ram`, performs
-both memory trials and uploads a separate HARDWARE-UNTESTED artifact. Its new
-run has not yet established CI acceptance for this change.
+both memory trials and uploads a separate HARDWARE-UNTESTED artifact. The
+`62db42b` matrix has now passed both memory trials and external-initrd packaging;
+downloaded image/provenance/console hashes were checked in the
+[remote CI report](openwrt-applications-ci-20261013.md). Its remote artifacts
+are recorded separately from the local identities above. The later NTP fixture
+still awaits its own remote acceptance.
 
 ## Remaining hardware gates
 

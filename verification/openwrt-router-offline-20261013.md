@@ -81,14 +81,16 @@ profile and Ethernet helper/profile checks, `make lint`, serial checks, core
 `make build` and `make test` pass locally.
 
 CI now declares locked pyserial and preserves its interpreter across the
-restricted host PATH. Plain/integrated builds have separate matrix jobs. This
-integration has no completed CI acceptance yet. Native core/Ethernet CI passed
-on `8415dec` in [run 38272805257](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38272805257).
-Plain application build/512-MiB QEMU CI passed on `b563d60` in
-[run 38278345386](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38278345386);
-that workflow did not run external-initrd packaging. Diagnostic CI passed on
-`62db42b` in [run 38287462061](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38287462061).
-These results do not cover the new native integration/matrix or UDP fixture.
+restricted host PATH. Plain/integrated builds have separate matrix jobs. The
+`62db42b` matrix has now passed both 512/240-MiB trials, actual TCP TPROXY and
+external-initrd packaging in
+[run 38287461985](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38287461985).
+Downloaded image/provenance/console hashes and markers were checked; the
+[remote report](openwrt-applications-ci-20261013.md) records those separate
+artifact identities. Native core/Ethernet CI also passed on `62db42b` in
+[run 38287462054](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38287462054).
+The completed application run predates the later UDP/NTP fixtures; their
+local acceptance is not replaced by this older CI result.
 
 ## Remaining acceptance
 
