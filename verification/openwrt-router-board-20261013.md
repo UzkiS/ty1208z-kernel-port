@@ -125,9 +125,10 @@ serial path or board UART; no guessed UART/clock register change was made.
 
 ## Later corrected-TX image and cold-default acceptance
 
-The current physical RAM image contains the
+The earlier corrected physical RAM image contains the
 [FEMAC BUSY accounting correction](femac-xmit-20261013.md) and delivered
-peer-DNS default. It supersedes the initial image for current runtime checks.
+peer-DNS default. It supersedes the initial image for the checks in this
+section; the Chinese image below supersedes it as the current runtime image.
 
 | Payload | Bytes | SHA-256 | Device CRC32 |
 |---|---:|---|---|
@@ -183,3 +184,68 @@ This alternative working path does not establish a single serial root cause.
 Full physical DDR is 1 GiB; the experimental image still exposes only low
 256 MiB with low 16 MiB reserved. Higher memory, external Ethernet routing,
 USB/Wi-Fi/AP, storage, SMP and optional Docker remain separate milestones.
+
+## Current Chinese RAM image
+
+The separately packaged [Chinese default](luci-chinese-default-20261013.md)
+image now runs physically. Its raw zImage remains the corrected TX kernel
+above; the wrapper DTB accounts for the larger translated initrd.
+
+| Payload | Bytes | SHA-256 | Device CRC32 |
+|---|---:|---|---|
+| uImage | 3436544 | `80bcfbf09f329ad96ed7fd2de44fb946f8822b99b7af53979cc9de8054e1c3c4` | `9d11beca` |
+| External initrd | 21142267 | `5d355a83991dc858643244bb635e517444f0d42e40f8836eea0e2eb384b258f7` | `3ff40518` |
+
+The user identified a dropped serial 3.3-V supply during the intervening
+garbled attempts, restored it and stopped at fastboot. The .NET bridge then
+completed fresh loader inspection, both TFTP receipts/filesizes/device CRCs,
+temporary-loader network restoration, boot and native console interaction.
+This identifies the cause of those garbled attempts; earlier pyserial RX-zero
+observations are kept separate. COM9 is released for follow-up over SSH.
+
+Before restoring user configuration, the fresh delivered image reported
+`zh_cn`, all three translation catalogues, peer-DNS enabled and an automatic
+DHCP resolver. Normal current 2026 NTP synchronization, 4/4 gateway replies,
+FESTAv220 100-Mbps full-duplex link and RAM-file time64 passed. Latest saved
+user config/password/authorized keys were restored with all 15 file hashes
+verified; fresh RAM SSH host keys were retained. After restoration LuCI was
+set to Chinese. Authenticated host Passwall UI passed; credentials are private.
+
+The physical ARM namespace fixture completed all seven required markers and
+exit zero again. HTTPS validated its local CA, VLESS/TLS SOCKS worked, SoC
+forwarding counted 19 packets/1501 bytes, and TCP/UDP TPROXY counted 3/180
+and 96/50824. Independent cleanup verified the saved network/firewall/Passwall
+hashes and `ip_forward`, no test namespaces/table, and Passwall disabled.
+These are local namespace endpoints, not external Ethernet routing evidence.
+
+Actual bidirectional physical Ethernet TCP received 650903552 bytes
+host-to-board and 651689984 bytes board-to-host. Every error/drop/FIFO/carrier
+counter increment was zero; initial cumulative TX drop remained 3. Board to
+Windows monotonic elapsed ratios were 1.000053/1.000096. The temporary
+source-restricted input rule was removed, user config hashes matched, and
+gateway/time64 checks passed afterward. The host WLAN/WSL-NAT path and WSL
+clock behavior still prevent treating this as an external routing benchmark.
+
+| Chinese-image evidence | Bytes where recorded | SHA-256 |
+|---|---:|---|
+| TFTP/boot stream | 10115 | `f4c1f2a054d132cdc672e58615302ce51cd61cb56fb3d5df40b22d34ca81e03f` |
+| Native console/default language/setup stream (private) | 4580 | `58ea1b2cbc4b2885bb6b8795bae4d5779be31b1058d7ed24310d5454152d39eb` |
+| Untouched DNS/NTP default | — | `c30c6dd86b1861f06990a3f2ce209ca31516857d6740bbf4255c12764d6b2a83` |
+| Restoration record | — | `b62c4e289ec8ba4fe6535e7a8ea77c6e2620041c1a81a9cf406bb654c4b5cbfa` |
+| Language/catalogues/time64 | — | `7a694b729de84281907cc31feda1c0dd1cdc7819d6c1c2e37e476851f73ed96d` |
+| Application fixture stream | 1301 | `1360c1b7327041dd9ee7dfe4cdc0a5d06381864f814eb24f0d06aaadd0808553` |
+| Post-fixture identity/time64 | — | `315039dfd98f8cb7c5829c17c38925fa8142f06d231431ffdb944e4800dc56b9` |
+| Independent fixture cleanup | — | `8b672e816d66d30c1b1432e49c053407ebe6dd316a49806e1ee5d941c1c32c75` |
+| Bidirectional TCP record | — | `09ae76fc706b1f32a7b4c62dea28fc03d321e8c62fa6a08e6485df12251f2be6` |
+| Post-TCP config/gateway/time64 | — | `184a7a68e5f7e59d0049ec2dd17f761c0758051aeacb36360be4f38a169b27ea` |
+| Final online identity/gateway/time64 | — | `b461e85963be8d9f2346952baf1944699e201416f89e777de4dfda9ba557705b` |
+
+Actual stored capture lengths/hashes, image identities, fixture markers and
+both TCP client/server hashes were independently checked. USB/RDA enumeration
+has separate [physical acceptance](usb-host-board-20261013.md); this running
+router image still excludes USB/Wi-Fi. Radio/AP, broader RAM, storage/SMP,
+external routing and installation remain unverified.
+
+The final online check again passed Chinese login labels, native identity,
+4/4 gateway replies and time64. The independent fixture-cleanup hash still
+matched, with no test namespace/table and Passwall disabled as restored.

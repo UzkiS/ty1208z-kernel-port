@@ -69,4 +69,9 @@ Both build entries now run this additional sanitizer. The native entry
 selects the actual package source and matching Linux tree after compilation,
 and rejects missing or ambiguous trees before export. Changes to Wi-Fi
 sanitizer scripts also trigger the native package workflow. Remote results
-for this change remain pending.
+for the native package entry remain pending. The later standalone diagnostic
+[run 38374147701](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38374147701)
+passed on `45762c2`; all six Wi-Fi manifest files, both exact Git patches and
+the actual `RDA_ASSOC_FRAMES_PASS` marker were independently verified. See
+the [complete CI report](diagnostic-ci-latest-20261013.md). This does not
+replace native-package or physical radio acceptance.

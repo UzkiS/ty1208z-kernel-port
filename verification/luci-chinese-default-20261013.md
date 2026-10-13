@@ -24,7 +24,7 @@ regression verifies backward acceptance and rejects a missing console marker
 even when the console hash is updated. Resource/payload/provenance mutations
 and the two device-CRC boot gates also pass.
 
-| New offline payload | Bytes | SHA-256 | CRC32 |
+| Chinese RAM payload | Bytes | SHA-256 | Device CRC32 |
 |---|---:|---|---|
 | uImage | 3436544 | `80bcfbf09f329ad96ed7fd2de44fb946f8822b99b7af53979cc9de8054e1c3c4` | `9d11beca` |
 | External initrd | 21142267 | `5d355a83991dc858643244bb635e517444f0d42e40f8836eea0e2eb384b258f7` | `3ff40518` |
@@ -34,11 +34,38 @@ Raw kernel SHA-256 remains
 The wrapper DTB changes only with the new initrd length. All six packaged
 payload identities, actual console/provenance and fixture-source hashes were
 independently verified. The three catalogue sizes are base 146072, firewall
-18960 and Passwall 35756 bytes. The new candidate is saved separately from
-the booted TX image.
+18960 and Passwall 35756 bytes. The Chinese candidate is saved separately from
+the earlier TX image and is now the running physical RAM image.
 
 Core lint/build/time64 tests pass; the language script also passes shellcheck.
-This Chinese candidate has offline acceptance only. The currently running
-physical router retains the previous image/configuration; no reboot, flash
-or persistent boot change was issued for this language preference. Fresh
-application CI remains separate from local QEMU acceptance.
+Fresh application CI remains separate from local QEMU acceptance.
+
+## Physical Chinese acceptance
+
+After the user restored the serial 3.3-V supply and stopped the original CA
+loader, fresh inspection, bounded RAM placement, both TFTP receipts/sizes
+and both device CRCs passed. Original loader network values were restored
+before boot. No flash or persistent boot change was performed.
+
+The untouched first boot reported `luci.main.lang=zh_cn`, all three catalogue
+sizes above and the delivered peer-DNS default. Native release/router DT and
+Ethernet identity were checked before restoring the latest 15 saved user
+configuration/authentication files; every restored file hash passed. The
+saved LuCI preference was then set to `zh_cn` in this RAM system. Password
+and authentication material stay in ignored local evidence.
+
+Actual host HTTP validation observed unauthenticated Passwall access returning
+403 with the login-required header, HTML `lang="zh-cn"`, and translated
+username/password labels. Existing credentials then produced HTTP 200 and
+the authenticated Passwall page, also with Chinese HTML language. Recorded
+login/authenticated page sizes are 17818/128880 bytes, with SHA-256:
+
+- Login: `ab86f5568b2913980b69b91847a1bc8b74ebb0b1ad54e3ffff5469e8c19148ff`.
+- Authenticated: `36a0ca38f5e92f3487c9a34b71d79d3414d92cdafcb6fdcef2e143fce288c1d7`.
+
+The normal current 2026 clock and RAM-file time64 probe passed. The physical
+ARM namespace HTTPS/SOCKS/forwarding/TCP/UDP TPROXY fixture and bidirectional
+Ethernet TCP also passed with configuration restored and temporary rules
+removed. Exact evidence identities and test limits are in the
+[physical router report](openwrt-router-board-20261013.md). These results do
+not establish external Ethernet routing, Wi-Fi/AP or persistent installation.

@@ -1,0 +1,78 @@
+{
+  "schema": 1,
+  "purpose": "Read-only source audit; alternatives not built or selected; no firmware",
+  "files": [
+    {
+      "repository": "zx297520v3-mainline/linux-3.4",
+      "commit": "80e1fec813691ceb16567581c3fe4d49e4bab7f3",
+      "path": "drivers/net/wireless/rdaw5995/rdawlan/wland_cmds.c",
+      "url": "https://raw.githubusercontent.com/zx297520v3-mainline/linux-3.4/80e1fec813691ceb16567581c3fe4d49e4bab7f3/drivers/net/wireless/rdaw5995/rdawlan/wland_cmds.c",
+      "bytes": 65102,
+      "sha256": "e97a353e4d0a657d5957488e379e19278d85076f1dfb32b8079609ddec81c06a"
+    },
+    {
+      "repository": "zx297520v3-mainline/linux-3.4",
+      "commit": "80e1fec813691ceb16567581c3fe4d49e4bab7f3",
+      "path": "drivers/net/wireless/rdaw5995/rdawlan/wland_cfg80211.c",
+      "url": "https://raw.githubusercontent.com/zx297520v3-mainline/linux-3.4/80e1fec813691ceb16567581c3fe4d49e4bab7f3/drivers/net/wireless/rdaw5995/rdawlan/wland_cfg80211.c",
+      "bytes": 229628,
+      "sha256": "efedbc18bfa5873969eea0fac40c295681b2c0eb240e7f9d38a3ace983e3101c"
+    },
+    {
+      "repository": "zx297520v3-mainline/linux-3.4",
+      "commit": "80e1fec813691ceb16567581c3fe4d49e4bab7f3",
+      "path": "drivers/net/wireless/rdaw5995/rdawlan/wland_wid.h",
+      "url": "https://raw.githubusercontent.com/zx297520v3-mainline/linux-3.4/80e1fec813691ceb16567581c3fe4d49e4bab7f3/drivers/net/wireless/rdaw5995/rdawlan/wland_wid.h",
+      "bytes": 28191,
+      "sha256": "7f31be879d80d999e6b81b94052fe259e6c664e632c60f597fbeeb75eba64d96"
+    },
+    {
+      "repository": "zx297520v3-mainline/linux-3.4",
+      "commit": "80e1fec813691ceb16567581c3fe4d49e4bab7f3",
+      "path": "drivers/net/wireless/rdaw80211/rdawlan/wland_cmds.c",
+      "url": "https://raw.githubusercontent.com/zx297520v3-mainline/linux-3.4/80e1fec813691ceb16567581c3fe4d49e4bab7f3/drivers/net/wireless/rdaw80211/rdawlan/wland_cmds.c",
+      "bytes": 60954,
+      "sha256": "92d82252d47a9dacacf395e67003fa0dbd92b7cf1bc8aedc08b56ca2e8cc5359"
+    },
+    {
+      "repository": "zx297520v3-mainline/linux-3.4",
+      "commit": "80e1fec813691ceb16567581c3fe4d49e4bab7f3",
+      "path": "drivers/net/wireless/rdaw80211/rdawlan/wland_cfg80211.c",
+      "url": "https://raw.githubusercontent.com/zx297520v3-mainline/linux-3.4/80e1fec813691ceb16567581c3fe4d49e4bab7f3/drivers/net/wireless/rdaw80211/rdawlan/wland_cfg80211.c",
+      "bytes": 227365,
+      "sha256": "c63d50a40700e08f53a9973089bbf6b34ab3d8bca437a5bbcb0091ac91785f5d"
+    },
+    {
+      "repository": "zx297520v3-mainline/linux-3.4",
+      "commit": "80e1fec813691ceb16567581c3fe4d49e4bab7f3",
+      "path": "drivers/net/wireless/rdaw80211/rdawlan/wland_wid.h",
+      "url": "https://raw.githubusercontent.com/zx297520v3-mainline/linux-3.4/80e1fec813691ceb16567581c3fe4d49e4bab7f3/drivers/net/wireless/rdaw80211/rdawlan/wland_wid.h",
+      "bytes": 27861,
+      "sha256": "5000cce0c2c8c972c1aad9dddefaaa4a99a4cda2fe13695d0a9dfddd31d5faae"
+    },
+    {
+      "repository": "Deema35/i96_kernel",
+      "commit": "2f133257b856aee3364454045ec74ee8dd998df1",
+      "path": "drivers/rda/net/rdawlan/wland_cmds.c",
+      "url": "https://raw.githubusercontent.com/Deema35/i96_kernel/2f133257b856aee3364454045ec74ee8dd998df1/drivers/rda/net/rdawlan/wland_cmds.c",
+      "bytes": 40618,
+      "sha256": "1b73ba6f9ea2527bfc3a816d34b5d7fcc9210e90e3d9a0402a369eeaddb37420"
+    },
+    {
+      "repository": "Deema35/i96_kernel",
+      "commit": "2f133257b856aee3364454045ec74ee8dd998df1",
+      "path": "drivers/rda/net/rdawlan/wland_cfg80211.c",
+      "url": "https://raw.githubusercontent.com/Deema35/i96_kernel/2f133257b856aee3364454045ec74ee8dd998df1/drivers/rda/net/rdawlan/wland_cfg80211.c",
+      "bytes": 180058,
+      "sha256": "8ea3f2ec9434afba6aa5e5ff0be591e6adf312b74370dcbfae5ba61cda8121b8"
+    },
+    {
+      "repository": "Deema35/i96_kernel",
+      "commit": "2f133257b856aee3364454045ec74ee8dd998df1",
+      "path": "drivers/rda/net/rdawlan/wland_wid.h",
+      "url": "https://raw.githubusercontent.com/Deema35/i96_kernel/2f133257b856aee3364454045ec74ee8dd998df1/drivers/rda/net/rdawlan/wland_wid.h",
+      "bytes": 23027,
+      "sha256": "f90bda5be0d1b25910cb1d27c7046ef4f2c9b3e4bef03fcedefb9b6666c0102c"
+    }
+  ]
+}

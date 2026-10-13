@@ -1,8 +1,9 @@
 # Wi-Fi 适配：本机为 RDA USB 方案
 
-2026-10-12 的只读 SSH 基线确认机器存在 RDA USB 无线设备。当前 Hinas 没有
-为它绑定驱动；现代内核也尚未集成对应驱动。Wi-Fi 仍是项目目标，扫描、联网
-和 AP 模式需要分别验收。
+2026-10-12 的只读 SSH 基线确认机器存在 RDA USB 无线设备。原 Hinas 没有
+为它绑定驱动；2026-10-13 的独立现代内核 USB 实验已通过 EHCI/OHCI、RDA
+480-Mbps 枚举及共享时钟解绑/重绑实测，见 [USB 实机报告](../verification/usb-host-board-20261013.md)。
+当前中文路由镜像尚未集成 USB/无线。Wi-Fi 扫描、联网和 AP 模式仍需分别验收。
 
 用户要求板载无线也支持 AP 热点。当前源码包含 AP/beacon 和密钥回调，但主接口
 的 AP-stop 命令路径仍未实现，现代内核下的固件启动和射频也尚未验收。后续 AP
@@ -162,6 +163,12 @@ ASan 越界，修正版在独立模块和原生包源码上均通过，完整 AR
 错误回复、重试和字符串边界已通过 sanitizer，完整模块和原生 APK 已重编译，
 见 [启动查询验收](../verification/wifi-chip-start-20261013.md)。这仍未解决
 cfg80211 的 named roaming/capability 初始化，也未证明实机无线可用。
+
+另外固定审查了两个公开仓库的三个驱动目录，包括独立 `rdaw5995` 分支。
+九个实际源码/header 的 URL、长度、哈希与逐项结论见
+[补充初始化审计](../verification/rda-startup-source-audit-20261013.md)。
+三者的 named-iovar set/get 传输也被 `#if 0` 禁用，不能补齐当前初始化路径；
+成功返回和源码里的能力默认值不能当作本机查询结果。精确芯片型号仍需实测或丝印依据。
 
 可选的 [原生 OpenWrt 打包入口](openwrt-wifi.md) 复用同一驱动补丁和
 `wifi/Kbuild`，在独立目录使用原生 Linux 6.12 cfg80211，不混用 backports。

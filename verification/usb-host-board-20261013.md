@@ -54,4 +54,7 @@ bindings/root hubs, time64 and absence of clock failures. RDA presence is
 recorded separately so a working host is not mislabeled as working Wi-Fi.
 Actual DT/config mutations, bounded RAM plan, 29 serial PTY cases, shared-helper
 2048 SDK trace comparisons, core lint/build/test and candidate QEMU passed
-locally. Remote results for the new planner/collector remain pending.
+locally. The later diagnostic CI on `45762c2` also passed; actual downloaded
+host profile/RAM-permission tests, image identities and sequence/QEMU markers
+were verified, [CI report](diagnostic-ci-latest-20261013.md). Remote builds
+remain separate from the physical observations above.
