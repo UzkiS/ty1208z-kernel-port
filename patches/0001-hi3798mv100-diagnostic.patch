@@ -287,7 +287,7 @@
  				   sdio.o sdio_ops.o sdio_bus.o \
 --- a/drivers/mmc/host/Kconfig
 +++ b/drivers/mmc/host/Kconfig
-@@ -802,6 +802,37 @@
+@@ -802,6 +802,47 @@
  	  Synopsys DesignWare Memory Card Interface driver. Select this option
  	  for platforms based on Exynos4 and Exynos5 SoC's.
  
@@ -316,11 +316,21 @@
 +
 +config MMC_DW_HI3798MV100_IDENT
 +	bool "TY1208Z restricted eMMC identification diagnostic"
-+	depends on MMC_DW && ARCH_HI3798MV100 && !BLOCK
++	depends on MMC_DW && ARCH_HI3798MV100
++	depends on !BLOCK || HI3798MV100_EMMC_READ_ONLY
 +	select MMC_DW_PLTFM
 +	help
 +	  PIO, 1-bit, legacy identification only. Blocks card settings,
 +	  data writes, sector I/O and unknown card commands.
++
++config HI3798MV100_EMMC_READ_ONLY
++	bool "TY1208Z enforced read-only eMMC user-area block experiment"
++	depends on ARCH_HI3798MV100 && MMC_DW && MMC_BLOCK && BLOCK
++	depends on !NET && !MODULES && !SMP && !USB_SUPPORT && !MTD
++	depends on !DEBUG_FS && !PM
++	help
++	  Dedicated user-area-only RAM experiment, not a production driver.
++	  Enforce queue write denial and suppress boot/RPMB devices.
 +
  config MMC_DW_HI3798CV200
  	tristate "Hi3798CV200 specific extensions for Synopsys DW Memory Card Interface"
@@ -336,6 +346,29 @@
  obj-$(CONFIG_MMC_DW_HI3798CV200) += dw_mmc-hi3798cv200.o
  obj-$(CONFIG_MMC_DW_HI3798MV200) += dw_mmc-hi3798mv200.o
  obj-$(CONFIG_MMC_DW_K3)		+= dw_mmc-k3.o
+--- a/drivers/mmc/core/block.c
++++ b/drivers/mmc/core/block.c
+@@ -3004,6 +3004,10 @@
+ {
+ 	int idx, ret;
+ 
++	/* This independent RAM profile exposes only the measured user area. */
++	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))
++		return 0;
++
+ 	if (!mmc_card_mmc(card))
+ 		return 0;
+ 
+@@ -3303,7 +3307,8 @@
+ 		pm_runtime_enable(&card->dev);
+ 	}
+ 
+-	mmc_blk_rpmb_add(card);
++	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))
++		mmc_blk_rpmb_add(card);
+ 
+ 	return 0;
+ 
 --- a/drivers/mmc/host/dw_mmc.h
 +++ b/drivers/mmc/host/dw_mmc.h
 @@ -588,6 +588,10 @@
@@ -1915,19 +1948,22 @@
 +#endif
 --- /dev/null
 +++ b/drivers/mmc/host/dw_mmc-hi3798mv100-ident.c
-@@ -0,0 +1,162 @@
+@@ -0,0 +1,182 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Restricted RAM diagnostic, not the production MV100 storage driver. */
 +#include <linux/io.h>
 +#include <linux/irq.h>
++#include <linux/mmc/card.h>
 +#include <linux/mmc/host.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
 +#include <linux/platform_device.h>
++#include <linux/string.h>
 +
 +#include "dw_mmc.h"
 +#include "dw_mmc-pltfm.h"
 +#include "hi3798mv100-ident-policy.h"
++#include "hi3798mv100-emmc-ro-policy.h"
 +
 +static int mv100_ident_init(struct dw_mci *host)
 +{
@@ -1974,9 +2010,9 @@
 +	mmc->pm_caps = 0;
 +	mmc->f_max = 25000000;
 +	mmc->max_blk_size = 512;
-+	mmc->max_blk_count = 1;
-+	mmc->max_req_size = 512;
-+	mmc->max_seg_size = 512;
++	mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ? 8 : 1;
++	mmc->max_req_size = 512 * mmc->max_blk_count;
++	mmc->max_seg_size = mmc->max_req_size;
 +	mmc->dsr_req = 0;
 +	return 0;
 +}
@@ -1985,11 +2021,23 @@
 +{
 +	int ret = hi3798mv100_ident_request(mrq);
 +
-+	if (ret)
++	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY)) {
++		struct mmc_card *card = host->slot ? host->slot->mmc->card : NULL;
++		bool user_area = card && mmc_card_mmc(card) &&
++			mmc_card_is_blockaddr(card) && card->csd.read_blkbits == 9 &&
++			!strcmp(card->cid.prod_name, "008G30") && card->ext_csd.rev == 8 &&
++			card->ext_csd.data_sector_size == 512 &&
++			!(card->ext_csd.part_config & EXT_CSD_PART_CONFIG_ACC_MASK);
++		u64 sectors = user_area ? card->ext_csd.sectors : 0;
++
++		ret = hi3798mv100_emmc_ro_request(mrq, user_area, sectors);
++	}
++
++	if (ret && mrq && mrq->cmd)
 +		dev_info_ratelimited(host->dev,
 +			"EMMC_IDENT_BLOCKED CMD%u arg=%08x error=%d\n",
 +			mrq->cmd->opcode, mrq->cmd->arg, ret);
-+	else if (mrq->cmd->opcode == MMC_SEND_OP_COND)
++	else if (!ret && mrq->cmd->opcode == MMC_SEND_OP_COND)
 +		dev_info_ratelimited(host->dev, "EMMC_IDENT_CMD1 arg=%08x\n",
 +				     mrq->cmd->arg);
 +	return ret;
@@ -2007,6 +2055,7 @@
 +	.validate_request = mv100_ident_validate,
 +	.switch_voltage = mv100_ident_voltage,
 +	.force_pio = true,
++	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY),
 +};
 +
 +static int mv100_ident_probe(struct platform_device *pdev)
@@ -2017,6 +2066,10 @@
 +	void __iomem *regs, *crg40;
 +	u32 value;
 +	int irq;
++
++	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram"))
++		return -ENODEV;
 +
 +	controller = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +	crg = platform_get_resource(pdev, IORESOURCE_MEM, 1);
@@ -2291,8 +2344,61 @@
 +MODULE_DESCRIPTION("TY1208Z restricted PIO SD identification diagnostic");
 +MODULE_LICENSE("GPL");
 --- /dev/null
++++ b/drivers/mmc/host/hi3798mv100-emmc-ro-policy.h
+@@ -0,0 +1,50 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef HI3798MV100_EMMC_RO_POLICY_H
++#define HI3798MV100_EMMC_RO_POLICY_H
++
++#include "hi3798mv100-ident-policy.h"
++
++/* Only the measured, sector-addressed user area. No CMD23, partition switch,
++ * boot/RPMB access, settings, writes or erase. Queue protection remains even
++ * if a userspace disk read-only flag is cleared.
++ */
++static inline int hi3798mv100_emmc_ro_request(struct mmc_request *mrq,
++					   bool user_area, u64 sectors)
++{
++	struct mmc_command *cmd;
++	struct mmc_data *data;
++	u32 read_flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
++	u32 stop_flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
++	int metadata;
++
++	if (!mrq)
++		return -EPERM;
++	cmd = mrq->cmd;
++	data = mrq->data;
++	metadata = hi3798mv100_ident_request(mrq);
++	if (cmd && cmd->opcode != MMC_READ_SINGLE_BLOCK &&
++	    cmd->opcode != MMC_READ_MULTIPLE_BLOCK &&
++	    cmd->opcode != MMC_STOP_TRANSMISSION &&
++	    (!metadata || metadata == -EBADMSG))
++		return metadata;
++	if (!cmd || !user_area || sectors != 15269888 || mrq->sbc ||
++	    cmd->data != data)
++		return -EPERM;
++	/* Mainline read recovery sends a non-busy STOP; no HPI argument. */
++	if (cmd->opcode == MMC_STOP_TRANSMISSION && !data && !mrq->stop)
++		return !cmd->arg && cmd->flags == stop_flags ? 0 : -EPERM;
++	if (!data || data->flags != MMC_DATA_READ || data->blksz != 512 ||
++	    !data->blocks || data->blocks > 8 || cmd->flags != read_flags ||
++	    cmd->arg >= sectors || data->blocks > sectors - cmd->arg)
++		return -EPERM;
++	if (data->blocks == 1)
++		return cmd->opcode == MMC_READ_SINGLE_BLOCK && !mrq->stop &&
++		       !data->stop ? 0 : -EPERM;
++	if (cmd->opcode != MMC_READ_MULTIPLE_BLOCK || !mrq->stop ||
++	    data->stop != mrq->stop || mrq->stop->opcode != MMC_STOP_TRANSMISSION ||
++	    mrq->stop->arg || mrq->stop->flags != stop_flags || mrq->stop->data)
++		return -EPERM;
++	return 0;
++}
++
++#endif
+--- /dev/null
 +++ b/drivers/mmc/host/hi3798mv100-ident-policy.h
-@@ -0,0 +1,59 @@
+@@ -0,0 +1,64 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
 +#ifndef HI3798MV100_IDENT_POLICY_H
 +#define HI3798MV100_IDENT_POLICY_H
@@ -2305,8 +2411,13 @@
 +/* Identification plus optional fixed read samples. No settings or data writes. */
 +static inline int hi3798mv100_ident_request(struct mmc_request *mrq)
 +{
-+	struct mmc_command *cmd = mrq->cmd;
-+	struct mmc_data *data = mrq->data;
++	struct mmc_command *cmd;
++	struct mmc_data *data;
++
++	if (!mrq)
++		return -EPERM;
++	cmd = mrq->cmd;
++	data = mrq->data;
 +
 +	if (!cmd || mrq->sbc || mrq->stop)
 +		return -EPERM;

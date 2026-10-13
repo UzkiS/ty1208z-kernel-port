@@ -32,6 +32,16 @@ healthy over SSH while host serial RX-zero is investigated before final
 return. No card/persistent writes occurred;
 [native SD report](verification/openwrt-sdro-board-20261014.md).
 Clean remote native SD CI, eMMC blocks/backups and Docker runtime remain pending.
+The eMMC user-area read-only groundwork now passes actual request/queue/slot
+and both block-core suppression paths under ASan/UBSan, real selected Kconfig
+and ARM object compilation. Original metadata/fixed-sample builds, QEMU and
+all seven native SD Kconfig cases also pass. It has no RAM boot image or
+filesystem/shutdown/restart acceptance, and the planner still denies this
+configuration; [offline report](verification/emmc-ro-offline-20261014.md).
+Fresh UART checks establish working host-to-board input but zero host RX
+despite board TX progress; the current native SD router and its 14 restored
+config hashes/Chinese authenticated UI remain healthy. TTL USB reconnection
+is pending; no additional box power cycle or reboot was sent.
 Downloaded clean diagnostic
 CI on f48bb5e passed 16 manifests/162 files and 15 uImage CRCs, including
 actual memory/SD/ARM-mount checks; [CI report](verification/ram768-ci-20261014.md).

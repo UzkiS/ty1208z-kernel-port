@@ -21,6 +21,8 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 它与 eMMC 的识别、读取候选分开验收，见 [SD/TF](sd.md)。
 `make emmc-audit` 和 `make emmc-ident` 使用各自内核输出目录；前者只读寄存器且
 关闭 MMC，后者通过受限 PIO 请求识别卡且关闭块设备。两者均不进入普通 diag1。
+`make emmc-ro-compile` 单独编译用户区只读块支持和实际请求/块核心回归；
+它不输出镜像，RAM 规划器仍拒绝这一配置，详见 [eMMC](emmc.md)。
 `make ethernet-audit` 另用独立配置/输出目录，只观察固定时钟/复位状态，并在
 继承状态符合条件时通过 MDIO 读取 PHY ID；关闭 NET、debugfs 和存储，不进入普通诊断。
 `make ethernet-clock-id` 单独验证暂时启用已实测的 MAC 时钟位、读取 PHY ID 并恢复；

@@ -280,17 +280,40 @@ changes.update({
         '\t  and ext4 superblock. No block interface or card-setting writes.\n\n'
         'config MMC_DW_HI3798MV100_IDENT\n'
         '\tbool "TY1208Z restricted eMMC identification diagnostic"\n'
-        '\tdepends on MMC_DW && ARCH_HI3798MV100 && !BLOCK\n'
+        '\tdepends on MMC_DW && ARCH_HI3798MV100\n'
+        '\tdepends on !BLOCK || HI3798MV100_EMMC_READ_ONLY\n'
         '\tselect MMC_DW_PLTFM\n'
         '\thelp\n'
         '\t  PIO, 1-bit, legacy identification only. Blocks card settings,\n'
         '\t  data writes, sector I/O and unknown card commands.\n\n'
+        'config HI3798MV100_EMMC_READ_ONLY\n'
+        '\tbool "TY1208Z enforced read-only eMMC user-area block experiment"\n'
+        '\tdepends on ARCH_HI3798MV100 && MMC_DW && MMC_BLOCK && BLOCK\n'
+        '\tdepends on !NET && !MODULES && !SMP && !USB_SUPPORT && !MTD\n'
+        '\tdepends on !DEBUG_FS && !PM\n'
+        '\thelp\n'
+        '\t  Dedicated user-area-only RAM experiment, not a production driver.\n'
+        '\t  Enforce queue write denial and suppress boot/RPMB devices.\n\n'
         'config MMC_DW_HI3798CV200\n'),
     "drivers/mmc/host/Makefile": (
         'obj-$(CONFIG_MMC_DW_HI3798CV200)',
         'obj-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += dw_mmc-hi3798mv100-ident.o\n'
         'obj-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += dw_mmc-hi3798mv100-sd-ident.o\n'
         'obj-$(CONFIG_MMC_DW_HI3798CV200)'),
+    "drivers/mmc/core/block.c": [
+        ('static int mmc_blk_alloc_parts(struct mmc_card *card, struct mmc_blk_data *md)\n'
+         '{\n'
+         '\tint idx, ret;\n',
+         'static int mmc_blk_alloc_parts(struct mmc_card *card, struct mmc_blk_data *md)\n'
+         '{\n'
+         '\tint idx, ret;\n\n'
+         '\t/* This independent RAM profile exposes only the measured user area. */\n'
+         '\tif (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))\n'
+         '\t\treturn 0;\n'),
+        ('\tmmc_blk_rpmb_add(card);\n',
+         '\tif (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))\n'
+         '\t\tmmc_blk_rpmb_add(card);\n'),
+    ],
     "drivers/mmc/host/dw_mmc.h": [
         (' * @init: early implementation specific initialization.\n',
          ' * @init: early implementation specific initialization.\n'

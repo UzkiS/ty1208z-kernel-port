@@ -19,6 +19,7 @@ help:
 	@echo 'make sd-ro - build enforced read-only SD block/filesystem RAM candidate'
 	@echo 'make emmc-ident - build a separate restricted PIO eMMC identification image'
 	@echo 'make emmc-read - build fixed four-sector read-only samples (no block device)'
+	@echo 'make emmc-ro-compile - compile isolated user-area RO blocks; no boot image'
 	@echo 'make ethernet-audit - inspect inherited clocks/PHY IDs without network or reset writes'
 	@echo 'make ethernet-clock-id - temporarily enable the measured MAC clock bit, read PHY ID, restore'
 	@echo 'make ethernet-net - build inherited-PHY Ethernet RAM candidate (storage disabled)'
@@ -119,6 +120,10 @@ emmc-ident:
 
 emmc-read:
 	bash tools/build-emmc-ident.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" read
+
+.PHONY: emmc-ro-compile
+emmc-ro-compile:
+	bash tools/build-emmc-ro-compile.sh $(if $(TASKBASE),"$(TASKBASE)")
 
 ethernet-audit:
 	bash tools/build-ethernet-audit.sh $(if $(TASKBASE),"$(TASKBASE)")

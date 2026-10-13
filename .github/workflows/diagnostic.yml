@@ -90,6 +90,10 @@ jobs:
         run: |
           make emmc-read > logs/emmc-read.log 2>&1 || { tail -n 100 logs/emmc-read.log; exit 1; }
           tail -n 20 logs/emmc-read.log
+      - name: Compile isolated read-only eMMC ARM objects and run actual request/block-core checks
+        run: |
+          make emmc-ro-compile > logs/emmc-ro-compile.log 2>&1 || { tail -n 100 logs/emmc-ro-compile.log; exit 1; }
+          tail -n 25 logs/emmc-ro-compile.log
       - name: Build independent bounded 768-MiB memory candidate and check allocation/reset/probe/RAM gates
         run: |
           make ram768 > logs/ram768.log 2>&1 || { tail -n 100 logs/ram768.log; exit 1; }
@@ -144,6 +148,7 @@ jobs:
             artifacts/sd-ro1/
             artifacts/emmc-ident1/
             artifacts/emmc-read1/
+            artifacts/emmc-ro-compile/
             artifacts/ethernet-audit1/
             artifacts/ethernet-clock-id1/
             artifacts/ethernet-net1/

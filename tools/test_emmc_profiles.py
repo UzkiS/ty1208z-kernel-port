@@ -33,7 +33,7 @@ class ProfileTests(unittest.TestCase):
 
     def test_unreviewed_subsystems_are_rejected(self):
         for option in ("MMC_BLOCK", "MMC_TEST", "MMC_DW_HI3798CV200", "BLOCK", "DEBUG_FS",
-                       "PWRSEQ_EMMC", "NET", "MODULES"):
+                       "PWRSEQ_EMMC", "NET", "MODULES", "HI3798MV100_EMMC_READ_ONLY"):
             with self.subTest(option=option), self.assertRaises(ValueError):
                 identification_profile(self.tree, self.config + f"CONFIG_{option}=y\n")
 
@@ -61,6 +61,8 @@ class ProfileTests(unittest.TestCase):
         self.assertFalse(identification_profile(tree, config))
         with self.assertRaises(ValueError):
             identification_profile(self.tree, config)
+        with self.assertRaises(ValueError):
+            identification_profile(tree, config + 'CONFIG_HI3798MV100_EMMC_READ_ONLY=y\n')
 
 
 if __name__ == "__main__":

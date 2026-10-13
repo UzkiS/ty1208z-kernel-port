@@ -10,8 +10,13 @@
 /* Identification plus optional fixed read samples. No settings or data writes. */
 static inline int hi3798mv100_ident_request(struct mmc_request *mrq)
 {
-	struct mmc_command *cmd = mrq->cmd;
-	struct mmc_data *data = mrq->data;
+	struct mmc_command *cmd;
+	struct mmc_data *data;
+
+	if (!mrq)
+		return -EPERM;
+	cmd = mrq->cmd;
+	data = mrq->data;
 
 	if (!cmd || mrq->sbc || mrq->stop)
 		return -EPERM;

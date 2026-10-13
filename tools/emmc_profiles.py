@@ -6,6 +6,8 @@ def identification_profile(tree, config):
     nodes = [node for node in tree["nodes"] if node["path"] == "/soc/mmc@f9830000"]
     enabled = "CONFIG_MMC_DW_HI3798MV100_IDENT=y\n" in config
     samples = "CONFIG_HI3798MV100_EMMC_READ_SAMPLES=y\n" in config
+    if "CONFIG_HI3798MV100_EMMC_READ_ONLY=y\n" in config:
+        raise ValueError("eMMC block experiment has no accepted RAM boot profile yet")
     if not enabled:
         if nodes or samples:
             raise ValueError("Identification node outside its explicit profile")
