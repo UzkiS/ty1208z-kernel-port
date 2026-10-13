@@ -39,3 +39,16 @@ the original shell-inspection stream has SHA-256
 `cb25294877e4a444a600e41a2a998baaaadc141a2a78562fb4f8a532553d61c0`.
 Raw logs remain in ignored local evidence. No flash or persistent boot change
 was performed.
+
+Complete diagnostic CI subsequently passed on `1ac00af`,
+[run 38351038836](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38351038836).
+The downloaded artifact's eleven manifests and all 109 listed payload files
+were verified by size/SHA-256; all ten kernel profiles also pass independent
+uImage header/data CRC, load/entry and appended-zImage/DTB checks. The actual
+Ethernet log contains `ETHERNET_PROBE_GUARDS_PASS`, `ETHERNET_NET_HELPERS_PASS`
+and `FEMAC_DATAPATH_PASS`; its SHA-256 is
+`35d329eb518fdc3e30e6381c98db9806aadb58d83f782f2d7683a54bae50456f`.
+The eight Wi-Fi sanitizer markers and read-only USB marker were also verified,
+and both downloaded RDA patches match that exact Git commit. Native-router
+application CI and the later TX-accounting correction are separate; this
+diagnostic run does not establish physical traffic or application acceptance.

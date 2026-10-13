@@ -33,4 +33,26 @@ matches the changed source.
 Guest-script SHA-256:
 `88553a54ed7c7ef61d7f224b96745820b963c3a64102af3561666439532f4b18`.
 These are local runtime reruns using existing native images, not fresh
-application rebuilds or physical-board acceptance. Fresh CI is pending.
+application rebuilds or physical-board acceptance.
+
+Fresh native application CI subsequently passed on `6b53448`,
+[run 38342674311](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38342674311).
+Both plain and router jobs rebuilt their native images and completed both
+memory budgets. All four downloaded artifacts were independently inspected:
+each RAM manifest's six payload files match their sizes/hashes, uImage header
+and data CRCs pass, initrd size/address match, and all four actual console
+files match their provenance hashes and required acceptance markers. The
+fixture-source hashes were compared with that exact Git commit, including the
+same bounded DNS-handover script above; downloaded NTP binaries also match.
+
+| CI variant | Usable MiB | Console SHA-256 |
+|---|---:|---|
+| Applications | 512 | `e7eeb8bd0bd246824f59579f23a408700da0d5167231f565819abdc04543324c` |
+| Applications | 240 | `e287cb1f6853982899d4ab5b5dfefe09b2bf17c4fa4d409c9e3938385a000e20` |
+| Router | 512 | `241f884bf9a82f654ff0a1dd4d4d6ba1904eb250bf46cf019ed7e845e547253e` |
+| Router | 240 | `8331f11c146c4faf8edff8b3100700010c56a90fca2921425b38793e31879f2e` |
+
+This establishes fresh CI acceptance of the fixture correction. That commit
+predates the later physical-router probe, pre-NTP Xray and DHCP-DNS-default
+corrections; this run does not validate those newer changes or physical
+Ethernet routing.

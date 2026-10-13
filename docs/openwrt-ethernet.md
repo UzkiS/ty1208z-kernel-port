@@ -60,3 +60,7 @@ The separate native `net` image has now passed physical RAM startup, DHCP,
 bidirectional TCP and cable down/up recovery; see the [board report](../verification/openwrt-ethernet-board-20261013.md).
 That report also distinguishes measured host WSL clock drift and the driver's
 busy-queue counter semantics from hardware drops and router performance.
+The two BUSY branches now preserve drop/FIFO statistics, with actual-function
+ownership/retry/DMA regression and rebuilt Ethernet/router acceptance recorded
+in the [TX report](../verification/femac-xmit-20261013.md). The corrected
+kernel's physical traffic result remains pending.

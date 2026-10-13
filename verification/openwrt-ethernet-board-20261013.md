@@ -1,5 +1,10 @@
 # Native OpenWrt Ethernet physical RAM experiment
 
+Later source correction and fresh offline TX ownership/retry checks are
+recorded in the [TX report](femac-xmit-20261013.md). This physical report retains
+the original image's measured counters; the new kernel's traffic acceptance
+is separate.
+
 Date: 2026-10-13. The existing CA fastboot loaded the separate native `net`
 image by YMODEM. Device CRC32 matched before `bootm`. This boot and all test
 files used RAM; no flash, persistent boot or security-state writes occurred.

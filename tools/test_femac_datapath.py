@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
-"""Run the actual patched RX/NAPI/ISR functions with FIFO and skb seams."""
+"""Run the actual patched RX/TX/NAPI/ISR functions with FIFO and skb seams."""
 import argparse
 from pathlib import Path
 import subprocess
 import tempfile
+
+from test_femac_xmit import run as run_xmit
 
 ROOT = Path(__file__).resolve().parents[1]
 PRELUDE = r"""
@@ -241,6 +243,7 @@ def run(linux):
                         "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
                         str(cfile), "-o", str(binary)], check=True)
         subprocess.run([binary], check=True, timeout=10)
+    run_xmit(linux)
 
 
 if __name__ == "__main__":

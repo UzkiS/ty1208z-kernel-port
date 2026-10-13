@@ -8,6 +8,8 @@ on:
       - 'overlay/**'
       - 'patches/0001-*'
       - 'tools/*openwrt*'
+      - 'tools/femac_patch.py'
+      - 'tools/test_femac*.py'
       - 'tools/time64-probe.c'
       - 'tools/inspect_kernel_layout.py'
       - 'tools/inspect_images.py'
@@ -18,6 +20,8 @@ on:
       - 'overlay/**'
       - 'patches/0001-*'
       - 'tools/*openwrt*'
+      - 'tools/femac_patch.py'
+      - 'tools/test_femac*.py'
       - '.github/workflows/openwrt.yml'
   workflow_dispatch:
 

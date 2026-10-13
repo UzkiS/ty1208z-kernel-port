@@ -530,27 +530,32 @@
  	hisi_femac_free_skb_rings(priv);
  
  	return 0;
-@@ -507,7 +559,8 @@
+@@ -507,18 +559,18 @@
  	val = readl(priv->port_base + ADDRQ_STAT);
  	val &= BIT_TX_READY;
  	if (!val) {
 -		hisi_femac_irq_enable(priv, IRQ_INT_TX_PER_PACKET);
+-		dev->stats.tx_dropped++;
+-		dev->stats.tx_fifo_errors++;
 +		hisi_femac_irq_enable(priv, priv->mv100_inherited ?
 +				      IRQ_INT_TX_FIFO_EMPTY : IRQ_INT_TX_PER_PACKET);
- 		dev->stats.tx_dropped++;
- 		dev->stats.tx_fifo_errors++;
++		/* The stack retains this skb for retry. */
  		netif_stop_queue(dev);
-@@ -516,7 +569,8 @@
+ 		return NETDEV_TX_BUSY;
+ 	}
  
  	if (unlikely(!CIRC_SPACE(txq->head, txq->tail,
  				 txq->num))) {
 -		hisi_femac_irq_enable(priv, IRQ_INT_TX_PER_PACKET);
+-		dev->stats.tx_dropped++;
+-		dev->stats.tx_fifo_errors++;
 +		hisi_femac_irq_enable(priv, priv->mv100_inherited ?
 +				      IRQ_INT_TX_FIFO_EMPTY : IRQ_INT_TX_PER_PACKET);
- 		dev->stats.tx_dropped++;
- 		dev->stats.tx_fifo_errors++;
++		/* The stack retains this skb for retry. */
  		netif_stop_queue(dev);
-@@ -757,12 +811,62 @@
+ 		return NETDEV_TX_BUSY;
+ 	}
+@@ -757,12 +809,62 @@
  	val |= MAX_FRAME_SIZE;
  	writel(val, priv->port_base + MAC_SET);
  
@@ -616,7 +621,7 @@
  }
  
  static int hisi_femac_drv_probe(struct platform_device *pdev)
-@@ -784,6 +888,19 @@
+@@ -784,6 +886,19 @@
  	priv = netdev_priv(ndev);
  	priv->dev = dev;
  	priv->ndev = ndev;
@@ -636,7 +641,7 @@
  
  	priv->port_base = devm_platform_ioremap_resource(pdev, 0);
  	if (IS_ERR(priv->port_base)) {
-@@ -810,12 +927,19 @@
+@@ -810,12 +925,19 @@
  		goto out_free_netdev;
  	}
  
@@ -662,7 +667,7 @@
  
  	priv->phy_rst = devm_reset_control_get(dev, "phy");
  	if (IS_ERR(priv->phy_rst)) {
-@@ -945,6 +1069,7 @@
+@@ -945,6 +1067,7 @@
  #endif
  
  static const struct of_device_id hisi_femac_match[] = {

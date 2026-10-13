@@ -1,5 +1,10 @@
 """Checked adaptations to the pinned upstream FEMAC for inherited MV100 PHY."""
 
+BUSY_COUNTERS = ('\t\tdev->stats.tx_dropped++;\n'
+                 '\t\tdev->stats.tx_fifo_errors++;\n'
+                 '\t\tnetif_stop_queue(dev);\n'
+                 '\t\treturn NETDEV_TX_BUSY;\n')
+
 
 def replacements():
     return [
@@ -70,6 +75,12 @@ def replacements():
         ('hisi_femac_irq_enable(priv, IRQ_INT_TX_PER_PACKET);',
          'hisi_femac_irq_enable(priv, priv->mv100_inherited ?\n'
          '\t\t\t\t      IRQ_INT_TX_FIFO_EMPTY : IRQ_INT_TX_PER_PACKET);'),
+        # NETDEV_TX_BUSY leaves skb ownership with the stack. Retried packets
+        # are not drops; retain the real drop accounting on DMA mapping failure.
+        (BUSY_COUNTERS,
+         '\t\t/* The stack retains this skb for retry. */\n'
+         '\t\tnetif_stop_queue(dev);\n'
+         '\t\treturn NETDEV_TX_BUSY;\n'),
         ('\tval = RX_COALESCED_TIMER |\n'
          '\t\t(RX_COALESCED_FRAMES << RX_COALESCED_FRAME_OFFSET);\n'
          '\twritel(val, priv->port_base + RX_COALESCE_SET);\n',
@@ -108,10 +119,11 @@ def replacements():
     ]
 
 
-# Two upstream statements intentionally occur twice (ISR/poll and queue full).
+# These anchors intentionally occur twice (ISR/poll and both queue-full paths).
 REPEATED_ANCHORS = {
     "writel(ints & DEF_INT_MASK,": 2,
     "hisi_femac_irq_enable(priv, IRQ_INT_TX_PER_PACKET);": 2,
+    BUSY_COUNTERS: 2,
 }
 
 TX_MONITOR = '''/* The SDK uses a periodic monitor to reclaim transmit buffers.
