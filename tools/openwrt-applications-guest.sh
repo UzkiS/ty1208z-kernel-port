@@ -96,17 +96,26 @@ echo CERTIFICATE_TIME64_PASS
 
 # Use the installed dnsmasq implementation without external DNS or a WAN.
 /etc/init.d/dnsmasq stop
+attempts=0
+until ! pidof dnsmasq > /dev/null; do
+    attempts=$((attempts+1))
+    [ "$attempts" -lt 10 ] || exit 1
+    sleep 1
+done
 dnsmasq --keep-in-foreground --conf-file=/dev/null --no-resolv --no-hosts \
     --listen-address=127.0.0.1 --bind-interfaces --address=/time64.test/127.0.0.1 \
     --local=/time64.test/ \
     --pid-file=/tmp/time64-test/dnsmasq.pid > dnsmasq.log 2>&1 &
+dns_fixture_pid=$!
 printf 'nameserver 127.0.0.1\n' > /tmp/resolv.conf
 attempts=0
 until resolveip -4 -t 2 time64.test > dns.txt 2>/dev/null; do
+    kill -0 "$dns_fixture_pid" || exit 1
     attempts=$((attempts+1))
     [ "$attempts" -lt 20 ] || exit 1
     sleep 1
 done
+kill -0 "$dns_fixture_pid"
 grep -qx 127.0.0.1 dns.txt
 echo DNS_TIME64_PASS
 echo '=== resolver immediately before TLS ==='
