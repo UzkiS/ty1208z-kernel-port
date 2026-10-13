@@ -18,11 +18,18 @@ The sing-box recipe comes from the pinned Passwall packages feed, explicitly
 overriding the packages feed's alternative recipe. InfoZIP unzip 6.0-r9 comes
 from the official packages feed. Other proxy engines and geodata are disabled.
 The RAM candidate disables embedded Tailscale, ACME certificate issuance and
-the gVisor userspace network stack to fit the 36-MiB compressed/96-MiB
-uncompressed archive limits. QUIC, uTLS, WireGuard and Clash API retain their
-recipe defaults; the requested Passwall proxy cores remain enabled. The
+gVisor to fit the 32-MiB compressed/96-MiB uncompressed archive limits.
+QUIC, uTLS, WireGuard and Clash API retain their recipe defaults;
+the requested Passwall proxy cores remain enabled. The
 full-defaults binary is independently buildable, but its initial
 rootfs exceeds this RAM profile's limits; do not relax those gates to boot it.
+
+The application image recipe uses the pinned upstream libdeflate 1.25 host
+tool with level 12, sorted reproducible newc and no gzip timestamp. It reduces
+the same rootfs enough for the existing TFTP bound without removing QUIC,
+uTLS, WireGuard or Clash API. The checker verifies the compressor recipe and
+actual source archive, and compares decompressed output with the generated
+cpio before QEMU validates the exact final archive.
 
 New application/router builds include the Simplified Chinese LuCI, firewall
 and Passwall translations. A first-boot UCI default selects `zh_cn`; browser
@@ -127,12 +134,14 @@ The application archive is too large to embed while keeping the kernel's
 decompressed image/BSS below the low-16-MiB boundary. `make_openwrt_apps_ram.py`
 keeps the accepted raw kernel and its matching rootfs/modules unchanged and
 adds an explicit chosen initrd range to a standalone board DTB. The archive
-starts at `0x04000000`; its maximum compressed budget of 36 MiB ends below the
+starts at `0x04000000`; its maximum compressed budget of 32 MiB ends below the
 unexplained bootloader Bound Addr `0x08e62000`. This conservative placement does
 not resolve the full memory map or establish a hardware boot.
-The compressed cap increased from 32 MiB only after the selected dual-core
-rootfs passed both 512/240-MiB QEMU budgets. Its maximum end is `0x06400000`,
-clear of the observed Bound Addr `0x08e62000`; the 96-MiB expansion cap remains.
+An interim 36-MiB offline cap had passed memory-layout/QEMU checks, but the
+actual immutable TFTP transport correctly rejected its oversized snapshot
+before device access because the current protocol forbids block-number
+rollover. The cap is restored to 32 MiB; RAM fit alone is insufficient to
+approve a transfer. The 96-MiB expansion cap also remains.
 
 The wrapper verifies the actual 240-MiB QEMU provenance, archive bounds,
 critical board source identities, kernel layout and explicit peripheral-free

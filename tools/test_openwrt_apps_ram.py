@@ -25,6 +25,7 @@ from openwrt_apps_ram_profile import (
 )
 from prepare_ram_boot import prepare
 from ram_boot_cli import load_image
+from tftp_readonly import ReadOnlyTftp
 from ymodem_sender import TransferError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -57,6 +58,10 @@ class ApplicationProfileTests(unittest.TestCase):
         self.assertEqual(plan["additional_loads"][0]["bytes"], len(data))
         self.assertEqual(plan["additional_loads"][0]["image_crc32"], f"{zlib.crc32(data):08x}")
         self.assertLess(INITRD_ADDRESS + MAX_COMPRESSED, BOOTLOADER_BOUND_ADDRESS)
+        self.assertLess(MAX_COMPRESSED, 512 * 65535)
+        # Constructor gates the actual immutable archive before any socket is
+        # opened; passing the RAM budget must also pass the delivery protocol.
+        ReadOnlyTftp("127.0.0.1", "127.0.0.1", [("ty1208z-initrd.bin", data)], port=0)
         self.assertGreater(INITRD_ADDRESS, plan["header_address"] + plan["image_bytes"] + 0x100000)
 
     def test_initrd_and_resource_mutations_are_rejected(self):

@@ -43,6 +43,16 @@
     }
   ],
   "base_source_lock": "../sources.lock.json",
+  "initrd_compression": {
+    "tool": "libdeflate-gzip",
+    "version": "1.25",
+    "recipe": "tools/libdeflate/Makefile",
+    "recipe_sha256": "9c51c38b23f251b56276ced93a90131a4f0056deb0a42f619befa2e858d28ddf",
+    "archive": "libdeflate-1.25.tar.gz",
+    "archive_sha256": "fed5cd22f00f30cc4c2e5329f94e2b8a901df9fa45ee255cb70e2b0b42344477",
+    "gzip_level": 12,
+    "cpio": "sorted reproducible newc, uid/gid 0"
+  },
   "scope": "Application build feeds; hardware and full application behavior unverified",
   "recipe_patches": [
     {

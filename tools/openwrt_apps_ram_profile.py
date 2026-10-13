@@ -11,10 +11,10 @@ from ethernet_net_profile import NETWORK_NODES, openwrt_router_ethernet_profile
 # Bound Addr (0x08e62000), clear of the measured kernel load/workspace.
 INITRD_ADDRESS = 0x04000000
 BOOTLOADER_BOUND_ADDRESS = 0x08E62000
-# The dual-core rootfs passes both 512/240-MiB QEMU budgets. 36 MiB ends at
-# 0x06400000, still well below the observed 0x08e62000 bootloader bound.
-# Retain the 96-MiB expansion cap and exact-image bounded-memory acceptance.
-MAX_COMPRESSED = 36 * 1024 * 1024
+# Keep the original bound, including the transfer path's 16-bit TFTP block
+# numbers with a minimum 512-byte block. Larger archives require an explicitly
+# reviewed transfer protocol, even when the RAM placement itself would fit.
+MAX_COMPRESSED = min(32 * 1024 * 1024, 512 * 65535 - 1)
 MAX_UNCOMPRESSED = 96 * 1024 * 1024
 COMPATIBLE = "tianyi,ty1208z-ca-openwrt-apps-ram"
 ROUTER_COMPATIBLE = "tianyi,ty1208z-ca-openwrt-router-ram"

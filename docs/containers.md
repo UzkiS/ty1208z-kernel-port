@@ -15,6 +15,22 @@ cgroups/resource limits, namespaces, overlayfs, veth/bridge and netfilter.
 Keep container bring-up separate from the existing diagnostic/router RAM
 profiles until their measured memory and storage boundaries are satisfied.
 Compiling Docker packages alone does not establish working container support.
+The separate `make openwrt-container-packages TASKBASE=/absolute/linux/build-root`
+entry now builds the official pinned Docker/dockerd 29.6.1, containerd 2.2.5,
+runc 1.3.6 and tini 0.19.0 recipes under `TASKBASE/container-packages/`.
+`openwrt/containers/sources.lock.json` pins the five recipe/source identities
+against the same official packages feed. `make openwrt-container-config` only
+resolves and checks their selection.
+
+These packages are selected as `m`, separate from the application rootfs.
+Their dependency kernel enables block support for upstream Btrfs dependencies,
+namespaces, cgroups and seccomp, while MMC, MTD, USB, board Ethernet and SMP
+stay excluded. The entry produces no rootfs/board image and refuses use by
+the application QEMU or RAM packager. On successful compilation, the checker
+extracts real APKs, checks ARM EABI5, verifies source/recipe hashes and runs only
+`--version` through qemu-arm. It exports packages and provenance as compile-only
+artifacts; no daemon or container is started by that check.
+
 First acceptance should run one small `linux/arm/v7` container, exercise DNS
 and outbound/forwarded networking with fw4/Passwall, verify memory/CPU limits
 and clean shutdown/restart. Confirm image architecture before download;

@@ -23,6 +23,8 @@ def unique(paths, description):
 
 
 def test(source, memory_mib=512):
+    if (source / ".ty1208z-container-compile-only.json").exists():
+        raise ValueError("Compile-only container packages have no application rootfs acceptance")
     ethernet = application_variant(source) == "ethernet"
     if memory_mib not in (256, 512):
         raise ValueError("Application memory experiment must be 256 or 512 MiB")

@@ -97,10 +97,13 @@ def merge_kernel_fragment(original, extra):
     return "\n".join(kept) + "\n" + extra
 
 
-def prepare_applications(project, taskbase, ethernet=False):
+def prepare_applications(project, taskbase, ethernet=False, container_packages=False):
+    if ethernet and container_packages:
+        raise ValueError("Container package compilation must remain separate from router RAM builds")
     toolchain, identity = toolchain_from_native(project, taskbase)
     feeds_config, lock = pinned_feeds(project, taskbase)
-    appbase = taskbase / ("router" if ethernet else "applications")
+    appbase = taskbase / ("container-packages" if container_packages else
+                          "router" if ethernet else "applications")
     appbase.mkdir(parents=True, exist_ok=True)
     downloads = appbase / "downloads"
     if not downloads.exists():
@@ -131,6 +134,13 @@ def prepare_applications(project, taskbase, ethernet=False):
         shutil.copyfile(project / "openwrt/router/overlay" / relative, source / relative)
         manifest[relative] = sha256(source / relative)
 
+    if container_packages:
+        relative = "target/linux/hi3798mv100/apps/config-6.12"
+        path = source / relative
+        path.write_text(merge_kernel_fragment(
+            path.read_text(), (project / "openwrt/containers/kernel.config").read_text()))
+        manifest[relative] = sha256(path)
+
     relative = Path("target/linux/hi3798mv100/Makefile")
     makefile = source / relative
     content = makefile.read_text()
@@ -158,7 +168,8 @@ def prepare_applications(project, taskbase, ethernet=False):
     (source / ".ty1208z-application-variant.json").write_text(json.dumps(
         {"schema": 1, "variant": "ethernet" if ethernet else "qemu"}, indent=2) + "\n")
     config = (project / "openwrt/config/ram.config").read_text()
-    config += (project / "openwrt/applications/config").read_text()
+    config += (project / ("openwrt/containers/config" if container_packages else
+                         "openwrt/applications/config")).read_text()
     if ethernet:
         config += (project / "openwrt/router/config").read_text()
     config += (
@@ -170,6 +181,11 @@ def prepare_applications(project, taskbase, ethernet=False):
         "CONFIG_EXTERNAL_TOOLCHAIN_LIBC_USE_MUSL=y\n")
     (source / ".config").write_text(config)
     (source / ".ty1208z-application.config").write_text(config)
+    if container_packages:
+        (source / ".ty1208z-container-compile-only.json").write_text(json.dumps({
+            "schema": 1, "scope": "native Docker packages only; no rootfs/boot/runtime acceptance",
+            "config_sha256": sha256(project / "openwrt/containers/config"),
+        }, indent=2) + "\n")
     print(source)
     return source
 
@@ -178,8 +194,10 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--taskbase", type=Path, required=True)
     parser.add_argument("--ethernet", action="store_true", help="Use separate router build with measured Ethernet support")
+    parser.add_argument("--container-packages", action="store_true", help="Separate compile-only Docker packages")
     args = parser.parse_args()
-    prepare_applications(Path(__file__).resolve().parents[1], args.taskbase.resolve(), args.ethernet)
+    prepare_applications(Path(__file__).resolve().parents[1], args.taskbase.resolve(),
+                         args.ethernet, args.container_packages)
 
 
 if __name__ == "__main__":

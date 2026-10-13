@@ -24,6 +24,8 @@ def unique(paths, label):
 
 
 def make(source, output):
+    if (source / ".ty1208z-container-compile-only.json").exists():
+        raise ValueError("Compile-only container packages must not become a board RAM image")
     check(source, built=True)
     ethernet = application_variant(source) == "ethernet"
     layer = "router" if ethernet else "applications"

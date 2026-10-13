@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Check selected native applications without claiming any board acceptance."""
 import argparse
+import gzip
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -39,6 +41,9 @@ def check(source, built=False):
         if sha256(source / relative) != expected:
             raise ValueError(f"Changed application input: {relative}")
     lock = json.loads((source / ".ty1208z-application-lock.json").read_text())
+    compression = lock["initrd_compression"]
+    if sha256(source / compression["recipe"]) != compression["recipe_sha256"]:
+        raise ValueError("Application initrd compressor recipe identity differs")
     for item in lock["feeds"]:
         feed = source / "feeds" / item["name"]
         if json.loads((feed / ".ty1208z-feed.json").read_text()) != item:
@@ -52,6 +57,16 @@ def check(source, built=False):
                 sha256(feed / item["path"]) != item["sha256"]):
             raise ValueError(f"Application source patch identity differs: {item['path']}")
     if built:
+        if sha256(source / "dl" / compression["archive"]) != compression["archive_sha256"]:
+            raise ValueError("Actual application initrd compressor source differs")
+        compressed = list((source / "bin/targets/hi3798mv100/apps").glob("*rootfs.cpio.gz"))
+        raw_archives = list((source / "build_dir").glob("target-*/linux-hi3798mv100_apps/ty1208z-rootfs.cpio"))
+        if len(compressed) != 1 or len(raw_archives) != 1:
+            raise ValueError("Expected one actual compressed/raw application initrd")
+        unpacked = gzip.decompress(compressed[0].read_bytes())
+        if (len(unpacked) != raw_archives[0].stat().st_size or
+                hashlib.sha256(unpacked).hexdigest() != sha256(raw_archives[0])):
+            raise ValueError("Compressed application initrd differs from the actual generated cpio")
         for item in lock.get("source_patches", []):
             patched = list((source / "build_dir").glob(f"target-*/{item['source_root']}/{item['source_file']}"))
             if len(patched) != 1 or sha256(patched[0]) != item["patched_sha256"]:
