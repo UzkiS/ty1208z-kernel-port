@@ -26,7 +26,7 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,14 @@
+@@ -1,4 +1,15 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
@@ -35,6 +35,7 @@
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb
 +dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb
++dtb-$(CONFIG_HI3798MV100_USB_CLOCK_AUDIT) += hi3798mv100-ty1208z-usb-clock-audit.dtb
 +dtb-$(CONFIG_POWER_RESET_TY1208Z_SP805) += hi3798mv100-ty1208z-restart.dtb
 +dtb-$(CONFIG_TY1208Z_ETHERNET_INHERITED) += hi3798mv100-ty1208z-ethernet-net.dtb
 +dtb-$(CONFIG_TY1208Z_USB_HOST0_EXPERIMENT) += hi3798mv100-ty1208z-usb-host.dtb
@@ -43,7 +44,7 @@
  dtb-$(CONFIG_ARCH_HIP01) += \
 --- a/drivers/soc/hisilicon/Kconfig
 +++ b/drivers/soc/hisilicon/Kconfig
-@@ -2,6 +2,37 @@
+@@ -2,6 +2,47 @@
  
  menu "Hisilicon SoC drivers"
  	depends on ARCH_HISI || COMPILE_TEST
@@ -78,17 +79,28 @@
 +	  Observe host0 clock/PHY controls and SYSID0 only. Read fixed
 +	  EHCI/OHCI capability words only when inherited controls permit.
 +	  No clock/reset writes, USB transactions or firmware loading.
++
++config HI3798MV100_USB_CLOCK_AUDIT
++	bool "TY1208Z guarded USB host0 clock/capability experiment"
++	depends on ARCH_HI3798MV100 && !USB_SUPPORT && !BLOCK && !NET
++	depends on !MMC && !MODULES && !SMP && !DEBUG_FS
++	depends on !HI3798MV100_USB_AUDIT
++	help
++	  Require the exact measured inactive state, run fixed host0
++	  clock/PHY initialization, read capabilities, then stop. No HCD,
++	  operational register, DMA, endpoint or firmware access.
  
  config KUNPENG_HCCS
  	tristate "HCCS driver on Kunpeng SoC"
 --- a/drivers/soc/hisilicon/Makefile
 +++ b/drivers/soc/hisilicon/Makefile
-@@ -1,2 +1,6 @@
+@@ -1,2 +1,7 @@
  # SPDX-License-Identifier: GPL-2.0-only
 +obj-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-emmc-audit.o
 +obj-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ethernet-audit.o
 +obj-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ethernet-clock-id.o
 +obj-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-usb-audit.o
++obj-$(CONFIG_HI3798MV100_USB_CLOCK_AUDIT) += hi3798mv100-usb-clock-audit.o
  obj-$(CONFIG_KUNPENG_HCCS)	+= kunpeng_hccs.o
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
@@ -924,6 +936,25 @@
 +&{/soc} {
 +	usb-audit@f9890000 {
 +		compatible = "tianyi,ty1208z-usb-register-audit";
++		reg = <0xf8a220b8 4>, <0xf8a220bc 4>,
++		      <0xf8a20120 4>, <0xf8a20124 4>, <0xf8000ee0 4>,
++		      <0xf9890000 0x10000>, <0xf9880000 0x10000>;
++	};
++};
+--- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-usb-clock-audit.dts
+@@ -0,0 +1,16 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-diagnostic.dts"
++
++/ {
++	compatible = "tianyi,ty1208z-ca-usb-clock-audit", "hi3798mv100-series";
++	model = "TY1208Z CA guarded USB host0 clock/capability experiment";
++};
++
++&{/soc} {
++	usb-clock-audit@f9890000 {
++		compatible = "tianyi,ty1208z-usb-clock-capability-audit";
 +		reg = <0xf8a220b8 4>, <0xf8a220bc 4>,
 +		      <0xf8a20120 4>, <0xf8a20124 4>, <0xf8000ee0 4>,
 +		      <0xf9890000 0x10000>, <0xf9880000 0x10000>;
@@ -2415,6 +2446,82 @@
 +builtin_platform_driver(hi3798mv100_usb_audit_driver);
 +MODULE_LICENSE("GPL");
 --- /dev/null
++++ b/drivers/soc/hisilicon/hi3798mv100-usb-clock-audit.c
+@@ -0,0 +1,73 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* One-shot guarded host0 clock/PHY initialization and capability observation. */
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#include "ty1208z-usb-clock-audit.h"
++
++static int hi3798mv100_usb_clock_audit_probe(struct platform_device *pdev)
++{
++	static const struct {
++		resource_size_t address, size;
++	} resources[] = {
++		{ 0xf8a220b8, 4 }, { 0xf8a220bc, 4 },
++		{ 0xf8a20120, 4 }, { 0xf8a20124, 4 }, { 0xf8000ee0, 4 },
++		{ 0xf9890000, 0x10000 }, { 0xf9880000, 0x10000 },
++	};
++	struct device *dev = &pdev->dev;
++	void __iomem *mapped[ARRAY_SIZE(resources)];
++	struct ty1208z_usb_clock_result result;
++	struct resource *res;
++	unsigned int i;
++	int ret;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-usb-clock-audit"))
++		return -ENODEV;
++	for (i = 0; i < ARRAY_SIZE(resources); i++) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++		if (!res || res->start != resources[i].address ||
++		    resource_size(res) != resources[i].size)
++			return -EINVAL;
++	}
++	if (platform_get_resource(pdev, IORESOURCE_MEM, ARRAY_SIZE(resources)))
++		return -EINVAL;
++	for (i = 0; i < ARRAY_SIZE(resources); i++) {
++		mapped[i] = devm_platform_ioremap_resource(pdev, i);
++		if (IS_ERR(mapped[i]))
++			return PTR_ERR(mapped[i]);
++	}
++	ret = ty1208z_usb_clock_audit(mapped, mapped[5], mapped[6], &result);
++	dev_info(dev, "USB_CLOCK_AUDIT_BEFORE CRG46=%08x CRG47=%08x USB0=%08x USB1=%08x SYSID0=%08x changed=%u\n",
++		 result.before.crg46, result.before.crg47, result.before.usb0,
++		 result.before.usb1, result.before.sysid0, result.changed);
++	if (result.enabled.controller_read)
++		dev_info(dev, "USB_CLOCK_AUDIT_CAPS EHCI_CAPBASE=%08x HCSPARAMS=%08x HCCPARAMS=%08x OHCI_REVISION=%08x\n",
++			 result.enabled.ehci_capbase, result.enabled.ehci_hcsparams,
++			 result.enabled.ehci_hccparams, result.enabled.ohci_revision);
++	dev_info(dev, "USB_CLOCK_AUDIT_STOP CRG46=%08x CRG47=%08x USB0=%08x USB1=%08x error=%d\n",
++		 result.stopped.crg46, result.stopped.crg47, result.stopped.usb0,
++		 result.stopped.usb1, result.stop_error);
++	if (ret) {
++		dev_warn(dev, "USB_CLOCK_AUDIT_FAILED error=%d\n", ret);
++		return ret;
++	}
++	dev_info(dev, "USB_CLOCK_AUDIT_COMPLETE sdk-last-user-stop no-device-transactions no-dma no-firmware\n");
++	return 0;
++}
++
++static const struct of_device_id hi3798mv100_usb_clock_audit_match[] = {
++	{ .compatible = "tianyi,ty1208z-usb-clock-capability-audit" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, hi3798mv100_usb_clock_audit_match);
++
++static struct platform_driver hi3798mv100_usb_clock_audit_driver = {
++	.probe = hi3798mv100_usb_clock_audit_probe,
++	.driver = {
++		.name = "hi3798mv100-usb-clock-audit",
++		.of_match_table = hi3798mv100_usb_clock_audit_match,
++	},
++};
++builtin_platform_driver(hi3798mv100_usb_clock_audit_driver);
++MODULE_LICENSE("GPL");
+--- /dev/null
 +++ b/drivers/soc/hisilicon/ty1208z-ethernet-audit.h
 @@ -0,0 +1,42 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
@@ -2574,6 +2681,86 @@
 +	state->controller_read = true;
 +}
 +
++#endif
+--- /dev/null
++++ b/drivers/soc/hisilicon/ty1208z-usb-clock-audit.h
+@@ -0,0 +1,77 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef TY1208Z_USB_CLOCK_AUDIT_H
++#define TY1208Z_USB_CLOCK_AUDIT_H
++
++#include "ty1208z-usb-audit.h"
++#include "../../clk/hisilicon/ty1208z-usb-host0.h"
++
++struct ty1208z_usb_clock_result {
++	struct ty1208z_usb_snapshot before, enabled, stopped;
++	bool changed;
++	int stop_error;
++};
++
++static inline void ty1208z_usb_clock_controls(void __iomem *control[5],
++		struct ty1208z_usb_snapshot *state)
++{
++	state->crg46 = readl(control[0]);
++	state->crg47 = readl(control[1]);
++	state->usb0 = readl(control[2]);
++	state->usb1 = readl(control[3]);
++	state->sysid0 = readl(control[4]);
++}
++
++/* Only the exact inactive state measured by the physical read-only audit. */
++static inline bool ty1208z_usb_clock_initial(const struct ty1208z_usb_snapshot *s)
++{
++	return s->crg46 == 0x0013707f && s->crg47 == 0x00000b01 &&
++	       s->usb0 == 0x000c71a8 && s->usb1 == 0 &&
++	       s->sysid0 == 0x37980100;
++}
++
++static inline bool ty1208z_usb_capabilities_sane(const struct ty1208z_usb_snapshot *s)
++{
++	u32 length = s->ehci_capbase & 0xff;
++	u32 ports = s->ehci_hcsparams & 0xf;
++	u32 ohci_version = s->ohci_revision & 0xff;
++
++	/* Structural EHCI/OHCI checks; raw capabilities are retained for review. */
++	return s->controller_read && length >= 0x10 && length <= 0x80 &&
++	       !(length & 3) && (s->ehci_capbase >> 16) == 0x0100 &&
++	       ports && s->ehci_hcsparams != ~0U && s->ehci_hccparams != ~0U &&
++	       s->ohci_revision != ~0U &&
++	       (ohci_version == 0x10 || ohci_version == 0x11);
++}
++
++/* No HCD, operational-register, schedule, endpoint or firmware access.
++ * The fixed SDK-equivalent sequence programs volatile analog PHY controls.
++ * Shutdown is the SDK last-user stop, NOT restoration of analog tuning.
++ */
++static inline int ty1208z_usb_clock_audit(void __iomem *control[5],
++		void __iomem *ehci, void __iomem *ohci,
++		struct ty1208z_usb_clock_result *result)
++{
++	int ret;
++
++	*result = (struct ty1208z_usb_clock_result) { 0 };
++	ty1208z_usb_clock_controls(control, &result->before);
++	if (!ty1208z_usb_clock_initial(&result->before))
++		return -ENODEV;
++	result->changed = true;
++	ret = ty1208z_usb_host0_start(control);
++	if (!ret) {
++		ty1208z_usb_observe(control, ehci, ohci, &result->enabled);
++		if (!ty1208z_usb_capabilities_sane(&result->enabled))
++			ret = -EIO;
++	}
++	/* Also independently verify stop after a failed initialization. */
++	result->stop_error = ty1208z_usb_host0_stop(control);
++	/* Read controls only: no controller capability reads after stopping. */
++	ty1208z_usb_clock_controls(control, &result->stopped);
++	if (result->stop_error || result->stopped.controller_read ||
++	    (result->stopped.crg47 & TY_USB_PHY_RESETS) != TY_USB_PHY_RESETS ||
++	    (result->stopped.crg46 & 0x71U))
++		return -EIO;
++	return ret;
++}
 +#endif
 --- /dev/null
 +++ b/include/linux/mmc/ty1208z-samples.h

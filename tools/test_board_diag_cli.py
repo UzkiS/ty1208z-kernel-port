@@ -79,6 +79,15 @@ class DiagnosticTests(unittest.TestCase):
                     restart = b"No restart handler" if mode == "missing-restart" else (
                         b"TY1208Z_RESTART_OBSERVED pid=00141805 cid=b105f00d control=00000000\r\n"
                         b"TY1208Z_RESTART_READY no-startup-writes explicit-restart-only")
+                    usb_clock = b"USB_CLOCK_AUDIT_FAILED error=-5" if mode == "failed-usb-clock" else (
+                        b"USB_CLOCK_AUDIT_BEFORE CRG46=0013707f CRG47=00000b01 USB0=000c71a8 USB1=00000000 SYSID0=37980100 changed=1\r\n"
+                        b"USB_CLOCK_AUDIT_CAPS EHCI_CAPBASE=01000010 HCSPARAMS=00000012 HCCPARAMS=00000080 OHCI_REVISION=00000010\r\n"
+                        b"USB_CLOCK_AUDIT_STOP CRG46=0010000e CRG47=00000f03 USB0=000c71a8 USB1=0000a801 error=0\r\n"
+                        b"USB_CLOCK_AUDIT_COMPLETE sdk-last-user-stop no-device-transactions no-dma no-firmware")
+                    if mode == "bad-usb-clock-stop":
+                        usb_clock = usb_clock.replace(b"USB1=0000a801 error=0", b"USB1=0000a801 error=-5")
+                    if mode == "missing-usb-clock-caps":
+                        usb_clock = usb_clock.replace(b"USB_CLOCK_AUDIT_CAPS", b"CAPABILITIES_SKIPPED")
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
@@ -90,6 +99,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\n" + (network if profile == "ethernet-net1" else b""),
                                  b"\r\n" + (usb if profile == "usb-audit1" else b""),
                                  b"\r\n" + (restart if profile == "restart1" else b""),
+                                 b"\r\n" + (usb_clock if profile == "usb-clock-audit1" else b""),
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -183,6 +193,18 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_restart_read_only_report_is_captured(self):
         self.exercise("success", profile="restart1")
+
+    def test_usb_clock_failure_is_not_accepted(self):
+        self.exercise("failed-usb-clock", profile="usb-clock-audit1")
+
+    def test_usb_clock_capabilities_and_shutdown_are_captured(self):
+        self.exercise("success", profile="usb-clock-audit1")
+
+    def test_usb_clock_failed_shutdown_is_not_accepted(self):
+        self.exercise("bad-usb-clock-stop", profile="usb-clock-audit1")
+
+    def test_usb_clock_missing_capabilities_are_not_accepted(self):
+        self.exercise("missing-usb-clock-caps", profile="usb-clock-audit1")
 
 
 if __name__ == "__main__":

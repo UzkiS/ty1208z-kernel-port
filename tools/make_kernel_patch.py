@@ -103,6 +103,29 @@ changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
     changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +
     'dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb\n')
 
+changes["drivers/soc/hisilicon/Kconfig"] = (
+    changes["drivers/soc/hisilicon/Kconfig"][0],
+    changes["drivers/soc/hisilicon/Kconfig"][1].replace(
+        'config KUNPENG_HCCS\n',
+        'config HI3798MV100_USB_CLOCK_AUDIT\n'
+        '\tbool "TY1208Z guarded USB host0 clock/capability experiment"\n'
+        '\tdepends on ARCH_HI3798MV100 && !USB_SUPPORT && !BLOCK && !NET\n'
+        '\tdepends on !MMC && !MODULES && !SMP && !DEBUG_FS\n'
+        '\tdepends on !HI3798MV100_USB_AUDIT\n'
+        '\thelp\n'
+        '\t  Require the exact measured inactive state, run fixed host0\n'
+        '\t  clock/PHY initialization, read capabilities, then stop. No HCD,\n'
+        '\t  operational register, DMA, endpoint or firmware access.\n\n'
+        'config KUNPENG_HCCS\n'))
+changes["drivers/soc/hisilicon/Makefile"] = (
+    changes["drivers/soc/hisilicon/Makefile"][0],
+    changes["drivers/soc/hisilicon/Makefile"][1] +
+    'obj-$(CONFIG_HI3798MV100_USB_CLOCK_AUDIT) += hi3798mv100-usb-clock-audit.o\n')
+changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][0],
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +
+    'dtb-$(CONFIG_HI3798MV100_USB_CLOCK_AUDIT) += hi3798mv100-ty1208z-usb-clock-audit.dtb\n')
+
 changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
     changes["arch/arm/boot/dts/hisilicon/Makefile"][0],
     changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +

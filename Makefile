@@ -26,6 +26,7 @@ help:
 	@echo 'make openwrt-applications - build and emulate applications (no board image)'
 	@echo 'make openwrt-net - build independent native Ethernet RAM candidate with traffic tools'
 	@echo 'make usb-audit - build standalone read-only host0 control/capability RAM audit'
+	@echo 'make usb-clock-audit - build guarded host0 clock/PHY/capability RAM experiment, no USB stack'
 	@echo 'make restart - build isolated SP805 explicit restart RAM experiment'
 	@echo 'make openwrt-app-ram - validate applications with a 240-MiB usable budget and package separate RAM initrd'
 	@echo 'make openwrt-router - build isolated applications plus measured Ethernet for RAM validation'
@@ -120,6 +121,10 @@ openwrt-net:
 .PHONY: usb-audit
 usb-audit:
 	bash tools/build-usb-audit.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"
+
+.PHONY: usb-clock-audit
+usb-clock-audit:
+	bash tools/build-usb-clock-audit.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"
 
 .PHONY: restart
 restart:

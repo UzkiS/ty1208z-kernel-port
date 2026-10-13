@@ -72,6 +72,32 @@ The Hinas log warned that the high-speed RDA bulk endpoints `03/83` advertise
 64-byte maximum packets. Enumeration is insufficient to justify an override;
 review the source's transfer sizing and actual hardware behavior first.
 
+## Separate bounded clock/capability experiment
+
+`make usb-clock-audit` creates the independent `usb-clock-audit1` RAM profile.
+It requires the exact five controls measured by the read-only audit: CRG46
+`0x0013707f`, CRG47 `0x00000b01`, USB0 `0x000c71a8`, USB1 zero and SYSID0
+`0x37980100`. A foreign board/resource, an active controller or any changed
+initial control inhibits all writes and controller reads.
+
+The experiment uses the same independently implemented, SDK-differentially
+tested host0 helper as the optional CCF provider. After fixed clock/PHY
+initialization and readiness readback, it reads only EHCI CAPBASE/HCSPARAMS/
+HCCPARAMS and OHCI revision. Basic structural checks reject absent/invalid
+capabilities. Both success and failure execute the SDK last-user shutdown and
+verify stopped clock/reset controls. Analog PHY tuning is volatile but is not
+restored to the inherited values; this is a control-writing experiment, not
+the earlier read-only audit.
+
+USB_SUPPORT, HCDs, NET, storage, firmware loading, modules, SMP and debugfs
+remain disabled. No operational register, schedule/DMA, PORTSC or endpoint is
+accessed. The exact profile and separate collector identity prevent it from
+entering ordinary diagnostic/router images. Actual helper/probe sanitizer
+checks cover every initial-state bit, active foreign state, capability errors,
+initialization/stop failures, exact resource/mapping gates and error propagation.
+Physical capability acceptance remains outstanding; the `usb-host1` boot gate
+remains closed until those measurements are independently reviewed.
+
 ## Optional compile experiment
 
 `make usb-host-compile` separately compiles `clk-ty1208z-usb.o` and the

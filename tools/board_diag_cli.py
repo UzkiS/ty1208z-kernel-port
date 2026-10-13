@@ -21,6 +21,7 @@ PROFILES = {
     "ethernet-clock-id1": b"6.12.112-ty1208z-ethernet-clock-id1",
     "ethernet-net1": b"6.12.112-ty1208z-ethernet-net1",
     "usb-audit1": b"6.12.112-ty1208z-usb-audit1",
+    "usb-clock-audit1": b"6.12.112-ty1208z-usb-clock-audit1",
     "restart1": b"6.12.112-ty1208z-restart1",
 }
 
@@ -111,6 +112,14 @@ def run(args, serial_module):
                         b"TY1208Z_RESTART_OBSERVED pid=", b"cid=b105f00d control=00000000",
                         b"TY1208Z_RESTART_READY no-startup-writes explicit-restart-only")):
                     raise TransferError("SP805 restart identity/registration is incomplete")
+                if args.profile == "usb-clock-audit1" and (
+                        not all(marker in report for marker in (
+                            b"USB_CLOCK_AUDIT_BEFORE CRG46=0013707f CRG47=00000b01 USB0=000c71a8 USB1=00000000 SYSID0=37980100 changed=1",
+                            b"USB_CLOCK_AUDIT_CAPS EHCI_CAPBASE=",
+                            b"USB_CLOCK_AUDIT_STOP CRG46=0010000e CRG47=00000f03 USB0=000c71a8 USB1=0000a801 error=0",
+                            b"USB_CLOCK_AUDIT_COMPLETE sdk-last-user-stop no-device-transactions no-dma no-firmware"))
+                        or b"USB_CLOCK_AUDIT_FAILED" in report):
+                    raise TransferError("Guarded USB clock/capability experiment did not complete")
                 result["report_complete"] = True
                 result["status"] = "diagnostic-captured"
             except (TransferError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:

@@ -15,6 +15,7 @@ from ethernet_net_profile import (
     ethernet_net_profile, openwrt_ethernet_profile, openwrt_router_ethernet_profile,
 )
 from usb_audit_profile import usb_audit_profile
+from usb_clock_audit_profile import usb_clock_audit_profile
 from usb_host_profile import usb_host_profile
 from restart_profile import restart_profile
 from openwrt_apps_ram_profile import BOOTLOADER_BOUND_ADDRESS, applications_ram_profile
@@ -84,6 +85,7 @@ def prepare(artifacts, inspection):
     ethernet_audit_profile(tree, config)
     ethernet_clock_id_profile(tree, config)
     usb_audit_profile(tree, config)
+    usb_clock_audit_profile(tree, config)
     if usb_host_profile(tree, config):
         raise ValueError("USB host0 image is offline-only pending physical USB register/capability audit")
     restart_profile(tree, config)

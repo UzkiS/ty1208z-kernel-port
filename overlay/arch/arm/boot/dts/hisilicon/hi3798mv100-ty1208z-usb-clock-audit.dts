@@ -1,0 +1,16 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	compatible = "tianyi,ty1208z-ca-usb-clock-audit", "hi3798mv100-series";
+	model = "TY1208Z CA guarded USB host0 clock/capability experiment";
+};
+
+&{/soc} {
+	usb-clock-audit@f9890000 {
+		compatible = "tianyi,ty1208z-usb-clock-capability-audit";
+		reg = <0xf8a220b8 4>, <0xf8a220bc 4>,
+		      <0xf8a20120 4>, <0xf8a20124 4>, <0xf8000ee0 4>,
+		      <0xf9890000 0x10000>, <0xf9880000 0x10000>;
+	};
+};

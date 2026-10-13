@@ -16,7 +16,7 @@ concurrency:
 jobs:
   diagnostic:
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
+    timeout-minutes: 45
     env:
       JOBS: "2"
       PYTHONUNBUFFERED: "1"
@@ -111,6 +111,10 @@ jobs:
         run: |
           make restart > logs/restart.log 2>&1 || { tail -n 100 logs/restart.log; exit 1; }
           tail -n 20 logs/restart.log
+      - name: Build guarded USB host0 clock/capability experiment and run MMIO/profile/QEMU checks
+        run: |
+          make usb-clock-audit > logs/usb-clock-audit.log 2>&1 || { tail -n 100 logs/usb-clock-audit.log; exit 1; }
+          tail -n 25 logs/usb-clock-audit.log
       - name: Upload UNTESTED diagnostics and logs
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -125,6 +129,7 @@ jobs:
             artifacts/ethernet-clock-id1/
             artifacts/ethernet-net1/
             artifacts/usb-audit1/
+            artifacts/usb-clock-audit1/
             artifacts/usb-host-compile/
             artifacts/usb-host1/
             artifacts/restart1/
