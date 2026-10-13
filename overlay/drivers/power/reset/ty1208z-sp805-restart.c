@@ -46,7 +46,9 @@ static int ty1208z_restart_probe(struct platform_device *pdev)
 #endif
 
 #ifdef TY1208Z_RAM_RESTART_MODULE
-	if (!of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router-ram"))
+	if (!of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router-ram") &&
+	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) &&
+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router768-ram")))
 #else
 	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic"))
 #endif
@@ -135,7 +137,9 @@ static int __init ty1208z_ram_restart_init(void)
 	};
 	int ret;
 
-	if (!of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router-ram"))
+	if (!of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router-ram") &&
+	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) &&
+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router768-ram")))
 		return -ENODEV;
 	ret = platform_driver_register(&ty1208z_restart_driver);
 	if (ret)

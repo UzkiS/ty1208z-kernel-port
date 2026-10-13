@@ -39,7 +39,11 @@ board support. Keep assumptions separate from measured facts.
   This profile now physically passes two complete 512-MiB patterns, all-page
   PFN bounds, cleanup, command restart and exact router/configuration return.
   Keep its init area reserved: normal ARM init reclamation otherwise exposes
-  pages below 16 MiB. Native higher-memory integration remains separate.
+  pages below 16 MiB. The separate native router768 variant now physically
+  passes memory/PFN, physical TCP, both proxy cores and command-restart return.
+  It retains the same fresh-allocation/low-reservation gates and has a distinct
+  opt-in kernel/board identity. The ordinary restored router remains low256;
+  SD/eMMC, Docker and production integration are still separate.
 
 ## Authorization
 

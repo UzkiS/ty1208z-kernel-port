@@ -34,7 +34,7 @@ def run(args, serial_module):
               "status": "starting", "kernel_verified": False, "restart_sent": False,
               "persistent_writes": False}
     profile = getattr(args, "profile", "diagnostic")
-    native = profile == "router"
+    native = profile in ("router", "router768")
     sd_ident = profile in ("sd-ident1", "sd-ro1")
     memory = profile == "ram768"
     result["profile"] = profile
@@ -52,9 +52,11 @@ def run(args, serial_module):
                     raise TransferError("Not the SP805 RAM experiment; no restart sent")
                 if native:
                     system = command(exchange, b"cat /etc/openwrt_release")
+                    board = (b"tianyi,ty1208z-ca-openwrt-router768-ram" if profile == "router768" else
+                             b"tianyi,ty1208z-ca-openwrt-router-ram")
                     if (b"DISTRIB_TARGET='hi3798mv100/apps'" not in system or
                             b"DISTRIB_REVISION='" + SOURCE_REVISION + b"'" not in system or
-                            not re.search(rb"(?:^|[\r\n])tianyi,ty1208z-ca-openwrt-router-ram[\r\n]",
+                            not re.search(rb"(?:^|[\r\n])" + re.escape(board) + rb"[\r\n]",
                                           command(exchange, DT_IDENTITY))):
                         raise TransferError("Native router source/DT differs; no restart sent")
                     binding = command(exchange, b"test -e /sys/module/ty1208z_sp805_restart && "
@@ -135,7 +137,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--profile", choices=("diagnostic", "router", "sd-ident1", "sd-ro1", "ram768"), default="diagnostic")
+    parser.add_argument("--profile", choices=("diagnostic", "router", "router768", "sd-ident1", "sd-ro1", "ram768"), default="diagnostic")
     parser.add_argument("--timeout", type=int, default=60)
     args = parser.parse_args()
     if not 5 <= args.timeout <= 120:

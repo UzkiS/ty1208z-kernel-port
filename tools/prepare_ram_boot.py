@@ -13,6 +13,7 @@ from emmc_profiles import identification_profile
 from ethernet_profiles import ethernet_audit_profile, ethernet_clock_id_profile
 from ethernet_net_profile import (
     ethernet_net_profile, openwrt_ethernet_profile, openwrt_router_ethernet_profile,
+    openwrt_router768_ethernet_profile,
 )
 from usb_audit_profile import usb_audit_profile
 from usb_clock_audit_profile import usb_clock_audit_profile
@@ -68,7 +69,7 @@ def prepare(artifacts, inspection, allocation_evidence=None):
     tree = parse_fdt(dtb)
     properties = {node["path"]: node["properties"] for node in tree["nodes"]}
     config = (artifacts / "linux.config").read_text()
-    extended = ram768_profile(tree, config)
+    extended = ram768_profile(tree, config) or openwrt_router768_ethernet_profile(tree, config)
     memory_evidence_sha256 = None
     if extended:
         if allocation_evidence is None:
@@ -109,7 +110,7 @@ def prepare(artifacts, inspection, allocation_evidence=None):
     restart_profile(tree, config)
     application_initrd = applications_ram_profile(tree, config, artifacts)
     board = properties["/"]["compatible"].get("strings", [None])[0]
-    if board == "tianyi,ty1208z-ca-openwrt-router-ram":
+    if board in ("tianyi,ty1208z-ca-openwrt-router-ram", "tianyi,ty1208z-ca-openwrt-router768-ram"):
         network = openwrt_router_ethernet_profile(tree, config)
         if application_initrd is None or not network:
             raise ValueError("Integrated Ethernet lacks its exact external-rootfs application acceptance")

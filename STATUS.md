@@ -18,8 +18,15 @@ only explicitly user-configured passwords are preserved on later restoration.
 The separate low-768-MiB memory profile now passes physical 512-MiB stress,
 all-page PFN bounds and automatic return/configuration restoration, with about
 745.18 MiB usable RAM; [memory report](verification/ram768-board-20261014.md).
-Its dedicated init area remains reserved. Current native-router memory still
-uses low 256 MiB; production integration and actual Docker remain pending.
+Its dedicated init area remains reserved. An independent native router768
+variant now physically passes 512-MiB/PFN stress with about 744.43 MiB usable,
+64 MiB of verified TCP data in each direction, both proxy cores and automatic
+return/configuration restoration; [native report](verification/openwrt-router768-board-20261014.md).
+The restored ordinary router still uses low 256 MiB. Storage/production
+integration and actual Docker remain pending. Downloaded clean diagnostic
+CI on f48bb5e passed 16 manifests/162 files and 15 uImage CRCs, including
+actual memory/SD/ARM-mount checks; [CI report](verification/ram768-ci-20261014.md).
+The new native memory integration has not yet completed clean remote CI.
 The user removed Kwrt customization and requires both Xray and sing-box in
 Passwall, plus unzip. Both cores and InfoZIP now build in the plain/router
 variants and pass both QEMU budgets, including actual Passwall SOCKS/TLS,

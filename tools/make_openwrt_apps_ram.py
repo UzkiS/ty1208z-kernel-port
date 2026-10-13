@@ -27,10 +27,12 @@ def make(source, output):
     if (source / ".ty1208z-container-compile-only.json").exists():
         raise ValueError("Compile-only container packages must not become a board RAM image")
     check(source, built=True)
-    ethernet = application_variant(source) == "ethernet"
-    layer = "router" if ethernet else "applications"
+    variant = application_variant(source)
+    ethernet = variant in ("ethernet", "ethernet-ram768")
+    layer = "router768" if variant == "ethernet-ram768" else "router" if ethernet else "applications"
     if output is None:
-        output = PROJECT / ("artifacts/openwrt-router1" if ethernet else "artifacts/openwrt-apps-ram1")
+        output = PROJECT / ("artifacts/openwrt-router768" if variant == "ethernet-ram768" else
+                            "artifacts/openwrt-router1" if ethernet else "artifacts/openwrt-apps-ram1")
     kernel = unique((source / "build_dir").glob("target-*/linux-hi3798mv100_apps/linux-6.12.112"), "application kernel")
     images = source / "bin/targets/hi3798mv100/apps"
     output.mkdir(parents=True, exist_ok=True)
@@ -61,6 +63,9 @@ def make(source, output):
                         "--linux", str(kernel)], check=True)
         subprocess.run([sys.executable, str(PROJECT / "tools/test_femac_datapath.py"),
                         "--linux", str(kernel)], check=True)
+    if variant == "ethernet-ram768":
+        from test_ram768 import actual_init_memory
+        actual_init_memory(kernel)
     subprocess.run([sys.executable, str(PROJECT / "tools/inspect_kernel_layout.py"),
                     "--build", str(kernel), "--output", str(checks / "kernel-layout.json")], check=True)
     cpp = subprocess.run([
@@ -91,7 +96,7 @@ def make(source, output):
         raise ValueError("Invalid application RAM uImage")
     (checks / "image-validation.json").write_text(json.dumps(image, indent=2) + "\n")
     manifest = {"status": "native application RAM placement candidate; hardware untested; no install recipe",
-                "application_variant": "ethernet" if ethernet else "qemu",
+                "application_variant": variant,
                 "external_initrd": initrd,
                 "files": {name: digest((output / name).read_bytes()) for name in (
                     "uImage-UNTESTED.bin", "zImage", "ty1208z-diagnostic.dtb", "linux.config",

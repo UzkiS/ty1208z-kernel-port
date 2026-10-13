@@ -25,7 +25,8 @@ def unique(paths, description):
 def test(source, memory_mib=512):
     if (source / ".ty1208z-container-compile-only.json").exists():
         raise ValueError("Compile-only container packages have no application rootfs acceptance")
-    ethernet = application_variant(source) == "ethernet"
+    variant = application_variant(source)
+    ethernet = variant in ("ethernet", "ethernet-ram768")
     if memory_mib not in (256, 512):
         raise ValueError("Application memory experiment must be 256 or 512 MiB")
     kernel = unique((source / "build_dir").glob(
@@ -178,7 +179,7 @@ def test(source, memory_mib=512):
             test_inputs["router_guest"] = Path(__file__).with_name("openwrt-router-guest.sh")
         provenance = {
             "schema": 1, "result": "OPENWRT_APPLICATIONS_QEMU_PASS",
-            "application_variant": "ethernet" if ethernet else "qemu",
+            "application_variant": variant,
             "machine": "virt,cortex-a7,single-core", "memory_mib": memory_mib,
             "memory_limit_mib": memory_limit_mib,
             "host_network": False, "disks": False, "clock_year": 2040,

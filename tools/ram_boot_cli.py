@@ -207,7 +207,7 @@ def main():
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--inspection", type=Path, required=True)
     parser.add_argument("--allocation-evidence", type=Path,
-                        help="Immediately preceding guarded reboot evidence; mandatory for ram768")
+                        help="Immediately preceding guarded reboot evidence; mandatory for either bounded 768-MiB profile")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--boot", action="store_true", help="Boot only after successful transfer size and RAM CRC checks")
     parser.add_argument("--boot-existing", action="store_true", help="Skip transfer; recheck current RAM CRC before boot")

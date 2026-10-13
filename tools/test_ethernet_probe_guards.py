@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Execute actual Ethernet probe guards for all three isolated board identities."""
+"""Execute actual Ethernet probes, including the opt-in higher-memory identity."""
 import argparse
 from pathlib import Path
 import re
@@ -20,6 +20,10 @@ PRELUDE = r'''
 typedef uint32_t u32;
 typedef uint64_t resource_size_t;
 #define __iomem
+#ifndef CONFIG_TY1208Z_ROUTER_RAM768
+#define CONFIG_TY1208Z_ROUTER_RAM768 0
+#endif
+#define IS_ENABLED(x) (x)
 #define ARRAY_SIZE(values) (sizeof(values) / sizeof((values)[0]))
 #define IORESOURCE_MEM 1
 #define GFP_KERNEL 0
@@ -93,9 +97,17 @@ static void initialize(const char *identity) {
 }
 int main(void) {
     const char *accepted[] = {"tianyi,ty1208z-ca-diagnostic", "tianyi,ty1208z-ca-openwrt-net",
-                             "tianyi,ty1208z-ca-openwrt-router-ram"};
+                             "tianyi,ty1208z-ca-openwrt-router-ram",
+#if CONFIG_TY1208Z_ROUTER_RAM768
+                             "tianyi,ty1208z-ca-openwrt-router768-ram",
+#endif
+                             };
     const char *rejected[] = {"", "linux,dummy-virt", "tianyi,ty1208z-ca-openwrt-ram",
-                             "tianyi,ty1208z-ca-usb-host-experiment", "tianyi,ty1208z-ca-openwrt-router"};
+                             "tianyi,ty1208z-ca-usb-host-experiment", "tianyi,ty1208z-ca-openwrt-router",
+#if !CONFIG_TY1208Z_ROUTER_RAM768
+                             "tianyi,ty1208z-ca-openwrt-router768-ram",
+#endif
+                             };
     for (unsigned i = 0; i < ARRAY_SIZE(rejected); i++) {
         initialize(rejected[i]);
         assert(ty1208z_ethernet_clock_probe(&clockdev) == -ENODEV);
@@ -146,7 +158,7 @@ int main(void) {
         assert(ty1208z_festa_probe(&phy) == -ENODEV && phy_reads == 2);
     }
     free(allocation);
-    puts("ETHERNET_PROBE_GUARDS_PASS: actual clock/MAC/PHY probes, three boards, foreign/resources/ID rejection");
+    puts("ETHERNET_PROBE_GUARDS_PASS: actual clock/MAC/PHY probes, opt-in board, foreign/resources/ID rejection");
     return 0;
 }
 '''
@@ -179,6 +191,11 @@ def run(linux=None):
         subprocess.run(["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                         "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
                         str(build / "test.c"), "-o", str(binary)], check=True)
+        subprocess.run([binary], check=True, timeout=10)
+        subprocess.run(["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                        "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
+                        "-DCONFIG_TY1208Z_ROUTER_RAM768=1", str(build / "test.c"),
+                        "-o", str(binary)], check=True)
         subprocess.run([binary], check=True, timeout=10)
 
 

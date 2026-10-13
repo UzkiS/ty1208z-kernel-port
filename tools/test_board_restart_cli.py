@@ -26,7 +26,7 @@ class RestartSerialTests(unittest.TestCase):
             master, slave = pty.openpty()
             errors = []
             sent = []
-            native = profile == "router"
+            native = profile in ("router", "router768")
             sd_ident = profile in ("sd-ident1", "sd-ro1")
             memory = profile == "ram768"
             prompt = b"root@OpenWrt:~# " if native else b"# "
@@ -62,7 +62,9 @@ class RestartSerialTests(unittest.TestCase):
                         if mode == "source":
                             return
                         self.assertEqual(read_command(), DT_IDENTITY + b"\r")
-                        dt = b"other,board" if mode == "dt" else b"tianyi,ty1208z-ca-openwrt-router-ram"
+                        dt = (b"other,board" if mode == "dt" else
+                              b"tianyi,ty1208z-ca-openwrt-router768-ram" if profile == "router768" else
+                              b"tianyi,ty1208z-ca-openwrt-router-ram")
                         os.write(master, dt + b"\r\n" + prompt)
                         if mode == "dt":
                             return
@@ -176,12 +178,14 @@ class RestartSerialTests(unittest.TestCase):
         self.exercise("success")
 
     def test_native_router_requires_source_dt_bound_module_and_measured_guard(self):
-        for mode in ("source", "dt", "unbound", "missing-mv100"):
-            with self.subTest(mode=mode):
-                self.exercise(mode, "router")
+        for profile in ("router", "router768"):
+            for mode in ("source", "dt", "unbound", "missing-mv100"):
+                with self.subTest(mode=mode, profile=profile):
+                    self.exercise(mode, profile)
 
     def test_native_router_uses_graceful_reboot_and_inspects_the_fresh_loader(self):
         self.exercise("success", "router")
+        self.exercise("success", "router768")
 
     def test_sd_identification_requires_exact_dt_binding_guard_and_actual_shutdown(self):
         for mode in ("dt", "unbound", "missing-mv100", "missing-shutdown", "failed-shutdown", "failed", "success"):

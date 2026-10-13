@@ -26,8 +26,26 @@ def openwrt_ethernet_profile(tree, config):
 
 
 def openwrt_router_ethernet_profile(tree, config):
+    if "CONFIG_TY1208Z_ROUTER_RAM768=y\n" in config:
+        return openwrt_router768_ethernet_profile(tree, config)
     return _ethernet_profile(tree, config, "tianyi,ty1208z-ca-openwrt-router-ram",
                              "-ty1208z-openwrt-router", applications=True)
+
+
+def openwrt_router768_ethernet_profile(tree, config):
+    props = {node["path"]: node["properties"] for node in tree["nodes"]}
+    identity = props["/"].get("compatible", {}).get("strings")
+    selected = "CONFIG_TY1208Z_ROUTER_RAM768=y\n" in config
+    board = "tianyi,ty1208z-ca-openwrt-router768-ram"
+    if not selected:
+        if identity == [board, "hi3798mv100-series"]:
+            raise ValueError("Native higher-memory board lacks its reservation configuration")
+        return False
+    if (props.get("/memory@0", {}).get("reg", {}).get("cells") != [0, 0x30000000] or
+            "CONFIG_PROC_PAGE_MONITOR=y\n" not in config or
+            re.search(r"^CONFIG_(HIGHMEM|WATCHDOG)=[ym]$", config, re.MULTILINE)):
+        raise ValueError("Native higher-memory bounds/PFN prerequisites differ")
+    return _ethernet_profile(tree, config, board, "-ty1208z-openwrt-router768", applications=True)
 
 
 def _ethernet_profile(tree, config, board, release, applications=False):
@@ -83,6 +101,8 @@ def _ethernet_profile(tree, config, board, release, applications=False):
         if set(node) != allowed:
             raise ValueError("Unreviewed Ethernet DT property")
     active = dict(re.findall(r"^CONFIG_(\w+)=([ym])$", config, re.MULTILINE))
+    if "TY1208Z_ROUTER_RAM768" in active and board != "tianyi,ty1208z-ca-openwrt-router768-ram":
+        raise ValueError("Higher-memory configuration outside its native router identity")
     required = {"NET", "INET", "PACKET", "NETDEVICES", "HISI_FEMAC",
                 "MDIO_HISI_FEMAC", "PHYLIB", "FESTA_TY1208Z_PHY"}
     if any(active.get(name) != "y" for name in required):

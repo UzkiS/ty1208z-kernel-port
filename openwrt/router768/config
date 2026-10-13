@@ -1,0 +1,2 @@
+# Pagemap must be selected at the OpenWrt layer as well as in Linux.
+CONFIG_KERNEL_PROC_PAGE_MONITOR=y

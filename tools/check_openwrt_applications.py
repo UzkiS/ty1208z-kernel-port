@@ -12,8 +12,11 @@ from prepare_openwrt_applications import application_variant
 
 
 def check(source, built=False):
-    ethernet = application_variant(source) == "ethernet"
+    variant = application_variant(source)
+    ethernet = variant in ("ethernet", "ethernet-ram768")
     config = (source / ".config").read_text()
+    if variant == "ethernet-ram768" and "CONFIG_KERNEL_PROC_PAGE_MONITOR=y\n" not in config:
+        raise ValueError("Higher-memory native configuration lacks the OpenWrt pagemap selection")
     for option in (
             "TARGET_hi3798mv100_apps", "TARGET_hi3798mv100_apps_DEVICE_ty1208z_apps",
             "TARGET_ROOTFS_INITRAMFS_SEPARATE", "USE_MUSL", "PACKAGE_luci-app-passwall",
@@ -85,13 +88,20 @@ def check(source, built=False):
                            "FESTA_TY1208Z_PHY", "PHYLIB", "NET_NS"):
                 if f"CONFIG_{option}=y\n" not in kernel_config:
                     raise ValueError(f"Missing built-in integrated Ethernet option: {option}")
-            if 'CONFIG_LOCALVERSION="-ty1208z-openwrt-router"\n' not in kernel_config:
+            release = "-ty1208z-openwrt-router768" if variant == "ethernet-ram768" else "-ty1208z-openwrt-router"
+            if f'CONFIG_LOCALVERSION="{release}"\n' not in kernel_config:
                 raise ValueError("Integrated application kernel release differs")
             for option in ("WIRELESS", "WLAN", "DEBUG_FS"):
                 if re.search(rf"^CONFIG_{option}=[ym]$", kernel_config, re.MULTILINE):
                     raise ValueError(f"Unexpected integrated Ethernet subsystem: {option}")
         elif re.search(r"^CONFIG_HISI_FEMAC=[ym]$", kernel_config, re.MULTILINE):
             raise ValueError("Plain application kernel unexpectedly enables board Ethernet")
+        extended = variant == "ethernet-ram768"
+        if ("CONFIG_TY1208Z_ROUTER_RAM768=y\n" in kernel_config) != extended:
+            raise ValueError("Higher-memory kernel selection differs from its native variant")
+        if extended and ("CONFIG_PROC_PAGE_MONITOR=y\n" not in kernel_config or
+                         re.search(r"^CONFIG_(HIGHMEM|WATCHDOG)=[ym]$", kernel_config, re.MULTILINE)):
+            raise ValueError("Native higher-memory reservation/PFN prerequisites differ")
         images = list((source / "bin/targets/hi3798mv100/apps").glob("*uImage*"))
         if images:
             raise ValueError("Application validation must not emit a CA board image")
@@ -162,7 +172,7 @@ def check(source, built=False):
                         "luci-i18n-passwall-zh-cn - "):
             if package not in packages:
                 raise ValueError(f"Application not installed in actual rootfs: {package}")
-    print("OPENWRT_APPLICATION_CONFIG_PASS variant=" + ("ethernet" if ethernet else "qemu") +
+    print("OPENWRT_APPLICATION_CONFIG_PASS variant=" + variant +
           ("; built, runtime/hardware untested" if built else ""))
 
 

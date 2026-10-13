@@ -18,6 +18,7 @@ MAX_COMPRESSED = min(32 * 1024 * 1024, 512 * 65535 - 1)
 MAX_UNCOMPRESSED = 96 * 1024 * 1024
 COMPATIBLE = "tianyi,ty1208z-ca-openwrt-apps-ram"
 ROUTER_COMPATIBLE = "tianyi,ty1208z-ca-openwrt-router-ram"
+ROUTER768_COMPATIBLE = "tianyi,ty1208z-ca-openwrt-router768-ram"
 BOOTARGS = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=7 panic=0"
 BASE_PATHS = {"/", "/aliases", "/chosen", "/memory@0", "/cpus", "/cpus/cpu@0",
               "/clock-24m", "/clock-83m3", "/interrupt-controller@f8a01000", "/soc",
@@ -43,7 +44,7 @@ def validate_pair(artifacts):
         ("packages", "packages.manifest"), ("console", "checks/qemu-applications-256.log"))}
     report = json.loads((Path(artifacts) / "checks/applications-qemu-256.json").read_text())
     variant = report.get("application_variant", "qemu")
-    markers = MARKERS | (ROUTER_MARKERS if variant == "ethernet" else set())
+    markers = MARKERS | (ROUTER_MARKERS if variant in ("ethernet", "ethernet-ram768") else set())
     # Preserve acceptance of earlier measured images. New builds record the
     # extra language check and must supply its actual console evidence too.
     if LANGUAGE_MARKER in report.get("passed_markers", []):
@@ -51,7 +52,7 @@ def validate_pair(artifacts):
     if DUAL_CORE_MARKERS & set(report.get("passed_markers", [])):
         markers |= DUAL_CORE_MARKERS
     if (report.get("result") != "OPENWRT_APPLICATIONS_QEMU_PASS" or
-            variant not in {"qemu", "ethernet"} or
+            variant not in {"qemu", "ethernet", "ethernet-ram768"} or
             report.get("machine") != "virt,cortex-a7,single-core" or
             report.get("memory_mib") != 256 or report.get("memory_limit_mib") != 240 or
             report.get("clock_year") != 2040 or report.get("disks") is not False or
@@ -60,8 +61,10 @@ def validate_pair(artifacts):
     for name, path in paths.items():
         if digest(path.read_bytes()) != report.get("artifacts", {}).get(name):
             raise ValueError(f"Application kernel/rootfs/provenance identity differs: {name}")
-    if ("CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" in paths["config"].read_text()) != (variant == "ethernet"):
+    if ("CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" in paths["config"].read_text()) != (variant in ("ethernet", "ethernet-ram768")):
         raise ValueError("Application memory/runtime acceptance variant differs from the actual kernel")
+    if ("CONFIG_TY1208Z_ROUTER_RAM768=y\n" in paths["config"].read_text()) != (variant == "ethernet-ram768"):
+        raise ValueError("Native higher-memory runtime acceptance differs from its actual kernel")
     transcript = paths["console"].read_bytes().replace(b"\r", b"")
     if any(b"\n" + marker.encode() + b"\n" not in transcript for marker in markers):
         raise ValueError("Recorded application markers are absent from the actual console")
@@ -91,9 +94,10 @@ def applications_ram_profile(tree, config, artifacts):
     props = {node["path"]: node["properties"] for node in tree["nodes"]}
     compatible = props["/"].get("compatible", {}).get("strings", [])
     chosen = props.get("/chosen", {})
-    router = compatible == [ROUTER_COMPATIBLE, "hi3798mv100-series"]
+    extended = compatible == [ROUTER768_COMPATIBLE, "hi3798mv100-series"]
+    router = extended or compatible == [ROUTER_COMPATIBLE, "hi3798mv100-series"]
     if compatible != [COMPATIBLE, "hi3798mv100-series"] and not router:
-        if ({COMPATIBLE, ROUTER_COMPATIBLE} & set(compatible) or
+        if ({COMPATIBLE, ROUTER_COMPATIBLE, ROUTER768_COMPATIBLE} & set(compatible) or
                 any(name.startswith("linux,initrd-") for name in chosen)):
             raise ValueError("External initrd outside the explicit application RAM profile")
         return None
@@ -102,7 +106,7 @@ def applications_ram_profile(tree, config, artifacts):
     if router and not openwrt_router_ethernet_profile(tree, config):
         raise ValueError("Integrated application profile lacks its measured Ethernet drivers")
     expected = (
-        ("/memory@0", "reg", "cells", [0, 0x10000000]),
+        ("/memory@0", "reg", "cells", [0, 0x30000000 if extended else 0x10000000]),
         ("/cpus/cpu@0", "reg", "cells", [0]),
         ("/cpus/cpu@0", "compatible", "strings", ["arm,cortex-a7"]),
         ("/clock-24m", "clock-frequency", "cells", [24000000]),
@@ -143,13 +147,16 @@ def applications_ram_profile(tree, config, artifacts):
                   "MMC_DW_HI3798MV100_IDENT", "HI3798MV100_ETHERNET_AUDIT",
                   "HI3798MV100_ETHERNET_CLOCK_ID", "TY1208Z_ETHERNET_INHERITED",
                   "POWER_RESET_TY1208Z_SP805"}
-    release = "-ty1208z-openwrt-router" if router else "-ty1208z-openwrt-ram"
+    release = ("-ty1208z-openwrt-router768" if extended else
+               "-ty1208z-openwrt-router" if router else "-ty1208z-openwrt-ram")
     if router:
         prohibited -= {"HISI_FEMAC", "TY1208Z_ETHERNET_INHERITED"}
     if (not required <= active or active & prohibited or
             f'CONFIG_LOCALVERSION="{release}"\n' not in config or
             'CONFIG_INITRAMFS_SOURCE=""\n' not in config):
         raise ValueError("Invalid native application RAM kernel configuration")
+    if ("CONFIG_TY1208Z_ROUTER_RAM768=y\n" in config) != extended:
+        raise ValueError("Native memory extension outside its dedicated application profile")
     data, unpacked_bytes = validate_pair(artifacts)
     end = INITRD_ADDRESS + len(data)
     if (chosen.get("linux,initrd-start", {}).get("cells") != [INITRD_ADDRESS] or

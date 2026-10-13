@@ -46,7 +46,7 @@ def ram768_profile(tree, config):
         for field, cells in fields.items():
             if props[node].get(field, {}).get("cells") != cells:
                 raise ValueError("Memory experiment UART/timer/GIC/CPU/clock differs")
-    forbidden = {"WATCHDOG", "HIGHMEM", "NET", "BLOCK", "MMC", "MTD", "USB_SUPPORT",
+    forbidden = {"WATCHDOG", "HIGHMEM", "NET", "BLOCK", "MMC", "MTD", "USB_SUPPORT", "TY1208Z_ROUTER_RAM768",
                  "MODULES", "SMP", "DEBUG_FS", "PM", "ATA", "SCSI", "PCI"}
     other = {option for option in active if option.startswith(("HI3798MV100_", "POWER_RESET_"))} - {
         "HI3798MV100_TIMER", "POWER_RESET_HISI", "POWER_RESET_TY1208Z_MV100_RAM"}

@@ -24,6 +24,7 @@ from openwrt_apps_ram_profile import (
     applications_ram_profile, validate_pair,
 )
 from prepare_ram_boot import prepare
+from test_ram768 import boot_fixture
 from ram_boot_cli import load_image
 from tftp_readonly import ReadOnlyTftp
 from ymodem_sender import TransferError
@@ -41,7 +42,16 @@ def write_inspection(directory):
     (directory / "inspection.rx").write_bytes(INSPECTION)
     path = directory / "inspection.json"
     path.write_text(json.dumps({"stop_reason": "probe-complete", "raw_file": "inspection.rx",
-                               "raw_sha256": hashlib.sha256(INSPECTION).hexdigest()}))
+                               "raw_sha256": hashlib.sha256(INSPECTION).hexdigest(),
+                               "port": "COM9", "started_utc": "2026-10-14T01:00:01+00:00"}))
+    return path
+
+
+def allocation_fixture(directory):
+    if "CONFIG_TY1208Z_ROUTER_RAM768=y\n" not in (ARTIFACTS / "linux.config").read_text():
+        return None
+    path = directory / "restart.json"
+    boot_fixture(path)
     return path
 
 
@@ -53,7 +63,8 @@ class ApplicationProfileTests(unittest.TestCase):
     def test_actual_candidate_and_separate_range(self):
         data, _ = validate_pair(ARTIFACTS)
         with tempfile.TemporaryDirectory() as directory:
-            plan = prepare(ARTIFACTS, write_inspection(Path(directory)))
+            path = Path(directory)
+            plan = prepare(ARTIFACTS, write_inspection(path), allocation_fixture(path))
         self.assertEqual(plan["additional_loads"][0]["address"], INITRD_ADDRESS)
         self.assertEqual(plan["additional_loads"][0]["bytes"], len(data))
         self.assertEqual(plan["additional_loads"][0]["image_crc32"], f"{zlib.crc32(data):08x}")
@@ -63,6 +74,30 @@ class ApplicationProfileTests(unittest.TestCase):
         # opened; passing the RAM budget must also pass the delivery protocol.
         ReadOnlyTftp("127.0.0.1", "127.0.0.1", [("ty1208z-initrd.bin", data)], port=0)
         self.assertGreater(INITRD_ADDRESS, plan["header_address"] + plan["image_bytes"] + 0x100000)
+
+    def test_native_higher_memory_requires_fresh_allocation_evidence(self):
+        if "CONFIG_TY1208Z_ROUTER_RAM768=y\n" not in self.config:
+            self.skipTest("The ordinary application retains its original memory bound")
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory)
+            inspection = write_inspection(path)
+            with self.assertRaisesRegex(ValueError, "fresh loader"):
+                prepare(ARTIFACTS, inspection)
+            allocation = allocation_fixture(path)
+            plan = prepare(ARTIFACTS, inspection, allocation)
+            self.assertEqual(plan["memory_end"], 0x30000000)
+            self.assertEqual(plan["allocation_evidence_sha256"],
+                             hashlib.sha256(allocation.with_suffix(".rx").read_bytes()).hexdigest())
+            record = json.loads(inspection.read_text())
+            record["started_utc"] = "2026-10-14T01:02:01+00:00"
+            inspection.write_text(json.dumps(record))
+            with self.assertRaisesRegex(ValueError, "immediately preceding"):
+                prepare(ARTIFACTS, inspection, allocation)
+        for option in ("HIGHMEM", "WATCHDOG"):
+            with self.subTest(option=option), self.assertRaises(ValueError):
+                applications_ram_profile(self.tree, self.config + f"CONFIG_{option}=y\n", ARTIFACTS)
+        with self.assertRaises(ValueError):
+            applications_ram_profile(self.tree, self.config.replace("CONFIG_TY1208Z_ROUTER_RAM768=y\n", ""), ARTIFACTS)
 
     def test_initrd_and_resource_mutations_are_rejected(self):
         for path, property_name in (("/chosen", "linux,initrd-start"), ("/chosen", "linux,initrd-end"),
@@ -191,7 +226,8 @@ class ApplicationBootGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             inspection = write_inspection(root)
-            plan = prepare(ARTIFACTS, inspection)
+            allocation = allocation_fixture(root)
+            plan = prepare(ARTIFACTS, inspection, allocation)
             master, slave = os.openpty()
             errors, boots = [], []
 
@@ -229,7 +265,8 @@ class ApplicationBootGateTests(unittest.TestCase):
                 sys.executable, "-u", str(ROOT / "tools/ram_boot_cli.py"), "--port", os.ttyname(slave),
                 "--artifacts", str(ARTIFACTS), "--inspection", str(inspection), "--boot-existing",
                 "--capture-seconds", "1", "--output", str(prefix),
-            ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+            ] + (["--allocation-evidence", str(allocation)] if allocation else []),
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             thread = threading.Thread(target=peer, daemon=True)
             thread.start()
             try:

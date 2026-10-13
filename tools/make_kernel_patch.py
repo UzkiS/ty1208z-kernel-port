@@ -27,6 +27,14 @@ changes = {
         '\thelp\n'
         '\t  Experimental RAM-only diagnostic candidate for TY1208Z CA.\n'
         '\t  Hardware boot and secure-boot acceptance remain unverified.\n\n'
+        'config TY1208Z_ROUTER_RAM768\n'
+        '\tbool "TY1208Z measured 768-MiB native router RAM experiment"\n'
+        '\tdepends on ARCH_HI3798MV100 && TY1208Z_ETHERNET_INHERITED\n'
+        '\tdepends on !HIGHMEM && !BLOCK && !MMC && !MTD && !USB_SUPPORT\n'
+        '\tdepends on !SMP && !DEBUG_FS && !WATCHDOG\n'
+        '\thelp\n'
+        '\t  Keep low 16 MiB reserved and expose only the measured low\n'
+        '\t  768 MiB on the dedicated native-router board identity.\n\n'
         'config ARCH_HI3xxx\n'),
     "arch/arm/mach-hisi/Makefile": (
         'obj-y\t+= hisilicon.o\n',
@@ -192,11 +200,14 @@ changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
 changes["arch/arm/mm/init.c"] = (
     '\tif (!machine_is_integrator() && !machine_is_cintegrator())\n'
     '\t\tfree_initmem_default(-1);\n',
-    '#ifdef CONFIG_POWER_RESET_TY1208Z_MV100_RAM\n'
-    '\t/* Keep low 16 MiB reserved in the dedicated memory experiment.\n'
+    '#if IS_ENABLED(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) || IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768)\n'
+    '\t/* Keep low 16 MiB reserved in the dedicated memory experiments.\n'
     '\t * ARM normally recycles its own init pages inside that reservation.\n'
     '\t */\n'
-    '\tif (of_machine_is_compatible("tianyi,ty1208z-ca-ram768")) {\n'
+    '\tif ((IS_ENABLED(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) &&\n'
+    '\t     of_machine_is_compatible("tianyi,ty1208z-ca-ram768")) ||\n'
+    '\t    (IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) &&\n'
+    '\t     of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router768-ram"))) {\n'
     '\t\tpr_info("RAM768_INIT_MEMORY_RETAINED low-16MiB-reservation\\n");\n'
     '\t\treturn;\n'
     '\t}\n'

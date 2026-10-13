@@ -1,0 +1,12 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "../router/ram-rootfs.dts"
+
+/ {
+	model = "TY1208Z CA native OpenWrt bounded 768-MiB RAM experiment";
+	compatible = "tianyi,ty1208z-ca-openwrt-router768-ram", "hi3798mv100-series";
+};
+
+/* Preserve low 16 MiB and exclude the upper 256 MiB/loader allocations. */
+&{/memory@0} {
+	reg = <0 0x30000000>;
+};

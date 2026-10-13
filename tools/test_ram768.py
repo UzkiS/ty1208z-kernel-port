@@ -55,7 +55,7 @@ class ProfileTests(unittest.TestCase):
                 with self.subTest(node=node, field=field), self.assertRaises(ValueError):
                     ram768_profile(changed, CONFIG)
         for option in ("NET", "BLOCK", "MMC", "HIGHMEM", "MODULES", "SMP", "DEBUG_FS", "WATCHDOG",
-                       "POWER_RESET_TY1208Z_SP805", "HI3798MV100_SD_AUDIT"):
+                       "POWER_RESET_TY1208Z_SP805", "HI3798MV100_SD_AUDIT", "TY1208Z_ROUTER_RAM768"):
             with self.subTest(option=option), self.assertRaises(ValueError):
                 ram768_profile(tree, CONFIG + f"CONFIG_{option}=y\n")
         for field in ("compatible", "reg"):
@@ -141,14 +141,25 @@ def actual_init_memory(linuxsrc):
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
-static bool board, integrator, cintegrator;
+static unsigned board;
+static bool integrator, cintegrator;
+#ifndef CONFIG_POWER_RESET_TY1208Z_MV100_RAM
+#define CONFIG_POWER_RESET_TY1208Z_MV100_RAM 0
+#endif
+#ifndef CONFIG_TY1208Z_ROUTER_RAM768
+#define CONFIG_TY1208Z_ROUTER_RAM768 0
+#endif
+#define IS_ENABLED(x) (x)
 static unsigned fixed, poisoned, freed, retained;
 static char init_area[16];
 #define __init_begin init_area
 #define __init_end (init_area + sizeof(init_area))
 #define machine_is_integrator() integrator
 #define machine_is_cintegrator() cintegrator
-#define of_machine_is_compatible(name) (assert(!strcmp(name, "tianyi,ty1208z-ca-ram768")), board)
+static bool __attribute__((unused)) of_machine_is_compatible(const char *name) {
+    if (!strcmp(name, "tianyi,ty1208z-ca-ram768")) return board == 1;
+    assert(!strcmp(name, "tianyi,ty1208z-ca-openwrt-router768-ram")); return board == 2;
+}
 #define pr_info(...) retained++
 static void fix_kernmem_perms(void) { fixed++; }
 static void poison_init_mem(void *start, unsigned long bytes) { assert(start == init_area && bytes == sizeof(init_area)); poisoned++; }
@@ -156,18 +167,15 @@ static void free_initmem_default(int value) { assert(value == -1); freed++; }
 '''
     main = r'''
 int main(void) {
-    for (unsigned bits = 0; bits < 8; bits++) {
-        board = bits & 1; integrator = bits & 2; cintegrator = bits & 4;
+    for (unsigned bits = 0; bits < 16; bits++) {
+        board = bits & 3; integrator = bits & 4; cintegrator = bits & 8;
         fixed = poisoned = freed = retained = 0;
         free_initmem();
         assert(fixed == 1 && poisoned == 1);
-#ifdef CONFIG_POWER_RESET_TY1208Z_MV100_RAM
-        assert(retained == (unsigned)board);
-        assert(freed == (unsigned)(!board && !integrator && !cintegrator));
-#else
-        assert(!retained);
-        assert(freed == (unsigned)(!integrator && !cintegrator));
-#endif
+        bool keep = (CONFIG_POWER_RESET_TY1208Z_MV100_RAM && board == 1) ||
+                    (CONFIG_TY1208Z_ROUTER_RAM768 && board == 2);
+        assert(retained == (unsigned)keep);
+        assert(freed == (unsigned)(!keep && !integrator && !cintegrator));
     }
     puts("RAM768_ACTUAL_INIT_MEMORY_PASS dedicated-board retention and unchanged generic/Integrator reclamation");
 }
@@ -176,12 +184,14 @@ int main(void) {
         path = Path(directory)
         file = path / "test.c"
         file.write_text(harness + function + main)
-        for selected in (False, True):
-            binary = path / ("on" if selected else "off")
+        for selected in range(4):
+            binary = path / str(selected)
             arguments = ["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                          "-fsanitize=address,undefined", "-fno-pie", "-no-pie"]
-            if selected:
+            if selected & 1:
                 arguments.append("-DCONFIG_POWER_RESET_TY1208Z_MV100_RAM=1")
+            if selected & 2:
+                arguments.append("-DCONFIG_TY1208Z_ROUTER_RAM768=1")
             subprocess.run(arguments + [str(file), "-o", str(binary)], check=True)
             subprocess.run([binary], check=True)
 

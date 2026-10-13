@@ -12,6 +12,10 @@ HARNESS = r'''
 #include <stdio.h>
 #include <string.h>
 #define __init
+#ifndef CONFIG_TY1208Z_ROUTER_RAM768
+#define CONFIG_TY1208Z_ROUTER_RAM768 0
+#endif
+#define IS_ENABLED(x) (x)
 #define __exit
 #define ENODEV 19
 #define EIO 5
@@ -23,10 +27,10 @@ struct resource { uint64_t start, end; unsigned long flags; };
 struct platform_device { int bound; };
 static struct platform_device device, *ty1208z_restart_device;
 static int ty1208z_restart_driver;
-static bool board;
+static const char *board;
 static unsigned mode, events;
 static bool of_machine_is_compatible(const char *name)
-{ assert(!strcmp(name, "tianyi,ty1208z-ca-openwrt-router-ram")); return board; }
+{ return !strcmp(name, board); }
 static int platform_driver_register(void *driver)
 { assert(driver == &ty1208z_restart_driver && events++ == 0); return mode == 1 ? -EIO : 0; }
 static struct platform_device *platform_device_register_simple(
@@ -49,9 +53,18 @@ static void platform_driver_unregister(void *driver)
 MAIN = r'''
 int main(void)
 {
-    board = false;
+    board = "other,board";
     assert(ty1208z_ram_restart_init() == -ENODEV && !events);
-    board = true;
+    board = "tianyi,ty1208z-ca-openwrt-router768-ram";
+#if CONFIG_TY1208Z_ROUTER_RAM768
+    mode = events = 0;
+    assert(ty1208z_ram_restart_init() == 0 && events == 2);
+    ty1208z_ram_restart_exit();
+#else
+    assert(ty1208z_ram_restart_init() == -ENODEV && !events);
+#endif
+    events = 0;
+    board = "tianyi,ty1208z-ca-openwrt-router-ram";
     for (mode = 1; mode <= 3; mode++) {
         events = 0;
         assert(ty1208z_ram_restart_init() == (mode == 3 ? -ENODEV : -EIO));
@@ -81,6 +94,10 @@ def test():
         subprocess.run(["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                         "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
                         str(program), "-o", str(binary)], check=True)
+        subprocess.run([binary], check=True)
+        subprocess.run(["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                        "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
+                        "-DCONFIG_TY1208Z_ROUTER_RAM768=1", str(program), "-o", str(binary)], check=True)
         subprocess.run([binary], check=True)
 
 

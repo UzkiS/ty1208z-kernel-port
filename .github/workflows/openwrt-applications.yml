@@ -75,6 +75,9 @@ jobs:
           - target: openwrt-router
             source_dir: router
             ram_dir: openwrt-router1
+          - target: openwrt-router768
+            source_dir: router768
+            ram_dir: openwrt-router768
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
@@ -124,6 +127,23 @@ jobs:
             artifacts/native-ram-sd-audit/
             logs/native-ram-restart.log
             logs/native-ram-sd-audit.log
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Compile the exact higher-memory router restart module
+        if: matrix.source_dir == 'router768'
+        run: |
+          python3 tools/test_restart_module.py
+          source_tree=$(find .work/router768/build -maxdepth 1 -type d -name 'openwrt-ram-*')
+          test -n "$source_tree"
+          python3 tools/build_openwrt_restart_module.py --taskbase .work --source "$source_tree" --router-artifacts artifacts/openwrt-router768 > logs/native-router768-restart.log 2>&1 || { tail -n 100 logs/native-router768-restart.log; exit 1; }
+      - name: Upload the exact higher-memory HARDWARE-UNTESTED restart module
+        if: always() && matrix.source_dir == 'router768'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ty1208z-router768-RAM-MODULE-HARDWARE-UNTESTED-${{ github.sha }}
+          path: |
+            artifacts/native-router768-restart/
+            logs/native-router768-restart.log
           retention-days: 14
           if-no-files-found: warn
       - name: Upload QEMU-only artifacts and checks

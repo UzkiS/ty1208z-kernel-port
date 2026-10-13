@@ -6,7 +6,10 @@ The board has 1 GiB of physical DDR and a 32-bit Cortex-A7/ARMv7 CPU. The
 current RAM experiment intentionally exposes only the low 256 MiB, with the
 low 16 MiB reserved. It is not a Docker installation candidate.
 An independent [768-MiB memory experiment](ram.md) now passes physical 512-MiB
-stress/PFN checks and autonomous return. Later native-router integration is separate.
+stress/PFN checks and autonomous return. Its independent native router768
+integration now also physically passes memory/PFN, Ethernet/application and
+automatic return checks; [native report](../verification/openwrt-router768-board-20261014.md).
+Storage and actual Docker runtime acceptance remain separate.
 
 Before integration, establish usable higher memory and independently validate
 the eMMC driver, block I/O and filesystem/recovery plan. Storage installation
