@@ -65,5 +65,8 @@ automatic module loading or boot-image export. No module was loaded on the
 box. Named roaming/capability startup transport remains unsupported; passing
 these tests does not bypass that blocker or prove working STA/AP.
 
-The standalone CI build now runs this additional sanitizer. Its remote
-result for this change remains pending.
+Both build entries now run this additional sanitizer. The native entry
+selects the actual package source and matching Linux tree after compilation,
+and rejects missing or ambiguous trees before export. Changes to Wi-Fi
+sanitizer scripts also trigger the native package workflow. Remote results
+for this change remain pending.

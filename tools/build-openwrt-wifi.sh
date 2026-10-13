@@ -20,6 +20,17 @@ make "${make_args[@]}" -j"$jobs" tools/install V=s
 make "${make_args[@]}" -j"$jobs" toolchain/install V=s
 make "${make_args[@]}" -j"$jobs" target/linux/compile V=s
 make "${make_args[@]}" -j"$jobs" package/kernel/ty1208z-rda-port/compile V=s
+# Exercise the parser from the actual native package source, not just the
+# standalone port: native preparation can otherwise leave a stale source.
+native_kernels=("$source_tree"/build_dir/target-*/linux-hi3798mv100_ram/linux-6.12.112)
+native_packages=("$source_tree"/build_dir/target-*/linux-hi3798mv100_ram/ty1208z-rda-port-*)
+if [ "${#native_kernels[@]}" -ne 1 ] || [ ! -d "${native_kernels[0]}" ] ||
+   [ "${#native_packages[@]}" -ne 1 ] || [ ! -d "${native_packages[0]}/rdawlan" ]; then
+    echo 'Expected one actual native Linux tree and RDA package source.' >&2
+    exit 1
+fi
+"$python_cmd" "$project/tools/test_wifi_assoc_frames.py" \
+    --source "${native_packages[0]}" --linux "${native_kernels[0]}"
 "$python_cmd" "$project/tools/check_openwrt_wifi.py" --source "$source_tree" --built
 "$python_cmd" "$project/tools/test_openwrt_wifi_package.py" --source "$source_tree"
 # Include the actual-APK rejection report in the exported hash manifest.

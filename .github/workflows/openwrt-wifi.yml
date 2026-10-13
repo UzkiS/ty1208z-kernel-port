@@ -17,6 +17,7 @@ on:
       - 'tools/prepare_openwrt_applications.py'
       - 'tools/fetch_wifi.py'
       - 'tools/make_wifi*'
+      - 'tools/test_wifi_*.py'
       - '.github/workflows/openwrt-wifi.yml'
   pull_request:
     paths:
@@ -25,6 +26,7 @@ on:
       - 'patches/0003-*'
       - 'patches/0004-*'
       - 'tools/*openwrt*wifi*'
+      - 'tools/test_wifi_*.py'
       - '.github/workflows/openwrt-wifi.yml'
   workflow_dispatch:
 
