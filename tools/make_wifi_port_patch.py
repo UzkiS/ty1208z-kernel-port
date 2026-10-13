@@ -161,6 +161,12 @@ def transform(files):
 \t\t\treturn ret;
 \t}''')
     text = text[:start] + operation + text[end:]
+    text = replace(text,
+                   '\t\t\t\t\twland_get_assoc_ies_from_frame(drvr->iflist[i], p_frame, frame_len, sub_type);',
+                   '\t\t\t\t\tret = wland_get_assoc_ies_from_frame(drvr->iflist[i], p_frame, frame_len, sub_type);', 2)
+    text = replace(text,
+                   '\t\t\t\t\twland_analysis_assoc_ies(drvr->iflist[i]);',
+                   '\t\t\t\t\tif (!ret)\n\t\t\t\t\t\twland_analysis_assoc_ies(drvr->iflist[i]);')
     text = replace(text, '''\t\tbuf = skb->data;
 \t\t// pull hdr from the skb''', '''\t\tif (skb->len < WID_HEADER_LEN) {
 \t\t\twland_pkt_buf_free_skb(skb);
@@ -311,6 +317,7 @@ def transform(files):
     result["rdawlan/wland_rf.c"] = text
 
     text = files["rdawlan/wland_cfg80211.c"]
+    text = replace_definition(text, "wland_get_assoc_ies_from_frame")
     text = replace(text, '#include "wland_android.h"',
                    '#include <linux/math64.h>\n#include "wland_port_key.h"\n'
                    '#include "wland_port_key_validate.h"\n#include "wland_android.h"')

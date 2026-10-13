@@ -1503,7 +1503,188 @@
  	.change_bss = wland_cfg80211_change_bss,
  	.mgmt_tx = wland_cfg80211_mgmt_tx,
  #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 5, 0)
-@@ -6954,18 +6926,18 @@
+@@ -6748,87 +6720,104 @@
+ 	return false;
+ }
+ 
++/* SPDX-License-Identifier: ISC */
+ s32 wland_get_assoc_ies_from_frame(struct wland_if *ifp,
+-								u8* frame, u16 frame_len, u8 frame_stype)
+-{
+-	struct wland_cfg80211_connect_info *conn_info = &ifp->vif->conn_info;
+-	s32 err = 0;
+-	u16 mgmt_hdr_len = GET_MGMT_HDR_LEN(frame);
+-	u16 assoc_ies_len = frame_len - mgmt_hdr_len;// - FCS_LEN;
+-	u8 sub_type = frame_stype;
+-	u8 *mac_addr = frame + MAC_HDR_ADDR2_OFFSET;
+-	struct wland_sta_info *sta_info;
+-	u8 find = 0;
++				 u8 *frame, u16 frame_len, u8 frame_stype)
++{
++	struct wland_cfg80211_connect_info *conn_info;
++	struct wland_sta_info *sta_info = NULL, *entry;
++	const u8 *ies, *mac_addr;
++	u8 *copy = NULL, *previous;
++	size_t header, fixed, ie_length, offset;
++	bool wmm = false, ht = false;
+ 	int i;
+ 
+-	WLAND_DBG(CFG80211, INFO, "Enter, sub_type %x\n", sub_type);
+-
+-	if (sub_type == ASSOC_REQ) {
+-		spin_lock_bh(&conn_info->sta_info_lock);
+-		list_for_each_entry(sta_info, &conn_info->sta_info_list, list) {
+-			if (memcmp(mac_addr, sta_info->mac_addr, ETH_ALEN) == 0) {
+-				find = 1;
+-				break;
+-			}
+-		}
+-
+-		if (!find) {
+-			sta_info = kzalloc(sizeof(struct wland_sta_info), GFP_ATOMIC);
+-			if (!sta_info) {
+-				spin_unlock_bh(&conn_info->sta_info_lock);
+-				WLAND_ERR("Memory alloc failure %zu\n", sizeof(struct wland_sta_info));
+-				return -1;
+-			}
+-			atomic_set(&sta_info->tid_map, 0);
+-			for (i=0; i<8; ++i) {
+-				sta_info->tid_jiffies[i] = jiffies;
+-				sta_info->tid_num[i] = 0;
+-			}
+-			list_add_tail(&sta_info->list, &conn_info->sta_info_list);
+-		}
+-
+-		if (sta_info->assoc_req_ie)
+-			kfree(sta_info->assoc_req_ie);
+-		sta_info->assoc_req_ie_len = assoc_ies_len - CAP_INFO_LEN - LISTEN_INTERVAL_LEN;
+-		sta_info->assoc_req_ie =
+-				kmemdup(frame + mgmt_hdr_len + CAP_INFO_LEN + LISTEN_INTERVAL_LEN,
+-				sta_info->assoc_req_ie_len, GFP_ATOMIC);
+-		sta_info->connect = 0;
+-		sta_info->aid = 0;
+-		if (sta_info->assoc_req_ie) {
+-			sta_info->wmm_enable = !!wland_find_wmmie(sta_info->assoc_req_ie, sta_info->assoc_req_ie_len);
+-			sta_info->n_enable = !!wland_parse_tlvs(sta_info->assoc_req_ie, sta_info->assoc_req_ie_len, WLAN_EID_HT_CAPABILITY);
++	if (!ifp || !ifp->vif || !frame)
++		return -EINVAL;
++	if (frame_len < MAC_HDR_LEN)
++		return -EMSGSIZE;
++	if ((frame[0] & 0x03) || (frame[0] & 0xfc) != frame_stype ||
++	    (frame[1] & 0x03))
++		return -EPROTO;
++	if (frame_stype == ASSOC_REQ)
++		fixed = CAP_INFO_LEN + LISTEN_INTERVAL_LEN;
++	else if (frame_stype == ASSOC_RSP)
++		fixed = CAP_INFO_LEN + STATUS_CODE_LEN + AID_LEN;
++	else
++		return -EOPNOTSUPP;
++	header = GET_MGMT_HDR_LEN(frame);
++	if (header > frame_len || fixed > frame_len - header)
++		return -EMSGSIZE;
++	ies = frame + header + fixed;
++	ie_length = frame_len - header - fixed;
++	mac_addr = frame + MAC_HDR_ADDR2_OFFSET;
++
++	/* Validate the complete IE stream before allocation or state changes. */
++	for (offset = 0; offset < ie_length; ) {
++		const u8 *element = ies + offset;
++		size_t length;
++
++		if (ie_length - offset < 2)
++			return -EMSGSIZE;
++		length = element[1];
++		if (length > ie_length - offset - 2)
++			return -EMSGSIZE;
++		if ((element[0] == WLAN_EID_SSID && length > 32) ||
++		    (element[0] == WLAN_EID_HT_CAPABILITY &&
++		     length != sizeof(struct ieee80211_ht_cap)))
++			return -EPROTO;
++		offset += length + 2;
++	}
++	if (ie_length) {
++		copy = kmemdup(ies, ie_length, GFP_ATOMIC);
++		if (!copy)
++			return -ENOMEM;
++		wmm = !!wland_find_wmmie(copy, ie_length);
++		ht = !!wland_parse_tlvs(copy, ie_length, WLAN_EID_HT_CAPABILITY);
++	}
++	conn_info = &ifp->vif->conn_info;
++	if (frame_stype == ASSOC_RSP) {
++		previous = conn_info->resp_ie;
++		conn_info->resp_ie = copy;
++		conn_info->resp_ie_len = ie_length;
++		kfree(previous);
++		return 0;
++	}
++
++	spin_lock_bh(&conn_info->sta_info_lock);
++	list_for_each_entry(entry, &conn_info->sta_info_list, list) {
++		if (!memcmp(mac_addr, entry->mac_addr, ETH_ALEN)) {
++			sta_info = entry;
++			break;
++		}
++	}
++	if (!sta_info) {
++		sta_info = kzalloc(sizeof(*sta_info), GFP_ATOMIC);
++		if (!sta_info) {
++			spin_unlock_bh(&conn_info->sta_info_lock);
++			kfree(copy);
++			return -ENOMEM;
++		}
++		atomic_set(&sta_info->tid_map, 0);
++		for (i = 0; i < 8; i++) {
++			sta_info->tid_jiffies[i] = jiffies;
++			sta_info->tid_num[i] = 0;
+ 		}
+ 		memcpy(sta_info->mac_addr, mac_addr, ETH_ALEN);
+-
+-		spin_unlock_bh(&conn_info->sta_info_lock);
+-
+-		WLAND_DBG(CFG80211, INFO, "Done(ASSOC_REQ req len:%d), wmm:%d, n:%d\n",
+-				assoc_ies_len  - CAP_INFO_LEN - LISTEN_INTERVAL_LEN, sta_info->wmm_enable, sta_info->n_enable);
+-	} else if(sub_type == ASSOC_RSP) {
+-		if (conn_info->resp_ie)
+-			kfree(conn_info->resp_ie);
+-		conn_info->resp_ie = NULL;
+-		conn_info->resp_ie_len = 0;
+-
+-		if (assoc_ies_len) {
+-			conn_info->resp_ie_len = assoc_ies_len - CAP_INFO_LEN - STATUS_CODE_LEN - AID_LEN;
+-			conn_info->resp_ie =
+-				kmemdup(frame + mgmt_hdr_len + CAP_INFO_LEN + STATUS_CODE_LEN + AID_LEN,
+-				conn_info->resp_ie_len,
+-				GFP_KERNEL);
+-		} else {
+-			conn_info->resp_ie_len = 0;
+-			conn_info->resp_ie = NULL;
+-		}
+-		WLAND_DBG(CFG80211, INFO, "Done(ASSOC_RSP resp len:%d)\n", conn_info->resp_ie_len);
+-	}
+-
+-	WLAND_DUMP(RX_NETEVENT, frame + mgmt_hdr_len, assoc_ies_len,
+-		"wland_get_assoc_ies_from_frame assoc_ies_len:%d\n", assoc_ies_len);
+-
+-	return err;
+-}
++		list_add_tail(&sta_info->list, &conn_info->sta_info_list);
++	}
++	previous = sta_info->assoc_req_ie;
++	sta_info->assoc_req_ie = copy;
++	sta_info->assoc_req_ie_len = ie_length;
++	sta_info->wmm_enable = wmm;
++	sta_info->n_enable = ht;
++	sta_info->connect = 0;
++	sta_info->aid = 0;
++	spin_unlock_bh(&conn_info->sta_info_lock);
++	kfree(previous);
++	return 0;
++}
++
+ 
+ 
+ static s32 wland_get_assoc_ies(struct wland_cfg80211_info *cfg,
+@@ -6954,18 +6943,18 @@
  		conn_info->resp_ie, conn_info->resp_ie_len, GFP_KERNEL);
  
  #else
@@ -1527,7 +1708,7 @@
  				.req_ie = conn_info->req_ie,
  				.req_ie_len = conn_info->req_ie_len,
  				.resp_ie = conn_info->resp_ie,
-@@ -7026,7 +6998,7 @@
+@@ -7026,7 +7015,7 @@
  	bool find = false;
  	int ret = 0;
  
@@ -1536,7 +1717,7 @@
  		&& (profile->ssid.SSID_len) && wiphy))
  		return 0;
  
-@@ -8196,6 +8168,9 @@
+@@ -8196,6 +8185,9 @@
  
  	cfg->dongle_up = true;
  up_exit:
@@ -3390,7 +3571,29 @@
  	WLAND_DBG(RX, DEBUG, "WID id=%04x\n", wid_id);
  	switch (wid_id) {
  		case WID_P2P_ACTION_TO_HOST:
-@@ -706,7 +720,7 @@
+@@ -516,7 +530,7 @@
+ 							break;
+ 				if (i!= P2PAPI_BSSCFG_MAX) {
+ 					frame_len = (u16) (p_buffer[6] | (p_buffer[7] << 8)) - 1;//reduce rssi length
+-					wland_get_assoc_ies_from_frame(drvr->iflist[i], p_frame, frame_len, sub_type);
++					ret = wland_get_assoc_ies_from_frame(drvr->iflist[i], p_frame, frame_len, sub_type);
+ 				}
+ 				break;
+ 			case ASSOC_RSP:
+@@ -526,9 +540,10 @@
+ 							break;
+ 				if (i!= P2PAPI_BSSCFG_MAX) {
+ 					frame_len = (u16) (p_buffer[6] | (p_buffer[7] << 8)) - 1;//reduce rssi length
+-					wland_get_assoc_ies_from_frame(drvr->iflist[i], p_frame, frame_len, sub_type);
++					ret = wland_get_assoc_ies_from_frame(drvr->iflist[i], p_frame, frame_len, sub_type);
+ #ifdef WLAND_TX_SOFT_MAC
+-					wland_analysis_assoc_ies(drvr->iflist[i]);
++					if (!ret)
++						wland_analysis_assoc_ies(drvr->iflist[i]);
+ #endif
+ 				}
+ 				break;
+@@ -706,7 +721,7 @@
  		 * If the receive is not processed inside an ISR, the softirqd must be woken explicitly to service the NET_RX_SOFTIRQ.
  		 * * In 2.6 kernels, this is handledby netif_rx_ni(), but in earlier kernels, we need to do it manually.
  		 */
@@ -3399,7 +3602,7 @@
  	}
  }
  
-@@ -870,7 +884,7 @@
+@@ -870,7 +885,7 @@
  		return 0;
  }
  
@@ -3408,7 +3611,7 @@
  {
  	if(current_seq < prev_seq)
  		rx_info->dbg_rx_ampdu_loss_count+= (4096 + current_seq - prev_seq);
-@@ -878,7 +892,7 @@
+@@ -878,7 +893,7 @@
  		rx_info->dbg_rx_ampdu_loss_count+= (current_seq - prev_seq);
  }
  
@@ -3417,7 +3620,7 @@
  {
  	struct list_head *pfree_recv_queue = NULL;
  	struct sk_buff *skb = NULL;
-@@ -922,7 +936,7 @@
+@@ -922,7 +937,7 @@
  	return 0;
  }
  
@@ -3426,7 +3629,7 @@
  	struct recv_reorder_ctrl *preorder_ctrl, int bforced)
  {
  	struct list_head *phead, *plist;
-@@ -1068,7 +1082,7 @@
+@@ -1068,7 +1083,7 @@
  	return precvframe->rx_tail;
  }
  
@@ -3435,7 +3638,7 @@
  {
  	u8 wsize = preorder_ctrl->wsize_b;
  	u16 wend = (preorder_ctrl->indicate_seq + wsize -1) & 0xFFF;//% 4096;
-@@ -2127,13 +2141,17 @@
+@@ -2127,13 +2142,17 @@
  		//WLAND_DBG(BUS, TRACE, "Enter,%s,count:%u\n", dev_name(dev), skb->len);
  
  
@@ -3454,7 +3657,7 @@
  			WLAND_ERR("read payload_len invalid! rx_len:%d size:%d\n"
  				, rx_len, size);
  			wland_pkt_buf_free_skb(skb);
-@@ -2264,6 +2282,10 @@
+@@ -2264,6 +2283,10 @@
  
  		} else if ((rx_type == PKT_TYPE_CFG_RSP) || (rx_type == PKT_TYPE_CFG_MAC1)){
  
@@ -3465,7 +3668,7 @@
  			msg_type = buf[2];
  			memset(&event_packet, 0, sizeof(event_packet));
  
-@@ -2279,6 +2301,10 @@
+@@ -2279,6 +2302,10 @@
  					skb->len, rx_len, rx_type);
  				WLAND_DUMP(RX_WIDRSP, skb->data, skb->len,
  					"RX Data (WID_MSG_RESP), len:%u\n", skb->len);
