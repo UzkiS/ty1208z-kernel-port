@@ -2,6 +2,7 @@
 """Actual application DT/provenance mutations and two-CRC UART boot gates."""
 import argparse
 import copy
+import gzip
 import hashlib
 import json
 import os
@@ -18,7 +19,8 @@ import zlib
 
 from inspect_images import parse_fdt
 from openwrt_apps_ram_profile import (
-    BOOTLOADER_BOUND_ADDRESS, INITRD_ADDRESS, LANGUAGE_MARKER, MAX_COMPRESSED,
+    BOOTLOADER_BOUND_ADDRESS, DUAL_CORE_MARKERS, INITRD_ADDRESS, LANGUAGE_MARKER, MAX_COMPRESSED,
+    MAX_UNCOMPRESSED,
     applications_ram_profile, validate_pair,
 )
 from prepare_ram_boot import prepare
@@ -137,6 +139,36 @@ class ApplicationProfileTests(unittest.TestCase):
             record.write_text(json.dumps(report))
             with self.assertRaisesRegex(ValueError, "markers are absent"):
                 validate_pair(root)
+
+    def test_dual_core_manifest_cannot_drop_all_extra_runtime_evidence(self):
+        if "sing-box - " not in (ARTIFACTS / "packages.manifest").read_text():
+            self.skipTest("The measured historical image predates the second core")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "candidate"
+            shutil.copytree(ARTIFACTS, root)
+            record = root / "checks/applications-qemu-256.json"
+            report = json.loads(record.read_text())
+            report["passed_markers"] = [marker for marker in report["passed_markers"]
+                                        if marker not in DUAL_CORE_MARKERS]
+            record.write_text(json.dumps(report))
+            with self.assertRaisesRegex(ValueError, "bounded-memory"):
+                validate_pair(root)
+
+    def test_rehashed_oversized_archives_remain_rejected(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "candidate"
+            shutil.copytree(ARTIFACTS, root)
+            record = root / "checks/applications-qemu-256.json"
+            report = json.loads(record.read_text())
+            for data, error in ((bytes(MAX_COMPRESSED + 1), "compressed RAM budget"),
+                                (gzip.compress(b"070701" + bytes(MAX_UNCOMPRESSED), mtime=0),
+                                 "bounded newc archive")):
+                (root / "rootfs.cpio.gz").write_bytes(data)
+                report["artifacts"]["rootfs"] = {"bytes": len(data),
+                                                 "sha256": hashlib.sha256(data).hexdigest()}
+                record.write_text(json.dumps(report))
+                with self.subTest(error=error), self.assertRaisesRegex(ValueError, error):
+                    validate_pair(root)
 
     def test_unapproved_transfer_address_or_command_sends_nothing(self):
         class NoCommands:

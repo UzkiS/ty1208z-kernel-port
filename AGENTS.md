@@ -5,11 +5,24 @@ Scope: this repository only. The user excluded the unrelated drive-root
 
 ## Objective and current boundary
 
-Port TY1208Z CA / Hi3798MV100 to a modern Linux kernel, then integrate native
-OpenWrt/Kwrt, Passwall and the board's Wi-Fi, with real time64 validation.
+Port TY1208Z CA / Hi3798MV100 to a modern Linux kernel, then integrate official
+OpenWrt, Passwall and the board's Wi-Fi, with real time64 validation.
 The first deliverable is a single-core, RAM-only diagnostic candidate.
 Read `STATUS.md`, `docs/architecture.md` and `docs/hardware.md` before changing
 board support. Keep assumptions separate from measured facts.
+
+## User defaults
+
+- The user dropped Kwrt customization on 2026-10-13. Use official OpenWrt
+  sources and pin the latest selected branch commit for reproducible builds.
+- Required user features: board support, Simplified Chinese, Docker,
+  Passwall with both Xray and sing-box, and unzip. Docker runtime acceptance
+  depends on measured higher-memory, storage and container-kernel support;
+  compiling packages alone does not satisfy that requirement.
+- New OpenWrt images use Simplified Chinese and an empty root password
+  by default, as requested on 2026-10-13. Do not generate or install a random
+  management password during RAM setup. Preserve a password explicitly set by
+  the user only when restoring that user's configuration.
 
 ## Authorization
 
@@ -28,7 +41,7 @@ board support. Keep assumptions separate from measured facts.
 ## Architecture and source ownership
 
 - Kernel board support in `overlay/` and `config/` builds independently of Wi-Fi
-  and OpenWrt/Kwrt. `docs/architecture.md` describes optional integration layers.
+  and OpenWrt. `docs/architecture.md` describes optional integration layers.
 - `overlay/` is authoritative for new Linux files. Modify it, then regenerate
   `patches/0001-hi3798mv100-diagnostic.patch`; do not edit generated patches alone.
 - Changes to existing upstream files belong in explicit, checked generators.

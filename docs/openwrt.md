@@ -1,8 +1,15 @@
-# Native OpenWrt/Kwrt integration
+# Official native OpenWrt integration
 
-The intended result is native OpenWrt with working Ethernet, optional onboard
-Wi-Fi and Passwall. A new kernel and a successful RAM diagnostic are necessary
+The intended result is official OpenWrt with working Ethernet, onboard
+Wi-Fi/AP, Docker and Passwall. A new kernel and a successful RAM diagnostic are necessary
 steps; neither is a working OpenWrt target or an installable image.
+
+On 2026-10-13 the user removed Kwrt customization from the requested scope.
+Use official OpenWrt plus the reviewed board support, Chinese interface,
+Docker, Passwall with Xray and sing-box, and unzip. The earlier Kwrt audit
+below remains source-selection history. Live GitHub commit/compare queries
+confirmed pinned `58efa991` still equals the `openwrt-25.12` branch head
+(zero commits ahead/behind). The master head was `ba45d608` at that check.
 
 ## Audited upstream state
 

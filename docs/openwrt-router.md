@@ -7,8 +7,9 @@ Passwall patches and kernel patch as the application target. It reuses the
 FEMAC/MDIO/FESTAv220 configuration. The standalone diagnostic, native Ethernet
 and plain application trees retain their own configurations and outputs.
 
-The candidate includes Passwall/Xray/LuCI, fw4, dnsmasq-full, ip-full, ethtool
-and iperf3. Its modules match its exact native kernel. The rootfs uses the
+New candidates include Chinese LuCI, Passwall with Xray and sing-box, unzip,
+fw4, dnsmasq-full, ip-full, ethtool and iperf3. Their modules match the exact
+native kernel. The rootfs uses the
 reviewed DHCP-client-only `probe` interface on eth0 and no DHCP-server interface.
 DHCP-supplied DNS is enabled for the installed resolver and NTP service.
 Kernel storage, USB, Wi-Fi, SMP, debugfs and restart experiments are excluded.
@@ -20,6 +21,12 @@ TX image also passes physical TCP in both directions with zero additional
 error/drop/FIFO counts and repeated local-namespace Passwall TCP/UDP TPROXY.
 Management access and routing policy need configuration before normal use.
 There is no flash/install recipe.
+
+The user's default is Simplified Chinese with username `root` and an empty
+password. Both current plain and router rootfs builds already have an empty
+root shadow field; the build checker now requires it. Physical RAM management
+setup must not add an automatically generated password. Restore a password
+only if the user explicitly configured it.
 
 ## Application and forwarding acceptance
 

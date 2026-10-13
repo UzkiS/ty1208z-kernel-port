@@ -11,7 +11,10 @@ from ethernet_net_profile import NETWORK_NODES, openwrt_router_ethernet_profile
 # Bound Addr (0x08e62000), clear of the measured kernel load/workspace.
 INITRD_ADDRESS = 0x04000000
 BOOTLOADER_BOUND_ADDRESS = 0x08E62000
-MAX_COMPRESSED = 32 * 1024 * 1024
+# The dual-core rootfs passes both 512/240-MiB QEMU budgets. 36 MiB ends at
+# 0x06400000, still well below the observed 0x08e62000 bootloader bound.
+# Retain the 96-MiB expansion cap and exact-image bounded-memory acceptance.
+MAX_COMPRESSED = 36 * 1024 * 1024
 MAX_UNCOMPRESSED = 96 * 1024 * 1024
 COMPATIBLE = "tianyi,ty1208z-ca-openwrt-apps-ram"
 ROUTER_COMPATIBLE = "tianyi,ty1208z-ca-openwrt-router-ram"
@@ -26,6 +29,8 @@ MARKERS = {"XRAY_UNSYNCHRONIZED_CLOCK_PASS", "NTP_ERA_TIME64_PASS", "CERTIFICATE
 ROUTER_MARKERS = {"OPENWRT_ROUTER_FORWARDING_TIME64_PASS", "PASSWALL_TPROXY_TCP_TIME64_PASS",
                   "PASSWALL_TPROXY_UDP_TIME64_PASS"}
 LANGUAGE_MARKER = "LUCI_CHINESE_DEFAULT_PASS"
+DUAL_CORE_MARKERS = {"PASSWALL_SINGBOX_SOCKS_TIME64_PASS", "PASSWALL_SINGBOX_TLS_TIME64_PASS",
+                     "UNZIP_ARCHIVE_TIME64_PASS", "LUCI_EMPTY_ROOT_LOGIN_PASS"}
 
 
 def digest(data):
@@ -43,6 +48,8 @@ def validate_pair(artifacts):
     # extra language check and must supply its actual console evidence too.
     if LANGUAGE_MARKER in report.get("passed_markers", []):
         markers = markers | {LANGUAGE_MARKER}
+    if DUAL_CORE_MARKERS & set(report.get("passed_markers", [])):
+        markers |= DUAL_CORE_MARKERS
     if (report.get("result") != "OPENWRT_APPLICATIONS_QEMU_PASS" or
             variant not in {"qemu", "ethernet"} or
             report.get("machine") != "virt,cortex-a7,single-core" or
@@ -71,6 +78,12 @@ def validate_pair(artifacts):
     for package in ("luci-app-passwall - ", "xray-core - ", "firewall4 - ", "dnsmasq-full - "):
         if package not in packages:
             raise ValueError(f"Native application manifest lacks {package}")
+    if "sing-box - " in packages and not DUAL_CORE_MARKERS <= markers:
+        raise ValueError("Dual-core application lacks bounded-memory runtime acceptance")
+    if DUAL_CORE_MARKERS <= markers:
+        for package in ("sing-box - ", "unzip - "):
+            if package not in packages:
+                raise ValueError(f"Native dual-core application manifest lacks {package}")
     return data, len(unpacked)
 
 

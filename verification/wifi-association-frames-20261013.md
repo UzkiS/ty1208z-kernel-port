@@ -69,7 +69,7 @@ Both build entries now run this additional sanitizer. The native entry
 selects the actual package source and matching Linux tree after compilation,
 and rejects missing or ambiguous trees before export. Changes to Wi-Fi
 sanitizer scripts also trigger the native package workflow. Remote results
-for the native package entry remain pending. The later standalone diagnostic
+for the native package entry are recorded below. The later standalone diagnostic
 [run 38374147701](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38374147701)
 passed on `45762c2`; all six Wi-Fi manifest files, both exact Git patches and
 the actual `RDA_ASSOC_FRAMES_PASS` marker were independently verified. See
@@ -83,4 +83,16 @@ configuration/package/eight-case guard markers were verified; build-log
 SHA-256 is `6a84a0bf2dfd4fa15e398448cc9effef24fec17c95f8c822257a3114e4dc75c9`.
 Its APK matches the 139270-byte local APK above. This proves native compilation
 and packaging of the association fix. It precedes `4904c2b`, which added the
-actual native parser sanitizer to CI; that later run remains pending.
+actual native parser sanitizer to CI.
+
+The later native [run 38371459967](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38371459967)
+now passes on `4904c2b87ddf9f2680d5bcead498f3a966d1a8d0`. Downloaded artifacts
+again match all 17 manifest files, the exact shared patch and all four recorded
+checker/generator source identities. The actual native `RDA_ASSOC_FRAMES_PASS`
+marker and configuration/package/eight broken-APK guard markers are present
+in the build log. Its SHA-256 is
+`1fd29faf2d753df57a743b4af1303471195bc8c8f7cbc047d548c00f6d4b8237`.
+The APK remains 139270 bytes with SHA-256
+`7b24488cd0c4e7f2889686a721249ddef31b6bf6b276790f7e6f6206582d6a1f`.
+This closes native compilation/package/parser acceptance; firmware/startup,
+physical association and AP operation remain separate.

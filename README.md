@@ -3,7 +3,8 @@
 [![Diagnostic CI](https://github.com/UzkiS/ty1208z-kernel-port/actions/workflows/diagnostic.yml/badge.svg)](https://github.com/UzkiS/ty1208z-kernel-port/actions/workflows/diagnostic.yml)
 
 为天邑 TY1208Z 高安版 / Hi3798MV100 准备现代 Linux 板级适配，后续目标是
-原生 OpenWrt/Kwrt、Passwall、板载 Wi-Fi，以及可验证的 64 位时间支持。
+官方原生 OpenWrt、中文 LuCI、Docker、Passwall（Xray 和 sing-box）、unzip、
+板载 Wi-Fi/AP，以及可验证的 64 位时间支持。用户已取消 Kwrt 定制要求。
 
 **Linux 6.12 RAM 诊断已在盒子上启动，仍不是可刷入的路由器固件。**
 现有 fastboot 和 Hinas 没有被修改。状态见 [STATUS.md](STATUS.md)。
@@ -56,7 +57,7 @@ CI 在干净环境执行相同构建，并提供名称含 `HARDWARE-UNTESTED` �
 内核、无线和 OpenWrt 集成有各自的输入、依赖及验收边界。
 当前内核构建独立于其他两层。目录和依赖见 [architecture.md](docs/architecture.md)，
 硬件依据见 [hardware.md](docs/hardware.md)，Wi-Fi 线索见 [wifi.md](docs/wifi.md)。
-网口主线驱动对照见 [Ethernet 审计](docs/ethernet.md)，原生 target、Kwrt 来源和
+网口主线驱动对照见 [Ethernet 审计](docs/ethernet.md)，官方原生 target、历史 Kwrt 来源审计和
 Passwall/time64 验收边界见 [OpenWrt 集成](docs/openwrt.md)。
 独立 `openwrt/` RAM target 已完成原生 GCC/musl 镜像构建，并通过核心用户空间的
 QEMU 2040 年验证。`make openwrt-ram` 使用锁定 OpenWrt 源码和 musl，

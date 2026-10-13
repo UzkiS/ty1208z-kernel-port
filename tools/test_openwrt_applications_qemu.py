@@ -3,6 +3,7 @@
 import argparse
 import base64
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -10,6 +11,7 @@ import re
 import selectors
 import subprocess
 import time
+import zipfile
 from prepare_openwrt_applications import application_variant
 
 
@@ -52,6 +54,30 @@ def test(source, memory_mib=512):
     # complete command below 256 bytes. The minimal BusyBox has no stty applet.
     commands = [b"printf %s '" + encoded[i:i+192] + b"' >> /tmp/application-test.b64\n"
                 for i in range(0, len(encoded), 192)]
+    # Exercise the delivered InfoZIP binary with stored/deflated data, UTF-8
+    # filenames, ZIP64 local headers and a timestamp beyond 2038.
+    zip_files = {
+        "deflated.txt": b"TY1208Z_UNZIP_2040\n" * 256,
+        "stored.bin": bytes(range(256)) * 4,
+        "中文目录/中文文件.txt": "中文解压验证\n".encode(),
+        "empty.txt": b"",
+    }
+    zip_files["SHA256SUMS"] = "".join(
+        f"{hashlib.sha256(data).hexdigest()}  {name}\n"
+        for name, data in zip_files.items()).encode()
+    archive_buffer = io.BytesIO()
+    with zipfile.ZipFile(archive_buffer, "w", allowZip64=True) as archive:
+        for name, data in zip_files.items():
+            entry = zipfile.ZipInfo(name, date_time=(2040, 1, 1, 0, 0, 0))
+            entry.compress_type = zipfile.ZIP_STORED if name == "stored.bin" else zipfile.ZIP_DEFLATED
+            with archive.open(entry, "w", force_zip64=True) as output_file:
+                output_file.write(data)
+    zip_fixture = output / "unzip-fixture.zip"
+    zip_fixture.write_bytes(archive_buffer.getvalue())
+    encoded_zip = base64.b64encode(zip_fixture.read_bytes())
+    commands += [b"printf %s '" + encoded_zip[i:i+192] + b"' >> /tmp/unzip-fixture.b64\n"
+                 for i in range(0, len(encoded_zip), 192)]
+    commands.append(b"base64 -d /tmp/unzip-fixture.b64 > /tmp/unzip-fixture.zip\n")
     for name, data in (("ntp-fixture", ntp_binary.read_bytes()),
                        ("ntp-test", Path(__file__).with_name("openwrt-ntp-guest.sh").read_bytes())):
         encoded_ntp = base64.b64encode(data)
@@ -94,6 +120,8 @@ def test(source, memory_mib=512):
                     transcript.extend(data)
                     log.write(data)
                     log.flush()
+                    if b"Initramfs unpacking failed:" in transcript or b"Kernel panic" in transcript:
+                        raise ValueError(f"Application QEMU runtime failed; see {transcript_path.name}")
                     if activation_at is None and b"Please press Enter" in transcript:
                         activation_at = time.monotonic() + 1
                     if sent < len(commands) and prompt.search(transcript[consumed:]):
@@ -118,6 +146,8 @@ def test(source, memory_mib=512):
             b"LUCI_CHINESE_DEFAULT_PASS", b"PASSWALL_LUCI_AUTH_TIME64_PASS",
             b"LUCI_RPCD_TIME64_PASS", b"PASSWALL_XRAY_SOCKS_TIME64_PASS",
             b"PASSWALL_XRAY_TLS_TIME64_PASS",
+            b"PASSWALL_SINGBOX_SOCKS_TIME64_PASS", b"PASSWALL_SINGBOX_TLS_TIME64_PASS",
+            b"UNZIP_ARCHIVE_TIME64_PASS", b"LUCI_EMPTY_ROOT_LOGIN_PASS",
             b"NFT_EXPRESSIONS_AND_COUNTER_PASS", b"OPENWRT_APPLICATIONS_QEMU_PASS",
         )
         if ethernet:
@@ -140,6 +170,7 @@ def test(source, memory_mib=512):
             "ntp_server_source": ntp_source, "ntp_server_binary": ntp_binary,
             "ntp_guest": Path(__file__).with_name("openwrt-ntp-guest.sh"),
             "applications_guest": Path(__file__).with_name("openwrt-applications-guest.sh"),
+            "unzip_archive": zip_fixture,
         }
         if ethernet:
             test_inputs["router_guest"] = Path(__file__).with_name("openwrt-router-guest.sh")

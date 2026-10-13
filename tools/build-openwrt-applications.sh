@@ -29,10 +29,10 @@ make_args=(-C "$source_tree" "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" COMMITCOUNT=
     # Install only the application roots and their dependency recipes. Installing
     # every unrelated LuCI app introduces upstream Kconfig dependency cycles.
     ./scripts/feeds uninstall -a
-    ./scripts/feeds install -f -p passwall_packages xray-core
+    ./scripts/feeds install -f -p passwall_packages xray-core sing-box
     ./scripts/feeds install -p luci luci luci-ssl luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn
     ./scripts/feeds install -f -p passwall luci-app-passwall luci-i18n-passwall-zh-cn
-    ./scripts/feeds install -p packages curl
+    ./scripts/feeds install -p packages curl unzip
     if [[ "$stage" == network* ]]; then ./scripts/feeds install -p packages iperf3; fi
 )
 # Feed indexing can resolve .config before all package recipes exist. Apply the

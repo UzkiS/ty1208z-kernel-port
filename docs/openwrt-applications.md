@@ -13,14 +13,25 @@ The base OpenWrt source and board/BusyBox patches come from the existing native
 target. `openwrt/applications/sources.lock.json` fixes complete archives for
 packages, LuCI, Passwall and Passwall packages by commit and SHA-256. Only the
 selected package roots and their dependencies are installed into the build.
-Passwall 26.10.4 selects Xray 26.10.10 and nftables; unused proxy engines and
-geodata are explicitly disabled rather than included by default.
+Passwall 26.10.4 selects both Xray 26.10.10 and sing-box 1.14.3, with nftables.
+The sing-box recipe comes from the pinned Passwall packages feed, explicitly
+overriding the packages feed's alternative recipe. InfoZIP unzip 6.0-r9 comes
+from the official packages feed. Other proxy engines and geodata are disabled.
+The RAM candidate disables embedded Tailscale, ACME certificate issuance and
+the gVisor userspace network stack to fit the 36-MiB compressed/96-MiB
+uncompressed archive limits. QUIC, uTLS, WireGuard and Clash API retain their
+recipe defaults; the requested Passwall proxy cores remain enabled. The
+full-defaults binary is independently buildable, but its initial
+rootfs exceeds this RAM profile's limits; do not relax those gates to boot it.
 
 New application/router builds include the Simplified Chinese LuCI, firewall
 and Passwall translations. A first-boot UCI default selects `zh_cn`; browser
 language detection is not required. Users can change the language in LuCI
 afterward. The built-rootfs checks require the language default, actual LMO
 catalogues and installed translation packages.
+The delivered root account has an empty password as requested. The runtime
+fixture verifies empty-password LuCI login before installing a guest-only
+password for the independent password-authentication check.
 
 The application build reuses the completed native GCC 14.3.0/musl 1.2.5
 toolchain as an external compiler and records compiler/libc hashes. The pinned
@@ -69,6 +80,11 @@ from 2026 to 2040 must produce the actual expected clock. Neither test helper
 enters the delivered rootfs. Source/binary/shell hashes join the runtime
 provenance; see the [NTP result](../verification/openwrt-ntp-time64-20261013.md).
 
+The fixture also extracts a host-generated ZIP archive with the installed
+InfoZIP executable: stored and deflated data, UTF-8 Chinese filenames, ZIP64
+local headers, empty files and a 2040 timestamp must survive extraction. SHA-256
+checks verify actual content; the fixture archive hash joins QEMU provenance.
+
 The fixture checks libc/file time64, logging, real dnsmasq resolution, OpenSSL
 certificate validation and curl/mbedTLS HTTPS. It requires valid 2040 TLS to
 work and expired/untrusted certificates to fail. It checks LuCI's protected
@@ -89,6 +105,12 @@ the expired proxy certificate must fail with Xray's certificate-expired log.
 The fixture waits for Passwall's asynchronous boot handler to finish before
 starting its instances, so a later service restart cannot erase their state.
 
+Equivalent real Passwall nodes exercise sing-box's generated configuration,
+SOCKS data flow and VLESS/TLS at 2040. The valid custom-CA connection must carry
+the HTTPS payload, and the expired proxy certificate must fail with an expiry
+log. These checks use the delivered ARM binary, not a host substitute. They do
+not establish every protocol/build-tag feature or sing-box TPROXY on hardware.
+
 nftables must count actual loopback packets and accept socket/TPROXY rules.
 Inserting those expressions is not transparent-proxy forwarding acceptance.
 The default QEMU test uses a Cortex-A7 with 512 MiB. The RAM stage repeats the
@@ -105,9 +127,12 @@ The application archive is too large to embed while keeping the kernel's
 decompressed image/BSS below the low-16-MiB boundary. `make_openwrt_apps_ram.py`
 keeps the accepted raw kernel and its matching rootfs/modules unchanged and
 adds an explicit chosen initrd range to a standalone board DTB. The archive
-starts at `0x04000000`; its maximum compressed budget of 32 MiB ends below the
+starts at `0x04000000`; its maximum compressed budget of 36 MiB ends below the
 unexplained bootloader Bound Addr `0x08e62000`. This conservative placement does
 not resolve the full memory map or establish a hardware boot.
+The compressed cap increased from 32 MiB only after the selected dual-core
+rootfs passed both 512/240-MiB QEMU budgets. Its maximum end is `0x06400000`,
+clear of the observed Bound Addr `0x08e62000`; the 96-MiB expansion cap remains.
 
 The wrapper verifies the actual 240-MiB QEMU provenance, archive bounds,
 critical board source identities, kernel layout and explicit peripheral-free

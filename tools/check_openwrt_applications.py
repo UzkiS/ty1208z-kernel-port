@@ -18,6 +18,8 @@ def check(source, built=False):
             "LUCI_LANG_zh_Hans", "PACKAGE_luci-i18n-base-zh-cn",
             "PACKAGE_luci-i18n-firewall-zh-cn", "PACKAGE_luci-i18n-passwall-zh-cn",
             "PACKAGE_luci-app-passwall_Nftables_Transparent_Proxy", "PACKAGE_xray-core",
+            "PACKAGE_luci-app-passwall_INCLUDE_Xray", "PACKAGE_luci-app-passwall_INCLUDE_SingBox",
+            "PACKAGE_sing-box", "PACKAGE_unzip",
             "PACKAGE_firewall4", "PACKAGE_dnsmasq-full", "PACKAGE_ty1208z-time64",
             "LIBCURL_THREADED_RESOLVER"):
         if f"CONFIG_{option}=y\n" not in config:
@@ -88,6 +90,10 @@ def check(source, built=False):
         if len(roots) != 1:
             raise ValueError("Expected one actual application rootfs")
         rootfs = roots[0]
+        root_accounts = [line.split(":") for line in (rootfs / "etc/shadow").read_text().splitlines()
+                         if line.startswith("root:")]
+        if len(root_accounts) != 1 or len(root_accounts[0]) != 9 or root_accounts[0][1] != "":
+            raise ValueError("Application rootfs must default to an empty root password")
         language_default = Path("etc/uci-defaults/99-ty1208z-luci-language")
         expected_language = (Path(__file__).resolve().parents[1] /
                             "openwrt/applications/overlay/target/linux/hi3798mv100/base-files" /
@@ -119,8 +125,9 @@ def check(source, built=False):
             if (not (rootfs / "sbin/ip").is_symlink() or
                     str((rootfs / "sbin/ip").readlink()) != "/usr/libexec/ip-full"):
                 raise ValueError("Integrated rootfs lacks the /sbin/ip wrapper")
-        if not (rootfs / "usr/bin/xray").is_file() or not (rootfs / "usr/share/passwall/app.sh").is_file():
-            raise ValueError("Actual application rootfs is missing Xray or Passwall")
+        for name in ("usr/bin/xray", "usr/bin/sing-box", "usr/bin/unzip", "usr/share/passwall/app.sh"):
+            if not (rootfs / name).is_file() or (rootfs / name).is_symlink():
+                raise ValueError(f"Actual application rootfs is missing installed application: {name}")
         for item in lock.get("recipe_patches", []):
             if "installed_path" not in item:
                 continue
@@ -134,7 +141,8 @@ def check(source, built=False):
             raise ValueError("Expected one built application package manifest")
         manifest_path = manifests[0]
         packages = manifest_path.read_text()
-        for package in ("luci-app-passwall - ", "xray-core - ", "firewall4 - ", "dnsmasq-full - ",
+        for package in ("luci-app-passwall - ", "xray-core - ", "sing-box - ", "unzip - ",
+                        "firewall4 - ", "dnsmasq-full - ",
                         "luci-i18n-base-zh-cn - ", "luci-i18n-firewall-zh-cn - ",
                         "luci-i18n-passwall-zh-cn - "):
             if package not in packages:

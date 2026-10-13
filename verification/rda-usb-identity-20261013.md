@@ -121,3 +121,17 @@ Final health raw SHA-256 is
 Passwall retains the user's disabled setting, and temporary namespace/test
 firewall state is absent. COM9 is released. This restoration does not extend
 radio or external-routing acceptance.
+
+## Verified diagnostic CI
+
+[Run 38385651695](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38385651695)
+passed on `bd1d76e43319dab66a6a3b1d75304f13632d6b0b`. Downloaded artifacts
+match all 120 files in twelve actual manifests; eleven uImages have correct
+header/payload CRCs and exactly match their zImage plus DTB. Both shared Wi-Fi
+patches match that Git revision, and all nine actual Wi-Fi sanitizer markers
+are present. The USB build log includes the actual identity parser/syscall
+regression, ARM wire-only selftest, USB helper and QEMU time64 success markers.
+Its SHA-256 is
+`0a6a1cb34a22d84d1c01a444a96d81c38a2601522aac07fe5947b15c8b58df47`.
+These are offline/tooling results; the earlier physical replies and restored
+router retain their exact separately recorded image/executable identities.

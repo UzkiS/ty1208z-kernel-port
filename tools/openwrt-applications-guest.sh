@@ -6,6 +6,9 @@ tr '\000' '\n' < /sys/firmware/devicetree/base/compatible | grep -qx linux,dummy
 finish() {
     result=$?
     trap - EXIT
+    # Preserve all failure diagnostics and reach poweroff even if a service
+    # failed to start or a diagnostic command itself returns an error.
+    set +e
     if [ "$result" -eq 0 ]; then
         echo OPENWRT_APPLICATIONS_QEMU_PASS
     else
@@ -47,6 +50,23 @@ wait_luci_login() {
         fi
         attempts=$((attempts+1))
         [ "$attempts" -lt 30 ] || return 1
+        sleep 1
+    done
+}
+
+reject_expired_proxy() {
+    attempts=0
+    while :; do
+        if curl --noproxy '' -fsS --max-time 5 --socks5-hostname "127.0.0.1:$1" \
+                --cacert ca.pem https://time64.test:18443/ > "$3.txt" 2> "$3-client.log"; then
+            echo "Proxy on port $1 accepted an expired TLS certificate"
+            return 1
+        fi
+        # A failed connection alone is insufficient. Wait for the core's real
+        # expiry error; startup/log scheduling must not masquerade as success.
+        if grep -qi 'certificate has expired' "$2" 2>/dev/null; then return 0; fi
+        attempts=$((attempts+1))
+        [ "$attempts" -lt 10 ] || return 1
         sleep 1
     done
 }
@@ -99,6 +119,16 @@ if openssl verify -CAfile ca.pem expired.pem >> cert.log 2>&1; then
     exit 1
 fi
 echo CERTIFICATE_TIME64_PASS
+
+unzip -v > unzip-version.txt
+grep -q 'UnZip 6.00' unzip-version.txt
+LC_ALL=C.UTF-8 unzip -t /tmp/unzip-fixture.zip > unzip-test.log
+LC_ALL=C.UTF-8 unzip -q /tmp/unzip-fixture.zip -d unzip-output
+(cd unzip-output && sha256sum -c SHA256SUMS)
+test "$(stat -c %Y unzip-output/deflated.txt)" = 2208988800
+test -f 'unzip-output/中文目录/中文文件.txt'
+test ! -s unzip-output/empty.txt
+echo UNZIP_ARCHIVE_TIME64_PASS
 
 # Use the installed dnsmasq implementation without external DNS or a WAN.
 /etc/init.d/dnsmasq stop
@@ -175,6 +205,16 @@ ubus call session create '{"timeout":60}' > session.json
 jsonfilter -i session.json -e @.ubus_rpc_session | grep -Eq '^[0-9a-f]{32}$'
 echo PASSWALL_LUA_CHECK_START
 lua -e 'assert(require("luci.passwall.api"))'
+status=$(curl --noproxy '*' -sS --max-time 30 -D empty-login.headers -c empty-login.cookies \
+    --data-urlencode luci_username=root --data-urlencode luci_password= \
+    -o empty-login.html -w '%{http_code}' http://127.0.0.1/cgi-bin/luci/admin/services/passwall)
+test "$status" = 302
+grep -qi '^set-cookie: sysauth_http=' empty-login.headers
+curl --noproxy '*' -fsS --max-time 30 -b empty-login.cookies \
+    http://127.0.0.1/cgi-bin/luci/admin/services/passwall > empty-passwall-page.html
+grep -qi passwall empty-passwall-page.html
+if grep -q 'bootstrap.sysauth' empty-passwall-page.html; then exit 1; fi
+echo LUCI_EMPTY_ROOT_LOGIN_PASS
 # This fixture password exists only in the diskless, network-isolated guest.
 printf 'qemu-fixture-only\nqemu-fixture-only\n' | passwd root > passwd.log 2>&1
 status=$(curl --noproxy '*' -sS --max-time 30 -D login.headers -c login.cookies \
@@ -270,13 +310,73 @@ until curl --noproxy '' -fsS --max-time 3 --socks5-hostname 127.0.0.1:18083 \
     sleep 1
 done
 grep -qx TY1208Z_LOCAL_PAYLOAD_2040 vless.txt
-if curl --noproxy '' -fsS --max-time 10 --socks5-hostname 127.0.0.1:18084 \
-        --cacert ca.pem https://time64.test:18443/ > vless-expired.txt 2> vless-expired-client.log; then
-    echo 'Xray accepted an expired TLS proxy certificate'
-    exit 1
-fi
-grep -qi 'certificate has expired' /tmp/etc/passwall/vless-expired.log
+reject_expired_proxy 18084 /tmp/etc/passwall/vless-expired.log vless-expired
 echo PASSWALL_XRAY_TLS_TIME64_PASS
+
+# Use Passwall's real sing-box generator/controller and the same local fixtures.
+sing-box version > sing-box-version.txt
+grep -q '^sing-box version 1\.14\.3' sing-box-version.txt
+uci set passwall.qemu_singbox=nodes
+uci set passwall.qemu_singbox.type=sing-box
+uci set passwall.qemu_singbox.protocol=socks
+uci set passwall.qemu_singbox.address=127.0.0.1
+uci set passwall.qemu_singbox.port=18081
+uci set passwall.qemu_singbox.remarks=QEMU-sing-box-local-only
+uci commit passwall
+controller_status=0
+sh /usr/share/passwall/app.sh run_socks flag=singbox_time64 node=qemu_singbox bind=127.0.0.1 \
+    socks_port=18085 config_file=singbox.json log_file=singbox.log > singbox-controller.log 2>&1 || controller_status=$?
+case "$controller_status" in 0|1) ;; *) cat singbox-controller.log; exit 1 ;; esac
+test -s /tmp/etc/passwall/singbox.json
+sing-box check -c /tmp/etc/passwall/singbox.json > singbox-check.log 2>&1
+attempts=0
+until curl --noproxy '' -fsS --max-time 3 --socks5-hostname 127.0.0.1:18085 \
+        --cacert ca.pem https://time64.test:18443/ > singbox-proxy.txt 2> singbox-proxy.log; do
+    attempts=$((attempts+1))
+    [ "$attempts" -lt 20 ] || exit 1
+    sleep 1
+done
+grep -qx TY1208Z_LOCAL_PAYLOAD_2040 singbox-proxy.txt
+echo PASSWALL_SINGBOX_SOCKS_TIME64_PASS
+
+for server in valid expired; do
+    node=qemu_singbox_vless_$server
+    if [ "$server" = valid ]; then listen_port=18445; socks_port=18086
+    else listen_port=18446; socks_port=18087; fi
+    uci set "passwall.$node=nodes"
+    uci set "passwall.$node.type=sing-box"
+    uci set "passwall.$node.protocol=vless"
+    uci set "passwall.$node.address=127.0.0.1"
+    uci set "passwall.$node.port=$listen_port"
+    uci set "passwall.$node.uuid=e38831d8-39ba-4ad8-a96d-3ef6988a7803"
+    uci set "passwall.$node.transport=tcp"
+    uci set "passwall.$node.tls=1"
+    uci set "passwall.$node.tls_serverName=time64.test"
+    uci set "passwall.$node.tls_certificate=1"
+    uci set "passwall.$node.tls_certificate_pem=$(cat ca.pem)"
+    uci commit passwall
+    controller_status=0
+    sh /usr/share/passwall/app.sh run_socks "flag=singbox_vless_$server" "node=$node" bind=127.0.0.1 \
+        "socks_port=$socks_port" "config_file=singbox-vless-$server.json" \
+        "log_file=singbox-vless-$server.log" loglevel=debug \
+        > "singbox-vless-$server-controller.log" 2>&1 || controller_status=$?
+    case "$controller_status" in 0|1) ;; *) exit 1 ;; esac
+    test -s "/tmp/etc/passwall/singbox-vless-$server.json"
+    sing-box check -c "/tmp/etc/passwall/singbox-vless-$server.json" \
+        > "singbox-vless-$server-check.log" 2>&1
+done
+attempts=0
+until curl --noproxy '' -fsS --max-time 3 --socks5-hostname 127.0.0.1:18086 \
+        --cacert ca.pem https://time64.test:18443/ > singbox-vless.txt 2> singbox-vless-client.log; do
+    attempts=$((attempts+1))
+    [ "$attempts" -lt 20 ] || exit 1
+    sleep 1
+done
+grep -qx TY1208Z_LOCAL_PAYLOAD_2040 singbox-vless.txt
+reject_expired_proxy 18087 /tmp/etc/passwall/singbox-vless-expired.log singbox-expired
+echo PASSWALL_SINGBOX_TLS_TIME64_PASS
+# Release these extra processes before the independent router/TPROXY fixture.
+killall sing-box
 
 # Confirm real kernel rules/counters and socket/TPROXY expression availability.
 nft add table inet time64
