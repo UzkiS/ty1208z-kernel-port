@@ -1,0 +1,21 @@
+#!/bin/sh
+found=0
+echo '=== SD identification (no block devices) ==='
+for card in /sys/bus/mmc/devices/mmc*:*/ty1208z_sd_ident; do
+    [ -f "$card" ] || continue
+    carddir=${card%/ty1208z_sd_ident}
+    for field in type name manfid oemid date ty1208z_sd_ident; do
+        [ -f "$carddir/$field" ] || continue
+        printf '%s=' "$field"
+        cat "$carddir/$field"
+    done
+    found=1
+done
+if [ "$found" = 0 ]; then
+    echo 'SD_IDENT_NO_CARD no-responsive-card-enumerated'
+fi
+if [ -d /sys/class/block ]; then
+    ls /sys/class/block
+else
+    echo 'BLOCK_DISABLED'
+fi

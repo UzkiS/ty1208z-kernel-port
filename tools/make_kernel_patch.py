@@ -39,6 +39,7 @@ changes = {
         'dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-ty1208z-sd-audit.dtb\n'
+        'dtb-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += hi3798mv100-ty1208z-sd-ident.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb\n'),
     "drivers/soc/hisilicon/Kconfig": (
@@ -152,9 +153,36 @@ changes["drivers/power/reset/Kconfig"] = (
 changes["drivers/power/reset/Makefile"] = (
     '# SPDX-License-Identifier: GPL-2.0\n',
     '# SPDX-License-Identifier: GPL-2.0\n'
-    'obj-$(CONFIG_POWER_RESET_TY1208Z_SP805) += ty1208z-sp805-restart.o\n')
+    'obj-$(CONFIG_POWER_RESET_TY1208Z_SP805) += ty1208z-sp805-restart.o\n'
+    'obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_SD) += ty1208z-mv100-sd-restart.o\n')
+
+changes["drivers/power/reset/Kconfig"] = (
+    changes["drivers/power/reset/Kconfig"][0],
+    changes["drivers/power/reset/Kconfig"][1].replace('config POWER_RESET_AS3722\n',
+        'config POWER_RESET_TY1208Z_MV100_SD\n'
+        '\tbool "TY1208Z measured MV100 restart for SD identification"\n'
+        '\tdepends on ARCH_HI3798MV100 && MMC_DW_HI3798MV100_SD_IDENT\n'
+        '\tdepends on !WATCHDOG && !BLOCK && !NET && !USB_SUPPORT\n'
+        '\tdepends on !MODULES && !SMP && !DEBUG_FS\n'
+        '\thelp\n'
+        '\t  Require measured SYSID0/zero ID cells/inactive watchdog state.\n'
+        '\t  No startup writes; only explicit kernel restart arms WDG0.\n\n'
+        'config POWER_RESET_AS3722\n'))
 
 changes.update({
+    "drivers/mmc/core/sd.c": [
+        ('static struct attribute *sd_std_attrs[] = {\n',
+         '#include "ty1208z-sd-ident.h"\n\n'
+         'static struct attribute *sd_std_attrs[] = {\n'
+         '#ifdef CONFIG_MMC_DW_HI3798MV100_SD_IDENT\n'
+         '\t&dev_attr_ty1208z_sd_ident.attr,\n'
+         '#endif\n'),
+        ('\tif (!(card->scr.cmds & SD_SCR_CMD48_SUPPORT))\n',
+         '\t/* Restricted profile never discovers/enables cache or PM settings. */\n'
+         '\tif (IS_ENABLED(CONFIG_MMC_DW_HI3798MV100_SD_IDENT))\n'
+         '\t\treturn 0;\n\n'
+         '\tif (!(card->scr.cmds & SD_SCR_CMD48_SUPPORT))\n'),
+    ],
     "drivers/mmc/core/mmc.c": [
         ('static struct attribute *mmc_std_attrs[] = {\n',
          '#include "ty1208z-ident.h"\n\n'
@@ -169,6 +197,13 @@ changes.update({
         'obj-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += ty1208z-samples.o\n'),
     "drivers/mmc/host/Kconfig": (
         'config MMC_DW_HI3798CV200\n',
+        'config MMC_DW_HI3798MV100_SD_IDENT\n'
+        '\tbool "TY1208Z restricted SD identification diagnostic"\n'
+        '\tdepends on MMC_DW && ARCH_HI3798MV100 && !BLOCK\n'
+        '\tselect MMC_DW_PLTFM\n'
+        '\thelp\n'
+        '\t  PIO, 1-bit, legacy SD metadata only. No MMC/SDIO or sectors.\n'
+        '\t  Reject card settings, data writes and unknown requests.\n\n'
         'config HI3798MV100_EMMC_READ_SAMPLES\n'
         '\tbool "TY1208Z fixed four-sector read-only diagnostic"\n'
         '\tdepends on MMC_DW_HI3798MV100_IDENT && !BLOCK\n'
@@ -187,6 +222,7 @@ changes.update({
     "drivers/mmc/host/Makefile": (
         'obj-$(CONFIG_MMC_DW_HI3798CV200)',
         'obj-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += dw_mmc-hi3798mv100-ident.o\n'
+        'obj-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += dw_mmc-hi3798mv100-sd-ident.o\n'
         'obj-$(CONFIG_MMC_DW_HI3798CV200)'),
     "drivers/mmc/host/dw_mmc.h": [
         (' * @init: early implementation specific initialization.\n',

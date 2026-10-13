@@ -47,7 +47,8 @@ class DiagnosticTests(unittest.TestCase):
                     os.write(master, b"uname -r\r\n" + kernel + b"\r\n# ")
                     if mode == "wrong-kernel":
                         return
-                    diagnostic = b"usb-diag; diag" if profile == "usb-host1" else b"diag"
+                    diagnostic = (b"usb-diag; diag" if profile == "usb-host1" else
+                                  b"sd-diag; diag" if profile == "sd-ident1" else b"diag")
                     self.assertEqual(read_command(), diagnostic + b"; echo TY1208Z_DIAG_COMPLETE\r")
                     time64 = b"TIME64_FAIL" if mode == "probe-failure" else b"TIME64_PASS sizeof(time_t)=8 file=2208988800"
                     audit = b"EMMC_AUDIT_READ_ONLY_COMPLETE" if mode != "missing-audit" else b"No audit driver"
@@ -58,6 +59,16 @@ class DiagnosticTests(unittest.TestCase):
                     if mode == "inactive-sd":
                         sd = sd.replace(b"SD_AUDIT_CONTROLLER_READ_COMPLETE",
                                         b"SD_AUDIT_CONTROLLER_SKIPPED inactive-clock-or-reset")
+                    sd_ident = (b"SD_IDENT_GUARD_PASS source=50000000 PIO-only\r\nUsing PIO mode.\r\n"
+                                b"type=SD\r\nBLOCK_DISABLED\r\n"
+                                b"ty1208z_sd_ident=SD_IDENT_COMPLETE bytes=16008609792 clock=25000000 bus_width=0 timing=0\r\n"
+                                b"TY1208Z_MV100_RESTART_READY")
+                    if mode == "no-sd-card":
+                        sd_ident = b"SD_IDENT_NO_CARD no-responsive-card-enumerated"
+                    if mode == "bad-sd-mode":
+                        sd_ident = sd_ident.replace(b"bus_width=0 timing=0", b"bus_width=2 timing=1")
+                    if mode == "bad-sd-clock":
+                        sd_ident = sd_ident.replace(b"clock=25000000", b"clock=50000000")
                     ident = b"No card" if mode == "missing-ident" else (
                         b"EMMC_IDENT_GUARD_PASS\r\nUsing PIO mode.\r\nnew MMC card\r\n"
                         b"name=008G30\r\ntype=MMC\r\nBLOCK_DISABLED\r\n"
@@ -115,6 +126,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\ndiagnostic output\r\n" * 1024,
                                  b"\r\n" + (audit if profile == "emmc-audit1" else b""),
                                  b"\r\n" + (sd if profile == "sd-audit1" else b""),
+                                 b"\r\n" + (sd_ident if profile == "sd-ident1" else b""),
                                  b"\r\n" + (ident if profile in ("emmc-ident1", "emmc-read1") else b""),
                                  b"\r\n" + (samples if profile == "emmc-read1" else b""),
                                  b"\r\n" + (ethernet if profile == "ethernet-audit1" else b""),
@@ -249,6 +261,11 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_usb_host_controller_acceptance_does_not_invent_rda(self):
         self.exercise("no-rda", profile="usb-host1")
+
+    def test_sd_identification_requires_card_capacity_legacy_bus_and_bounded_clock(self):
+        for mode in ("no-sd-card", "bad-sd-mode", "bad-sd-clock", "success"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, profile="sd-ident1")
 
 
 if __name__ == "__main__":

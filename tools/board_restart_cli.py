@@ -14,6 +14,8 @@ from serial_cli import console_text, open_receiver
 from ymodem_sender import TransferError
 from openwrt_ethernet_board_cli import command as native_command, DT_IDENTITY, SOURCE_REVISION
 
+SD_DT_IDENTITY = b"cat /sys/firmware/devicetree/base/compatible; echo"
+
 
 def run(args, serial_module):
     started = datetime.now(timezone.utc)
@@ -26,8 +28,10 @@ def run(args, serial_module):
     result = {"schema": 1, "port": args.port, "started_utc": started.isoformat(),
               "status": "starting", "kernel_verified": False, "restart_sent": False,
               "persistent_writes": False}
-    native = getattr(args, "profile", "diagnostic") == "router"
-    result["profile"] = "router" if native else "diagnostic"
+    profile = getattr(args, "profile", "diagnostic")
+    native = profile == "router"
+    sd_ident = profile == "sd-ident1"
+    result["profile"] = profile
     command = native_command if native else shell_command
     probe = BootloaderProbe()
     with open_receiver(serial_module, args.port, 115200, 0.01) as port:
@@ -36,7 +40,8 @@ def run(args, serial_module):
             try:
                 command(exchange, b"")
                 identity = command(exchange, b"uname -r")
-                release = rb"6\.12\.112" if native else rb"6\.12\.112-ty1208z-restart1"
+                release = (rb"6\.12\.112" if native else rb"6\.12\.112-ty1208z-sd-ident1" if sd_ident
+                           else rb"6\.12\.112-ty1208z-restart1")
                 if not re.search(rb"(?:^|[\r\n])" + release + rb"[\r\n]", identity):
                     raise TransferError("Not the SP805 RAM experiment; no restart sent")
                 if native:
@@ -50,13 +55,20 @@ def run(args, serial_module):
                                       b"readlink /sys/bus/platform/devices/ty1208z-sp805-restart/driver")
                     if b"../../../bus/platform/drivers/ty1208z-sp805-restart" not in binding:
                         raise TransferError("Actual RAM restart module binding missing")
+                if sd_ident:
+                    if not re.search(rb"(?:^|[\r\n])tianyi,ty1208z-ca-sd-ident-ram\x00hi3798mv100-series\x00",
+                                     command(exchange, SD_DT_IDENTITY)):
+                        raise TransferError("SD identification DT differs; no restart sent")
+                    binding = command(exchange, b"readlink /sys/bus/platform/devices/f8a2c000.sd-restart/driver")
+                    if b"../../../bus/platform/drivers/ty1208z-mv100-sd-restart" not in binding:
+                        raise TransferError("Actual SD-profile restart binding missing")
                 result["kernel_verified"] = True
                 report = command(exchange, b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE")
                 if (not re.search(rb"(?:^|[\r\n])[^\r\n]*TY1208Z_RESTART_READY "
                                   rb"no-startup-writes explicit-restart-only[\r\n]", report) or
                         not re.search(rb"(?:^|[\r\n])TY1208Z_RESTART_CHECK_COMPLETE[\r\n]", report)):
                     raise TransferError("Actual restart registration missing; no restart sent")
-                if native and b"TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes" not in report:
+                if (native or sd_ident) and b"TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes" not in report:
                     raise TransferError("Measured MV100 restart guard missing")
                 # PID 1 is the diagnostic shell, not an init service manager.
                 # This fixed -f command enters the kernel restart syscall.
@@ -74,11 +86,16 @@ def run(args, serial_module):
                         continue
                     print(console_text(data.decode("utf-8", "backslashreplace")), end="", flush=True)
                     failure_tail = (failure_tail + data)[-4096:]
+                    if sd_ident and b"SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
+                        result["sd_shutdown_verified"] = True
                     if any(marker in failure_tail for marker in (
-                            b"TY1208Z_RESTART_REFUSED", b"TY1208Z_RESTART_TIMEOUT", b"Reboot failed")):
+                            b"TY1208Z_RESTART_REFUSED", b"TY1208Z_RESTART_TIMEOUT", b"Reboot failed",
+                            b"SD_IDENT_SHUTDOWN_FAILED")):
                         raise TransferError("Kernel restart failed; no retry")
                     for outgoing in probe.feed(data):
                         exchange.write(outgoing)
+                if sd_ident and not result.get("sd_shutdown_verified"):
+                    raise TransferError("SD shutdown completion missing from actual restart stream")
                 result["status"] = "restart-bootloader-verified"
             except (TransferError, ProbeError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:
                 result.update(status="error", error=str(exc) or "Host interrupted")
@@ -98,7 +115,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--profile", choices=("diagnostic", "router"), default="diagnostic")
+    parser.add_argument("--profile", choices=("diagnostic", "router", "sd-ident1"), default="diagnostic")
     parser.add_argument("--timeout", type=int, default=60)
     args = parser.parse_args()
     if not 5 <= args.timeout <= 120:

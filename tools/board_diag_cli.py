@@ -16,6 +16,7 @@ PROFILES = {
     "diag1": b"6.12.112-ty1208z-diag1",
     "emmc-audit1": b"6.12.112-ty1208z-emmc-audit1",
     "sd-audit1": b"6.12.112-ty1208z-sd-audit1",
+    "sd-ident1": b"6.12.112-ty1208z-sd-ident1",
     "emmc-ident1": b"6.12.112-ty1208z-emmc-ident1",
     "emmc-read1": b"6.12.112-ty1208z-emmc-read1",
     "ethernet-audit1": b"6.12.112-ty1208z-ethernet-audit1",
@@ -70,7 +71,8 @@ def run(args, serial_module):
                 if not re.search(rb"(?:^|[\r\n])" + re.escape(PROFILES[args.profile]) + rb"[\r\n]", identity):
                     raise TransferError("Kernel identity differs; diagnostic command not sent")
                 result["kernel_verified"] = True
-                diagnostic = b"usb-diag; diag" if args.profile == "usb-host1" else b"diag"
+                diagnostic = (b"usb-diag; diag" if args.profile == "usb-host1" else
+                              b"sd-diag; diag" if args.profile == "sd-ident1" else b"diag")
                 report = shell_command(exchange, diagnostic + b"; echo TY1208Z_DIAG_COMPLETE", timeout=30)
                 if not re.search(rb"(?:^|[\r\n])TY1208Z_DIAG_COMPLETE[\r\n]", report):
                     raise TransferError("Diagnostic report is incomplete")
@@ -91,6 +93,15 @@ def run(args, serial_module):
                         b"name=008G30", b"type=MMC", b"BLOCK_DISABLED",
                         b"EMMC_IDENT_COMPLETE sectors=15269888 bytes=7818182656")):
                     raise TransferError("Restricted eMMC card identification did not complete")
+                if args.profile == "sd-ident1":
+                    matched = re.findall(rb"SD_IDENT_COMPLETE bytes=(\d+) clock=(\d+) bus_width=(\d+) timing=(\d+)", report)
+                    if (not all(marker in report for marker in (
+                            b"SD_IDENT_GUARD_PASS source=50000000 PIO-only", b"Using PIO mode.",
+                            b"type=SD", b"BLOCK_DISABLED", b"TY1208Z_MV100_RESTART_READY")) or
+                            len(matched) != 1 or not 0 < int(matched[0][0]) <= 2 ** 41 or
+                            not 0 < int(matched[0][1]) <= 25000000 or matched[0][2:] != (b"0", b"0") or
+                            b"SD_IDENT_NO_CARD" in report):
+                        raise TransferError("Restricted SD card identification did not complete")
                 if args.profile == "emmc-read1" and (
                         not all(marker in report for marker in (
                             b"EMMC_SAMPLE_HINAS_HEADER_MATCH crc32=2ba1a125",

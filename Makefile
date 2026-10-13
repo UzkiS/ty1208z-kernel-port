@@ -15,6 +15,7 @@ help:
 	@echo 'make openwrt-wifi-port - compile/package RDA with the native OpenWrt kernel in an isolated tree'
 	@echo 'make emmc-audit - build a separate read-only eMMC-register RAM diagnostic'
 	@echo 'make sd-audit - build a separate read-only onboard SD-register RAM diagnostic'
+	@echo 'make sd-ident - build restricted SD metadata-only RAM candidate with explicit restart'
 	@echo 'make emmc-ident - build a separate restricted PIO eMMC identification image'
 	@echo 'make emmc-read - build fixed four-sector read-only samples (no block device)'
 	@echo 'make ethernet-audit - inspect inherited clocks/PHY IDs without network or reset writes'
@@ -40,6 +41,7 @@ lint:
 	python3 tools/fetch_wifi.py --check-lock
 	shellcheck tools/*.sh initramfs/init initramfs/diag initramfs/ethernet-diag initramfs/ethernet-dhcp
 	shellcheck initramfs/usb-diag
+	shellcheck initramfs/sd-diag
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
 	python3 tools/test_pinned_archives.py
@@ -48,6 +50,8 @@ lint:
 	python3 tools/test_restart_module.py
 	python3 tools/test_sd_audit.py
 	python3 tools/test_sd_audit_module.py
+	python3 tools/test_sd_restart.py
+	python3 tools/test_sd_ident_profile.py
 
 test-serial:
 	python3 tools/test_tftp_readonly.py
@@ -90,6 +94,10 @@ emmc-audit:
 .PHONY: sd-audit
 sd-audit:
 	bash tools/build-sd-audit.sh $(if $(TASKBASE),"$(TASKBASE)")
+
+.PHONY: sd-ident
+sd-ident:
+	bash tools/build-sd-ident.sh $(if $(TASKBASE),"$(TASKBASE)")
 
 emmc-ident:
 	bash tools/build-emmc-ident.sh $(if $(TASKBASE),"$(TASKBASE)")

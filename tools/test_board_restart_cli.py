@@ -14,6 +14,7 @@ import unittest
 
 from bootloader_probe import BootloaderProbe
 from openwrt_ethernet_board_cli import DT_IDENTITY, SOURCE_REVISION
+from board_restart_cli import SD_DT_IDENTITY
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -26,6 +27,7 @@ class RestartSerialTests(unittest.TestCase):
             errors = []
             sent = []
             native = profile == "router"
+            sd_ident = profile == "sd-ident1"
             prompt = b"root@OpenWrt:~# " if native else b"# "
 
             def read_command():
@@ -47,7 +49,8 @@ class RestartSerialTests(unittest.TestCase):
                         return
                     os.write(master, b"\r\n" + prompt)
                     self.assertEqual(read_command(), b"uname -r\r")
-                    release = b"4.4.35_ecoo" if mode == "hinas" else b"6.12.112" if native else b"6.12.112-ty1208z-restart1"
+                    release = (b"4.4.35_ecoo" if mode == "hinas" else b"6.12.112" if native else
+                               b"6.12.112-ty1208z-sd-ident1" if sd_ident else b"6.12.112-ty1208z-restart1")
                     os.write(master, b"uname -r\r\n" + release + b"\r\n" + prompt)
                     if mode == "hinas":
                         return
@@ -67,10 +70,21 @@ class RestartSerialTests(unittest.TestCase):
                         os.write(master, (b"unbound" if mode == "unbound" else b"../../../bus/platform/drivers/ty1208z-sp805-restart") + b"\r\n" + prompt)
                         if mode == "unbound":
                             return
+                    if sd_ident:
+                        self.assertEqual(read_command(), SD_DT_IDENTITY + b"\r")
+                        dt = b"other,board" if mode == "dt" else b"tianyi,ty1208z-ca-sd-ident-ram\x00hi3798mv100-series\x00"
+                        os.write(master, dt + b"\r\n" + prompt)
+                        if mode == "dt":
+                            return
+                        self.assertEqual(read_command(), b"readlink /sys/bus/platform/devices/f8a2c000.sd-restart/driver\r")
+                        binding = b"unbound" if mode == "unbound" else b"../../../bus/platform/drivers/ty1208z-mv100-sd-restart"
+                        os.write(master, binding + b"\r\n" + prompt)
+                        if mode == "unbound":
+                            return
                     self.assertEqual(read_command(), b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE\r")
                     registration = b"not registered" if mode == "missing" else (
                         b"[0.4] driver: TY1208Z_RESTART_READY no-startup-writes explicit-restart-only")
-                    if native and mode != "missing-mv100":
+                    if (native or sd_ident) and mode != "missing-mv100":
                         registration += b"\r\n[0.5] driver: TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes"
                     completion = (b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE" if mode == "echo-completion"
                                   else b"TY1208Z_RESTART_CHECK_COMPLETE")
@@ -83,6 +97,11 @@ class RestartSerialTests(unittest.TestCase):
                         time.sleep(0.03)
                         os.write(master, b"led -- System halted\r\n")
                         return
+                    if mode == "failed-shutdown":
+                        os.write(master, b"[0.7] driver: SD_IDENT_SHUTDOWN_FAILED controller-not-quiesced\r\n")
+                        return
+                    if sd_ident and mode != "missing-shutdown":
+                        os.write(master, b"[0.7] driver: SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\r\n")
                     os.write(master, b"Bootrom start\r\nFastboot 3.3.0-dirty (test)\r\n"
                              b"CPU: Hi3798Mv100 (CA)\r\nReserve Memory\r\n")
                     self.assertEqual(read_command(), b"\x03")
@@ -109,10 +128,12 @@ class RestartSerialTests(unittest.TestCase):
                 self.assertEqual(process.returncode, 0 if mode == "success" else 1, output.decode())
                 self.assertFalse(select.select([master], [], [], 0.05)[0], "Extra command")
                 report = json.loads(prefix.with_suffix(".json").read_text())
-                self.assertEqual(report["restart_sent"], mode in {"success", "failed"})
+                self.assertEqual(report["restart_sent"], mode in {"success", "failed", "missing-shutdown", "failed-shutdown"})
                 if mode == "success":
                     self.assertEqual(report["probe"]["completed_commands"], len(BootloaderProbe.COMMANDS))
                     self.assertEqual(report["status"], "restart-bootloader-verified")
+                    if sd_ident:
+                        self.assertTrue(report["sd_shutdown_verified"])
                 self.assertFalse(report["persistent_writes"])
             finally:
                 if process.poll() is None:
@@ -139,6 +160,11 @@ class RestartSerialTests(unittest.TestCase):
 
     def test_native_router_uses_graceful_reboot_and_inspects_the_fresh_loader(self):
         self.exercise("success", "router")
+
+    def test_sd_identification_requires_exact_dt_binding_guard_and_actual_shutdown(self):
+        for mode in ("dt", "unbound", "missing-mv100", "missing-shutdown", "failed-shutdown", "failed", "success"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, "sd-ident1")
 
 
 if __name__ == "__main__":

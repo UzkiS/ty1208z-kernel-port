@@ -19,6 +19,7 @@ from usb_clock_audit_profile import usb_clock_audit_profile
 from usb_host_profile import usb_host_profile
 from restart_profile import restart_profile
 from sd_audit_profile import sd_audit_profile
+from sd_ident_profile import sd_ident_profile
 from openwrt_apps_ram_profile import BOOTLOADER_BOUND_ADDRESS, applications_ram_profile
 
 ADDRESS = 0x01FFFFC0
@@ -84,6 +85,7 @@ def prepare(artifacts, inspection):
     config = (artifacts / "linux.config").read_text()
     ident = identification_profile(tree, config)
     sd_audit_profile(tree, config)
+    sd_ident = sd_ident_profile(tree, config)
     ethernet_audit_profile(tree, config)
     ethernet_clock_id_profile(tree, config)
     usb_audit_profile(tree, config)
@@ -108,7 +110,7 @@ def prepare(artifacts, inspection):
     for name in ("BLOCK", "MMC", "MTD", "ATA", "SCSI", "NET", "USB_SUPPORT", "MODULES", "SMP"):
         if name == "USB_SUPPORT" and usb_host:
             continue
-        if name == "MMC" and ident:
+        if name == "MMC" and (ident or sd_ident):
             continue
         if name == "NET" and network:
             continue

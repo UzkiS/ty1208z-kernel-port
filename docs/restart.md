@@ -4,7 +4,11 @@ The native router now has a physically accepted, explicitly RAM-loaded restart
 module: a graceful `reboot` reaches the CA loader, the UART tool stops and inspects
 that fresh boot, and the exact router is transferred/CRC-checked and restored
 without another power cycle. See [physical acceptance](../verification/native-restart-board-20261013.md).
-Other independent diagnostic profiles still require their own restart integration.
+Independent diagnostic profiles require matching restart and peripheral shutdown
+integration before unattended image switching.
+The later independent SD metadata profile now also carries the same measured
+MV100 helper and passes explicit command reboot, read-back-checked SD shutdown
+and automatic return to the native router; [SD board report](../verification/sd-ident-board-20261013.md).
 `make restart` retains the original isolated SP805-ID candidate described below.
 
 ## Native router module and measured MV100 identity

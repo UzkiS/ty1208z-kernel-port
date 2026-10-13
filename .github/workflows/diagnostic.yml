@@ -78,6 +78,10 @@ jobs:
         run: |
           make emmc-ident > logs/emmc-ident.log 2>&1 || { tail -n 100 logs/emmc-ident.log; exit 1; }
           tail -n 20 logs/emmc-ident.log
+      - name: Build restricted SD metadata and measured restart with request/MMIO/RAM/QEMU gates
+        run: |
+          make sd-ident > logs/sd-ident.log 2>&1 || { tail -n 100 logs/sd-ident.log; exit 1; }
+          tail -n 30 logs/sd-ident.log
       - name: Build fixed read-only eMMC samples and run request/content/QEMU checks
         run: |
           make emmc-read > logs/emmc-read.log 2>&1 || { tail -n 100 logs/emmc-read.log; exit 1; }
@@ -128,6 +132,7 @@ jobs:
             artifacts/diag1/
             artifacts/emmc-audit1/
             artifacts/sd-audit1/
+            artifacts/sd-ident1/
             artifacts/emmc-ident1/
             artifacts/emmc-read1/
             artifacts/ethernet-audit1/

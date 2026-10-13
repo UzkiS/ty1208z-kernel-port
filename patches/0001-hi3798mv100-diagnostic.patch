@@ -26,13 +26,14 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,16 @@
+@@ -1,4 +1,17 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
 +dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb
 +dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-ty1208z-sd-audit.dtb
++dtb-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += hi3798mv100-ty1208z-sd-ident.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb
 +dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb
@@ -138,7 +139,7 @@
  obj-$(CONFIG_KEYSTONE_TIMER)		+= timer-keystone.o
 --- a/drivers/power/reset/Kconfig
 +++ b/drivers/power/reset/Kconfig
-@@ -8,6 +8,15 @@
+@@ -8,6 +8,24 @@
  	  Say Y here to enable board reset and power off
  
  if POWER_RESET
@@ -151,17 +152,53 @@
 +	  Read real SP805 IDs and require disabled inherited control.
 +	  Register a restart handler without startup writes or a watchdog
 +	  device. Only explicit system restart arms this short watchdog.
++
++config POWER_RESET_TY1208Z_MV100_SD
++	bool "TY1208Z measured MV100 restart for SD identification"
++	depends on ARCH_HI3798MV100 && MMC_DW_HI3798MV100_SD_IDENT
++	depends on !WATCHDOG && !BLOCK && !NET && !USB_SUPPORT
++	depends on !MODULES && !SMP && !DEBUG_FS
++	help
++	  Require measured SYSID0/zero ID cells/inactive watchdog state.
++	  No startup writes; only explicit kernel restart arms WDG0.
  
  config POWER_RESET_AS3722
  	bool "ams AS3722 power-off driver"
 --- a/drivers/power/reset/Makefile
 +++ b/drivers/power/reset/Makefile
-@@ -1,4 +1,5 @@
+@@ -1,4 +1,6 @@
  # SPDX-License-Identifier: GPL-2.0
 +obj-$(CONFIG_POWER_RESET_TY1208Z_SP805) += ty1208z-sp805-restart.o
++obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_SD) += ty1208z-mv100-sd-restart.o
  obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
  obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
  obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
+--- a/drivers/mmc/core/sd.c
++++ b/drivers/mmc/core/sd.c
+@@ -764,7 +764,12 @@
+ sdio_info_attr(3);
+ sdio_info_attr(4);
+ 
++#include "ty1208z-sd-ident.h"
++
+ static struct attribute *sd_std_attrs[] = {
++#ifdef CONFIG_MMC_DW_HI3798MV100_SD_IDENT
++	&dev_attr_ty1208z_sd_ident.attr,
++#endif
+ 	&dev_attr_vendor.attr,
+ 	&dev_attr_device.attr,
+ 	&dev_attr_revision.attr,
+@@ -1258,6 +1263,10 @@
+ 	if (mmc_host_is_spi(card->host))
+ 		return 0;
+ 
++	/* Restricted profile never discovers/enables cache or PM settings. */
++	if (IS_ENABLED(CONFIG_MMC_DW_HI3798MV100_SD_IDENT))
++		return 0;
++
+ 	if (!(card->scr.cmds & SD_SCR_CMD48_SUPPORT))
+ 		return 0;
+ 
 --- a/drivers/mmc/core/mmc.c
 +++ b/drivers/mmc/core/mmc.c
 @@ -838,7 +838,12 @@
@@ -189,10 +226,18 @@
  				   sdio.o sdio_ops.o sdio_bus.o \
 --- a/drivers/mmc/host/Kconfig
 +++ b/drivers/mmc/host/Kconfig
-@@ -802,6 +802,22 @@
+@@ -802,6 +802,30 @@
  	  Synopsys DesignWare Memory Card Interface driver. Select this option
  	  for platforms based on Exynos4 and Exynos5 SoC's.
  
++config MMC_DW_HI3798MV100_SD_IDENT
++	bool "TY1208Z restricted SD identification diagnostic"
++	depends on MMC_DW && ARCH_HI3798MV100 && !BLOCK
++	select MMC_DW_PLTFM
++	help
++	  PIO, 1-bit, legacy SD metadata only. No MMC/SDIO or sectors.
++	  Reject card settings, data writes and unknown requests.
++
 +config HI3798MV100_EMMC_READ_SAMPLES
 +	bool "TY1208Z fixed four-sector read-only diagnostic"
 +	depends on MMC_DW_HI3798MV100_IDENT && !BLOCK
@@ -214,11 +259,12 @@
  	depends on MMC_DW
 --- a/drivers/mmc/host/Makefile
 +++ b/drivers/mmc/host/Makefile
-@@ -50,6 +50,7 @@
+@@ -50,6 +50,8 @@
  obj-$(CONFIG_MMC_DW_PLTFM)	+= dw_mmc-pltfm.o
  obj-$(CONFIG_MMC_DW_BLUEFIELD)	+= dw_mmc-bluefield.o
  obj-$(CONFIG_MMC_DW_EXYNOS)	+= dw_mmc-exynos.o
 +obj-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += dw_mmc-hi3798mv100-ident.o
++obj-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += dw_mmc-hi3798mv100-sd-ident.o
  obj-$(CONFIG_MMC_DW_HI3798CV200) += dw_mmc-hi3798cv200.o
  obj-$(CONFIG_MMC_DW_HI3798MV200) += dw_mmc-hi3798mv200.o
  obj-$(CONFIG_MMC_DW_K3)		+= dw_mmc-k3.o
@@ -946,6 +992,35 @@
 +	sd-audit@f9820000 {
 +		compatible = "tianyi,ty1208z-sd-register-audit";
 +		reg = <0xf9820000 0x1000>, <0xf8a2209c 4>, <0xf8a2011c 4>;
++	};
++};
+--- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-sd-ident.dts
+@@ -0,0 +1,26 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-diagnostic.dts"
++
++/ {
++	model = "TY1208Z CA restricted SD identification with explicit restart";
++	compatible = "tianyi,ty1208z-ca-sd-ident-ram", "hi3798mv100-series";
++};
++
++&{/soc} {
++	mmc@f9820000 {
++		compatible = "tianyi,ty1208z-sd-identification";
++		reg = <0xf9820000 0x1000>, <0xf8a2209c 4>, <0xf8a2011c 4>;
++		reg-names = "controller", "crg39", "ldo";
++		interrupts = <0 34 4>;
++		clock-frequency = <50000000>;
++		fifo-depth = <256>;
++		bus-width = <1>;
++		max-frequency = <25000000>;
++		no-mmc;
++		no-sdio;
++	};
++	sd-restart@f8a2c000 {
++		compatible = "tianyi,ty1208z-mv100-sd-ident-restart";
++		reg = <0xf8a2c000 0x1000>, <0xf8000ee0 4>;
 +	};
 +};
 --- /dev/null
@@ -1702,6 +1777,17 @@
 +MODULE_DESCRIPTION("TY1208Z fixed read-only Hinas header/superblock RAM diagnostic");
 +MODULE_LICENSE("GPL");
 --- /dev/null
++++ b/drivers/mmc/core/ty1208z-sd-ident.h
+@@ -0,0 +1,8 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Decoded non-unique metadata only; reading this attribute sends no commands. */
++#ifdef CONFIG_MMC_DW_HI3798MV100_SD_IDENT
++MMC_DEV_ATTR(ty1208z_sd_ident,
++	"SD_IDENT_COMPLETE bytes=%llu clock=%u bus_width=%u timing=%u\n",
++	(unsigned long long)card->csd.capacity << card->csd.read_blkbits,
++	card->host->ios.clock, card->host->ios.bus_width, card->host->ios.timing);
++#endif
+--- /dev/null
 +++ b/drivers/mmc/host/dw_mmc-hi3798mv100-ident.c
 @@ -0,0 +1,162 @@
 +// SPDX-License-Identifier: GPL-2.0-only
@@ -1867,6 +1953,202 @@
 +MODULE_DESCRIPTION("TY1208Z restricted PIO eMMC identification diagnostic");
 +MODULE_LICENSE("GPL");
 --- /dev/null
++++ b/drivers/mmc/host/dw_mmc-hi3798mv100-sd-ident.c
+@@ -0,0 +1,193 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Restricted RAM diagnostic, not the production MV100 storage driver. */
++#include <linux/io.h>
++#include <linux/irq.h>
++#include <linux/mmc/host.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++#include "dw_mmc.h"
++#include "dw_mmc-pltfm.h"
++#include "hi3798mv100-sd-ident-policy.h"
++
++static int mv100_sd_ident_init(struct dw_mci *host)
++{
++	if (host->bus_hz != 50000000 || host->pdata->fifo_depth != 256 ||
++	    mci_readl(host, VERID) != 0x5342270a ||
++	    mci_readl(host, HCON) != 0x00e44c81)
++		return -ENODEV;
++
++	/* PIO bypasses dw_mci_idmac_init(), including its inherited-IRQ cleanup.
++	 * Quiesce the measured 32-bit IDMAC before request_irq enables the GIC line.
++	 * This changes only controller state, not card settings or storage contents.
++	 */
++	dev_info(host->dev,
++		 "SD_IDENT_INHERITED CTRL=%08x BMOD=%08x IDINTEN=%08x IDSTS=%08x RINTSTS=%08x\n",
++		 mci_readl(host, CTRL), mci_readl(host, BMOD),
++		 mci_readl(host, IDINTEN), mci_readl(host, IDSTS),
++		 mci_readl(host, RINTSTS));
++	mci_writel(host, INTMASK, 0);
++	mci_writel(host, IDINTEN, 0);
++	mci_writel(host, BMOD, mci_readl(host, BMOD) & ~SDMMC_IDMAC_ENABLE);
++	mci_writel(host, CTRL, mci_readl(host, CTRL) &
++		   ~(SDMMC_CTRL_INT_ENABLE | SDMMC_CTRL_DMA_ENABLE |
++		     SDMMC_CTRL_USE_IDMAC));
++	mci_writel(host, IDSTS, SDMMC_IDMAC_INT_AI | SDMMC_IDMAC_INT_NI |
++		   SDMMC_IDMAC_INT_CES | SDMMC_IDMAC_INT_DU |
++		   SDMMC_IDMAC_INT_FBE | SDMMC_IDMAC_INT_RI | SDMMC_IDMAC_INT_TI);
++	mci_writel(host, RINTSTS, 0xffffffff);
++	dev_info(host->dev,
++		 "SD_IDENT_PIO_QUIESCED CTRL=%08x BMOD=%08x IDINTEN=%08x IDSTS=%08x\n",
++		 mci_readl(host, CTRL), mci_readl(host, BMOD),
++		 mci_readl(host, IDINTEN), mci_readl(host, IDSTS));
++
++	dev_info(host->dev, "SD_IDENT_GUARD_PASS source=50000000 PIO-only\n");
++	return 0;
++}
++
++static int mv100_sd_ident_slot(struct dw_mci_slot *slot)
++{
++	struct mmc_host *mmc = slot->mmc;
++
++	/* Override all DT/core capabilities before mmc_add_host can enumerate. */
++	mmc->caps = MMC_CAP_NEEDS_POLL;
++	mmc->caps2 = MMC_CAP2_NO_MMC | MMC_CAP2_NO_SDIO;
++	mmc->pm_caps = 0;
++	mmc->f_max = 25000000;
++	mmc->max_blk_size = 512;
++	mmc->max_blk_count = 1;
++	mmc->max_req_size = 512;
++	mmc->max_seg_size = 512;
++	mmc->dsr_req = 0;
++	return 0;
++}
++
++static int mv100_sd_ident_validate(struct dw_mci *host, struct mmc_request *mrq)
++{
++	int ret = hi3798mv100_sd_ident_request(mrq);
++
++	if (ret)
++		dev_info_ratelimited(host->dev,
++			"SD_IDENT_BLOCKED CMD%u arg=%08x error=%d\n",
++			mrq->cmd->opcode, mrq->cmd->arg, ret);
++	else if (mrq->cmd->opcode == SD_APP_OP_COND)
++		dev_info_ratelimited(host->dev, "SD_IDENT_ACMD41 arg=%08x\n",
++				     mrq->cmd->arg);
++	return ret;
++}
++
++static int mv100_sd_ident_voltage(struct mmc_host *mmc, struct mmc_ios *ios)
++{
++	/* Retain the inherited I/O voltage; never change regulators/UHS voltage. */
++	return ios->signal_voltage == MMC_SIGNAL_VOLTAGE_330 ? 0 : -EPERM;
++}
++
++static const struct dw_mci_drv_data mv100_sd_ident_data = {
++	.init = mv100_sd_ident_init,
++	.init_slot = mv100_sd_ident_slot,
++	.validate_request = mv100_sd_ident_validate,
++	.switch_voltage = mv100_sd_ident_voltage,
++	.force_pio = true,
++};
++
++static int mv100_sd_ident_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct resource *controller, *crg, *ldo;
++	struct irq_data *irq_data;
++	void __iomem *regs, *crg39, *ldo_regs;
++	u32 value;
++	int irq;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
++		return -ENODEV;
++	controller = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	crg = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	ldo = platform_get_resource(pdev, IORESOURCE_MEM, 2);
++	if (!controller || controller->start != 0xf9820000 ||
++	    resource_size(controller) != 0x1000 || !crg ||
++	    crg->start != 0xf8a2209c || resource_size(crg) != 4 ||
++	    !ldo || ldo->start != 0xf8a2011c || resource_size(ldo) != 4 ||
++	    platform_get_resource(pdev, IORESOURCE_MEM, 3))
++		return -EINVAL;
++
++	irq = platform_get_irq(pdev, 0);
++	if (irq < 0)
++		return irq;
++	irq_data = irq_get_irq_data(irq);
++	if (!irq_data || irq_data->hwirq != 66)
++		return -EINVAL;
++
++	/* Inherit measured pinmux/CRG; no clock/reset/power provider is called. */
++	if (of_find_property(dev->of_node, "clocks", NULL) ||
++	    of_find_property(dev->of_node, "resets", NULL) ||
++	    of_find_property(dev->of_node, "mmc-pwrseq", NULL) ||
++	    of_find_property(dev->of_node, "vmmc-supply", NULL) ||
++	    of_find_property(dev->of_node, "vqmmc-supply", NULL))
++		return -EINVAL;
++
++	crg39 = devm_platform_ioremap_resource(pdev, 1);
++	if (IS_ERR(crg39))
++		return PTR_ERR(crg39);
++	value = readl(crg39);
++	if (value != 0x00000203)
++		return dev_err_probe(dev, -ENODEV, "Unexpected inherited CRG39=%08x\n", value);
++
++	ldo_regs = devm_platform_ioremap_resource(pdev, 2);
++	if (IS_ERR(ldo_regs))
++		return PTR_ERR(ldo_regs);
++	value = readl(ldo_regs);
++	if (value != 0x00000060)
++		return dev_err_probe(dev, -ENODEV, "Unexpected inherited LDO=%08x\n", value);
++
++	/* Check the measured identity before the generic driver can write MMIO. */
++	regs = devm_ioremap(dev, controller->start, resource_size(controller));
++	if (!regs)
++		return -ENOMEM;
++	value = readl(regs + SDMMC_VERID);
++	if (value != 0x5342270a || readl(regs + SDMMC_HCON) != 0x00e44c81) {
++		devm_iounmap(dev, regs);
++		return -ENODEV;
++	}
++	devm_iounmap(dev, regs);
++
++	return dw_mci_pltfm_register(pdev, &mv100_sd_ident_data);
++}
++
++static void mv100_sd_ident_shutdown(struct platform_device *pdev)
++{
++	struct dw_mci *host = platform_get_drvdata(pdev);
++
++	/* Remove the host before reset: stop rescans/requests, mask IRQs and
++	 * disable its card clock through the existing DW remove path. No
++	 * CRG/LDO provider exists and request policy rejects card writes.
++	 */
++	dw_mci_pltfm_remove(pdev);
++	if (mci_readl(host, INTMASK) || mci_readl(host, CLKENA) ||
++	    mci_readl(host, IDINTEN) ||
++	    (mci_readl(host, CTRL) & (SDMMC_CTRL_DMA_ENABLE | SDMMC_CTRL_USE_IDMAC))) {
++		dev_err(&pdev->dev, "SD_IDENT_SHUTDOWN_FAILED controller-not-quiesced\n");
++		return;
++	}
++	dev_info(&pdev->dev, "SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\n");
++}
++
++static const struct of_device_id mv100_sd_ident_match[] = {
++	{ .compatible = "tianyi,ty1208z-sd-identification" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, mv100_sd_ident_match);
++
++static struct platform_driver mv100_sd_ident_driver = {
++	.probe = mv100_sd_ident_probe,
++	.remove_new = dw_mci_pltfm_remove,
++	.shutdown = mv100_sd_ident_shutdown,
++	.driver = {
++		.name = "hi3798mv100-sd-ident",
++		.of_match_table = mv100_sd_ident_match,
++	},
++};
++module_platform_driver(mv100_sd_ident_driver);
++MODULE_DESCRIPTION("TY1208Z restricted PIO SD identification diagnostic");
++MODULE_LICENSE("GPL");
+--- /dev/null
 +++ b/drivers/mmc/host/hi3798mv100-ident-policy.h
 @@ -0,0 +1,59 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
@@ -1922,6 +2204,68 @@
 +		return cmd->arg == 0x00010000 ? 0 : -EPERM;
 +	case MMC_SELECT_CARD:
 +		return cmd->arg == 0 || cmd->arg == 0x00010000 ? 0 : -EPERM;
++	default:
++		return -EPERM;
++	}
++}
++
++#endif
+--- /dev/null
++++ b/drivers/mmc/host/hi3798mv100-sd-ident-policy.h
+@@ -0,0 +1,59 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef HI3798MV100_SD_IDENT_POLICY_H
++#define HI3798MV100_SD_IDENT_POLICY_H
++
++#include <linux/errno.h>
++#include <linux/mmc/core.h>
++#include <linux/mmc/mmc.h>
++#include <linux/mmc/sd.h>
++
++/* Native SD identification and fixed-size metadata only; no sector access.
++ * CMD6 check-mode is a metadata read. SET-mode and ACMD6 bus changes fail.
++ */
++static inline int hi3798mv100_sd_ident_request(struct mmc_request *mrq)
++{
++	struct mmc_command *cmd = mrq->cmd;
++	struct mmc_data *data = mrq->data;
++
++	if (!cmd || mrq->sbc || mrq->stop || cmd->data != data ||
++	    (data && data->stop))
++		return -EPERM;
++	if (data) {
++		if (data->flags != MMC_DATA_READ || data->blocks != 1)
++			return -EPERM;
++		if (cmd->opcode == SD_APP_SEND_SCR && cmd->arg == 0 &&
++		    data->blksz == 8)
++			return 0;
++		if (cmd->opcode == SD_APP_SD_STATUS && cmd->arg == 0 &&
++		    data->blksz == 64)
++			return 0;
++		/* Actual core queries function group 1 in CHECK mode. */
++		if (cmd->opcode == SD_SWITCH && data->blksz == 64 &&
++		    cmd->arg == 0x00fffff0)
++			return 0;
++		return -EPERM;
++	}
++
++	switch (cmd->opcode) {
++	case MMC_GO_IDLE_STATE:
++	case MMC_ALL_SEND_CID:
++	case SD_SEND_RELATIVE_ADDR:
++		return cmd->arg == 0 ? 0 : -EPERM;
++	case SD_SEND_IF_COND:
++		return cmd->arg == 0x1aa ? 0 : -EPERM;
++	case SD_APP_OP_COND:
++		/* Host never advertises S18R/XPC/SD Express or low-voltage OCR. */
++		return cmd->arg & ~0x40ff8000U ? -EPERM : 0;
++	case MMC_APP_CMD:
++	case MMC_SELECT_CARD:
++		return (cmd->arg & 0xffffU) == 0 ? 0 : -EPERM;
++	case MMC_SEND_CSD:
++	case MMC_SEND_CID:
++	case MMC_SEND_STATUS:
++		return cmd->arg && (cmd->arg & 0xffffU) == 0 ? 0 : -EPERM;
 +	default:
 +		return -EPERM;
 +	}
@@ -2065,6 +2409,89 @@
 +}
 +
 +#endif
+--- /dev/null
++++ b/drivers/power/reset/ty1208z-mv100-sd-restart.c
+@@ -0,0 +1,80 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Explicit reset for the separate, storage-disabled SD identification profile. */
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++#include <linux/slab.h>
++
++#include "ty1208z-mv100-restart.h"
++
++struct ty1208z_sd_restart_context {
++	void __iomem *base;
++	void __iomem *sysid;
++};
++
++static int ty1208z_sd_restart_callback(struct sys_off_data *data)
++{
++	struct ty1208z_sd_restart_context *context = data->cb_data;
++
++	if (!ty1208z_mv100_restart(context->base, context->sysid)) {
++		pr_err("TY1208Z_RESTART_REFUSED watchdog identity/state changed\n");
++		return NOTIFY_DONE;
++	}
++	mdelay(1000);
++	pr_err("TY1208Z_RESTART_TIMEOUT SP805 did not reset within one second\n");
++	return NOTIFY_DONE;
++}
++
++static int ty1208z_sd_restart_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct ty1208z_sd_restart_context *context;
++	struct resource *res;
++	int ret;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
++		return -ENODEV;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res || res->start != 0xf8a2c000 || resource_size(res) != 0x1000)
++		return -EINVAL;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res || res->start != 0xf8000ee0 || resource_size(res) != 4 ||
++	    platform_get_resource(pdev, IORESOURCE_MEM, 2))
++		return -EINVAL;
++	context = devm_kzalloc(dev, sizeof(*context), GFP_KERNEL);
++	if (!context)
++		return -ENOMEM;
++	context->sysid = devm_platform_ioremap_resource(pdev, 1);
++	if (IS_ERR(context->sysid))
++		return PTR_ERR(context->sysid);
++	context->base = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(context->base))
++		return PTR_ERR(context->base);
++	if (!ty1208z_mv100_restart_ready(context->base, context->sysid))
++		return dev_err_probe(dev, -ENODEV, "Unexpected MV100 identity/watchdog state; no writes\n");
++	ret = devm_register_sys_off_handler(dev, SYS_OFF_MODE_RESTART,
++		SYS_OFF_PRIO_DEFAULT, ty1208z_sd_restart_callback, context);
++	if (ret)
++		return ret;
++	dev_info(dev, "TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes\n");
++	dev_info(dev, "TY1208Z_RESTART_READY no-startup-writes explicit-restart-only\n");
++	return 0;
++}
++
++static const struct of_device_id ty1208z_sd_restart_match[] = {
++	{ .compatible = "tianyi,ty1208z-mv100-sd-ident-restart" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ty1208z_sd_restart_match);
++
++static struct platform_driver ty1208z_sd_restart_driver = {
++	.probe = ty1208z_sd_restart_probe,
++	.driver = {
++		.name = "ty1208z-mv100-sd-restart",
++		.of_match_table = ty1208z_sd_restart_match,
++	},
++};
++builtin_platform_driver(ty1208z_sd_restart_driver);
++MODULE_LICENSE("GPL");
 --- /dev/null
 +++ b/drivers/power/reset/ty1208z-sp805-restart.c
 @@ -0,0 +1,172 @@

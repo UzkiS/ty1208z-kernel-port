@@ -9,11 +9,14 @@ import tempfile
 ROOT = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--linuxsrc", type=Path, required=True)
+parser.add_argument("--profile", choices=("emmc", "sd"), default="emmc")
 args = parser.parse_args()
 header = (args.linuxsrc / "drivers/mmc/host/dw_mmc.h").read_text()
-driver = (ROOT / "overlay/drivers/mmc/host/dw_mmc-hi3798mv100-ident.c").read_text()
-init = "static int mv100_ident_init(" + driver.split(
-    "static int mv100_ident_init(", 1)[1].split("\nstatic int mv100_ident_slot", 1)[0]
+name = "sd-ident" if args.profile == "sd" else "ident"
+function = "mv100_sd_ident" if args.profile == "sd" else "mv100_ident"
+driver = (ROOT / f"overlay/drivers/mmc/host/dw_mmc-hi3798mv100-{name}.c").read_text()
+init = f"static int {function}_init(" + driver.split(
+    f"static int {function}_init(", 1)[1].split(f"\nstatic int {function}_slot", 1)[0]
 names = set(re.findall(r"\bSDMMC_[A-Z0-9_]+\b", init))
 names.update("SDMMC_" + reg for reg in re.findall(r"mci_(?:readl|writel)\(host, ([A-Z0-9_]+)", init))
 defines = []
@@ -79,6 +82,11 @@ int main(void) {
     puts("EMMC_HANDOFF_PASS: inherited DMA/interrupts quiesced; mismatches write nothing");
 }
 '''.replace("/* DEFINES */", "\n".join(defines)).replace("/* INIT */", init)
+if args.profile == "sd":
+    harness = harness.replace("mv100_ident_init", "mv100_sd_ident_init")
+    harness = harness.replace(".bus_hz = 100000000", ".bus_hz = 50000000")
+    harness = harness.replace("host.bus_hz = 50000000", "host.bus_hz = 100000000")
+    harness = harness.replace("EMMC_HANDOFF_PASS", "SD_HANDOFF_PASS")
 with tempfile.TemporaryDirectory() as directory:
     temp = Path(directory)
     (temp / "test.c").write_text(harness)

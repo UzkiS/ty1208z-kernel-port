@@ -30,7 +30,10 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 仅在系统重启回调中写复位寄存器，不提供看门狗服务。严格 SP805 ID 候选仍未通过
 本机验证；原生 router 的精确临时模块已通过命令重启及自动重新加载 RAM 系统，
 见 [restart](restart.md)。SD 只读临时模块也能在该 router 中测量并卸载，
-无需切换镜像；卡协议驱动仍未接入。
+无需切换镜像。
+`make sd-ident` 的独立 PIO/metadata/restart 候选已识别本机 SDHC，
+并通过命令重启自动返回；当前原生 router 的 MMC/BLOCK 仍关闭，
+生产系统的块设备/文件系统整合尚未完成。
 `make wifi-usb-audit` 使用单独的内核输出目录和配置，不改变诊断镜像；目前只编译
 `wland_usb.o`，不链接模块、不加载固件。来源锁与适配范围见 [Wi-Fi 说明](wifi.md)。
 `make wifi-port` 另行编译完整模块并执行制造入口/密钥回归；同样不改变诊断镜像，

@@ -1,0 +1,26 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA restricted SD identification with explicit restart";
+	compatible = "tianyi,ty1208z-ca-sd-ident-ram", "hi3798mv100-series";
+};
+
+&{/soc} {
+	mmc@f9820000 {
+		compatible = "tianyi,ty1208z-sd-identification";
+		reg = <0xf9820000 0x1000>, <0xf8a2209c 4>, <0xf8a2011c 4>;
+		reg-names = "controller", "crg39", "ldo";
+		interrupts = <0 34 4>;
+		clock-frequency = <50000000>;
+		fifo-depth = <256>;
+		bus-width = <1>;
+		max-frequency = <25000000>;
+		no-mmc;
+		no-sdio;
+	};
+	sd-restart@f8a2c000 {
+		compatible = "tianyi,ty1208z-mv100-sd-ident-restart";
+		reg = <0xf8a2c000 0x1000>, <0xf8000ee0 4>;
+	};
+};
