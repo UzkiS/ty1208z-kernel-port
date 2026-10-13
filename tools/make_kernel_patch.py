@@ -170,6 +170,44 @@ changes["drivers/power/reset/Kconfig"] = (
         '\t  No startup writes; only explicit kernel restart arms WDG0.\n\n'
         'config POWER_RESET_AS3722\n'))
 
+changes["drivers/power/reset/Kconfig"] = (
+    changes["drivers/power/reset/Kconfig"][0],
+    changes["drivers/power/reset/Kconfig"][1].replace('config POWER_RESET_AS3722\n',
+        'config POWER_RESET_TY1208Z_MV100_RAM\n'
+        '\tbool "TY1208Z bounded 768-MiB memory and measured restart experiment"\n'
+        '\tdepends on ARCH_HI3798MV100 && !WATCHDOG && !NET && !BLOCK && !MMC\n'
+        '\tdepends on !USB_SUPPORT && !MODULES && !SMP && !DEBUG_FS\n'
+        '\thelp\n'
+        '\t  Dedicated memory-only board with measured MV100 reset guards.\n'
+        '\t  No startup writes; explicit restart only.\n\n'
+        'config POWER_RESET_AS3722\n'))
+changes["drivers/power/reset/Makefile"] = (
+    changes["drivers/power/reset/Makefile"][0],
+    changes["drivers/power/reset/Makefile"][1] +
+    'obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) += ty1208z-mv100-ram-restart.o\n')
+changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][0],
+    changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +
+    'dtb-$(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) += hi3798mv100-ty1208z-ram768.dtb\n')
+changes["arch/arm/mm/init.c"] = (
+    '\tif (!machine_is_integrator() && !machine_is_cintegrator())\n'
+    '\t\tfree_initmem_default(-1);\n',
+    '#ifdef CONFIG_POWER_RESET_TY1208Z_MV100_RAM\n'
+    '\t/* Keep low 16 MiB reserved in the dedicated memory experiment.\n'
+    '\t * ARM normally recycles its own init pages inside that reservation.\n'
+    '\t */\n'
+    '\tif (of_machine_is_compatible("tianyi,ty1208z-ca-ram768")) {\n'
+    '\t\tpr_info("RAM768_INIT_MEMORY_RETAINED low-16MiB-reservation\\n");\n'
+    '\t\treturn;\n'
+    '\t}\n'
+    '#endif\n'
+    '\tif (!machine_is_integrator() && !machine_is_cintegrator())\n'
+    '\t\tfree_initmem_default(-1);\n')
+changes["arch/arm/mm/init.c"] = [
+    ('#include <linux/of_fdt.h>\n', '#include <linux/of.h>\n#include <linux/of_fdt.h>\n'),
+    changes["arch/arm/mm/init.c"],
+]
+
 changes.update({
     "drivers/mmc/core/sd.c": [
         ('static struct attribute *sd_std_attrs[] = {\n',

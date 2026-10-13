@@ -14,7 +14,7 @@ import unittest
 
 from bootloader_probe import BootloaderProbe
 from openwrt_ethernet_board_cli import DT_IDENTITY, SOURCE_REVISION
-from board_restart_cli import SD_DT_IDENTITY, SD_RO_RESTART_GUARD
+from board_restart_cli import SD_DT_IDENTITY, SD_RO_RESTART_GUARD, RAM768_RESTART_GUARD
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -28,6 +28,7 @@ class RestartSerialTests(unittest.TestCase):
             sent = []
             native = profile == "router"
             sd_ident = profile in ("sd-ident1", "sd-ro1")
+            memory = profile == "ram768"
             prompt = b"root@OpenWrt:~# " if native else b"# "
 
             def read_command():
@@ -50,7 +51,7 @@ class RestartSerialTests(unittest.TestCase):
                     os.write(master, b"\r\n" + prompt)
                     self.assertEqual(read_command(), b"uname -r\r")
                     release = (b"4.4.35_ecoo" if mode == "hinas" else b"6.12.112" if native else
-                               b"6.12.112-ty1208z-" + profile.encode() if sd_ident else b"6.12.112-ty1208z-restart1")
+                               b"6.12.112-ty1208z-" + profile.encode() if sd_ident or memory else b"6.12.112-ty1208z-restart1")
                     os.write(master, b"uname -r\r\n" + release + b"\r\n" + prompt)
                     if mode == "hinas":
                         return
@@ -87,10 +88,25 @@ class RestartSerialTests(unittest.TestCase):
                             os.write(master, (b"SD_RO_MOUNT_ACTIVE" if mode == "mounted" else b"SD_RO_RESTART_GUARD") + b"\r\n" + prompt)
                             if mode == "mounted":
                                 return
+                    if memory:
+                        self.assertEqual(read_command(), SD_DT_IDENTITY + b"\r")
+                        identity = b"foreign" if mode == "dt" else b"tianyi,ty1208z-ca-ram768\x00hi3798mv100-series\x00"
+                        os.write(master, identity + b"\r\n" + prompt)
+                        if mode == "dt":
+                            return
+                        self.assertEqual(read_command(), b"readlink /sys/bus/platform/devices/f8a2c000.ram-restart/driver\r")
+                        binding = b"unbound" if mode == "unbound" else b"../../../bus/platform/drivers/ty1208z-mv100-ram-restart"
+                        os.write(master, binding + b"\r\n" + prompt)
+                        if mode == "unbound":
+                            return
+                        self.assertEqual(read_command(), RAM768_RESTART_GUARD + b"\r")
+                        os.write(master, (b"RAM768_MOUNT_ACTIVE" if mode == "mounted" else b"RAM768_RESTART_GUARD") + b"\r\n" + prompt)
+                        if mode == "mounted":
+                            return
                     self.assertEqual(read_command(), b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE\r")
                     registration = b"not registered" if mode == "missing" else (
                         b"[0.4] driver: TY1208Z_RESTART_READY no-startup-writes explicit-restart-only")
-                    if (native or sd_ident) and mode != "missing-mv100":
+                    if (native or sd_ident or memory) and mode != "missing-mv100":
                         registration += b"\r\n[0.5] driver: TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes"
                     completion = (b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE" if mode == "echo-completion"
                                   else b"TY1208Z_RESTART_CHECK_COMPLETE")
@@ -176,6 +192,11 @@ class RestartSerialTests(unittest.TestCase):
         for mode in ("dt", "unbound", "mounted", "missing-mv100", "missing-shutdown", "failed-shutdown", "success"):
             with self.subTest(mode=mode):
                 self.exercise(mode, "sd-ro1")
+
+    def test_memory_profile_requires_binding_completed_cleanup_and_measured_guard(self):
+        for mode in ("dt", "unbound", "mounted", "missing-mv100", "failed", "success"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, "ram768")
 
 
 if __name__ == "__main__":

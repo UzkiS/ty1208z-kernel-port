@@ -26,7 +26,7 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,18 @@
+@@ -1,4 +1,19 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
@@ -40,6 +40,7 @@
 +dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_USB_CLOCK_AUDIT) += hi3798mv100-ty1208z-usb-clock-audit.dtb
 +dtb-$(CONFIG_POWER_RESET_TY1208Z_SP805) += hi3798mv100-ty1208z-restart.dtb
++dtb-$(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) += hi3798mv100-ty1208z-ram768.dtb
 +dtb-$(CONFIG_TY1208Z_ETHERNET_INHERITED) += hi3798mv100-ty1208z-ethernet-net.dtb
 +dtb-$(CONFIG_TY1208Z_USB_HOST0_EXPERIMENT) += hi3798mv100-ty1208z-usb-host.dtb
  dtb-$(CONFIG_ARCH_HI3xxx) += \
@@ -140,7 +141,7 @@
  obj-$(CONFIG_KEYSTONE_TIMER)		+= timer-keystone.o
 --- a/drivers/power/reset/Kconfig
 +++ b/drivers/power/reset/Kconfig
-@@ -8,6 +8,24 @@
+@@ -8,6 +8,32 @@
  	  Say Y here to enable board reset and power off
  
  if POWER_RESET
@@ -162,18 +163,53 @@
 +	help
 +	  Require measured SYSID0/zero ID cells/inactive watchdog state.
 +	  No startup writes; only explicit kernel restart arms WDG0.
++
++config POWER_RESET_TY1208Z_MV100_RAM
++	bool "TY1208Z bounded 768-MiB memory and measured restart experiment"
++	depends on ARCH_HI3798MV100 && !WATCHDOG && !NET && !BLOCK && !MMC
++	depends on !USB_SUPPORT && !MODULES && !SMP && !DEBUG_FS
++	help
++	  Dedicated memory-only board with measured MV100 reset guards.
++	  No startup writes; explicit restart only.
  
  config POWER_RESET_AS3722
  	bool "ams AS3722 power-off driver"
 --- a/drivers/power/reset/Makefile
 +++ b/drivers/power/reset/Makefile
-@@ -1,4 +1,6 @@
+@@ -1,4 +1,7 @@
  # SPDX-License-Identifier: GPL-2.0
 +obj-$(CONFIG_POWER_RESET_TY1208Z_SP805) += ty1208z-sp805-restart.o
 +obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_SD) += ty1208z-mv100-sd-restart.o
++obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) += ty1208z-mv100-ram-restart.o
  obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
  obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
  obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -14,6 +14,7 @@
+ #include <linux/export.h>
+ #include <linux/nodemask.h>
+ #include <linux/initrd.h>
++#include <linux/of.h>
+ #include <linux/of_fdt.h>
+ #include <linux/highmem.h>
+ #include <linux/gfp.h>
+@@ -471,6 +472,15 @@
+ 	fix_kernmem_perms();
+ 
+ 	poison_init_mem(__init_begin, __init_end - __init_begin);
++#ifdef CONFIG_POWER_RESET_TY1208Z_MV100_RAM
++	/* Keep low 16 MiB reserved in the dedicated memory experiment.
++	 * ARM normally recycles its own init pages inside that reservation.
++	 */
++	if (of_machine_is_compatible("tianyi,ty1208z-ca-ram768")) {
++		pr_info("RAM768_INIT_MEMORY_RETAINED low-16MiB-reservation\n");
++		return;
++	}
++#endif
+ 	if (!machine_is_integrator() && !machine_is_cintegrator())
+ 		free_initmem_default(-1);
+ }
 --- a/drivers/mmc/core/sd.c
 +++ b/drivers/mmc/core/sd.c
 @@ -764,7 +764,12 @@
@@ -983,6 +1019,30 @@
 +		clocks = <&ethclk>;
 +		phy-mode = "mii";
 +		phy-handle = <&phy1>;
++	};
++};
+--- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-ram768.dts
+@@ -0,0 +1,21 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-diagnostic.dts"
++
++/ {
++	model = "TY1208Z CA bounded 768-MiB RAM experiment";
++	compatible = "tianyi,ty1208z-ca-ram768", "hi3798mv100-series";
++};
++
++/* Keep the upper 256 MiB, including every measured loader allocation, out.
++ * This is an independent experiment, not a complete secure-reservation map.
++ */
++&{/memory@0} {
++	reg = <0 0x30000000>;
++};
++
++&{/soc} {
++	ram-restart@f8a2c000 {
++		compatible = "tianyi,ty1208z-mv100-ram-restart";
++		reg = <0xf8a2c000 0x1000>, <0xf8000ee0 4>;
 +	};
 +};
 --- /dev/null
@@ -2457,6 +2517,89 @@
 +	{ }
 +};
 +MODULE_DEVICE_TABLE(mdio, ty1208z_festa_ids);
+--- /dev/null
++++ b/drivers/power/reset/ty1208z-mv100-ram-restart.c
+@@ -0,0 +1,80 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* The memory-only profile shares the physically measured MV100 reset protocol. */
++#include <linux/delay.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++#include <linux/slab.h>
++
++#include "ty1208z-mv100-restart.h"
++
++struct ty1208z_ram768_restart_context {
++	void __iomem *base;
++	void __iomem *sysid;
++};
++
++static int ty1208z_ram768_restart_callback(struct sys_off_data *data)
++{
++	struct ty1208z_ram768_restart_context *context = data->cb_data;
++
++	if (!ty1208z_mv100_restart(context->base, context->sysid)) {
++		pr_err("TY1208Z_RESTART_REFUSED watchdog identity/state changed\n");
++		return NOTIFY_DONE;
++	}
++	mdelay(1000);
++	pr_err("TY1208Z_RESTART_TIMEOUT SP805 did not reset within one second\n");
++	return NOTIFY_DONE;
++}
++
++static int ty1208z_ram768_restart_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct ty1208z_ram768_restart_context *context;
++	struct resource *res;
++	int ret;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-ram768"))
++		return -ENODEV;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
++	if (!res || res->start != 0xf8a2c000 || resource_size(res) != 0x1000)
++		return -EINVAL;
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res || res->start != 0xf8000ee0 || resource_size(res) != 4 ||
++	    platform_get_resource(pdev, IORESOURCE_MEM, 2))
++		return -EINVAL;
++	context = devm_kzalloc(dev, sizeof(*context), GFP_KERNEL);
++	if (!context)
++		return -ENOMEM;
++	context->sysid = devm_platform_ioremap_resource(pdev, 1);
++	if (IS_ERR(context->sysid))
++		return PTR_ERR(context->sysid);
++	context->base = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(context->base))
++		return PTR_ERR(context->base);
++	if (!ty1208z_mv100_restart_ready(context->base, context->sysid))
++		return dev_err_probe(dev, -ENODEV, "Unexpected MV100 identity/watchdog state; no writes\n");
++	ret = devm_register_sys_off_handler(dev, SYS_OFF_MODE_RESTART,
++		SYS_OFF_PRIO_DEFAULT, ty1208z_ram768_restart_callback, context);
++	if (ret)
++		return ret;
++	dev_info(dev, "TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes\n");
++	dev_info(dev, "TY1208Z_RESTART_READY no-startup-writes explicit-restart-only\n");
++	return 0;
++}
++
++static const struct of_device_id ty1208z_ram768_restart_match[] = {
++	{ .compatible = "tianyi,ty1208z-mv100-ram-restart" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ty1208z_ram768_restart_match);
++
++static struct platform_driver ty1208z_ram768_restart_driver = {
++	.probe = ty1208z_ram768_restart_probe,
++	.driver = {
++		.name = "ty1208z-mv100-ram-restart",
++		.of_match_table = ty1208z_ram768_restart_match,
++	},
++};
++builtin_platform_driver(ty1208z_ram768_restart_driver);
++MODULE_LICENSE("GPL");
 --- /dev/null
 +++ b/drivers/power/reset/ty1208z-mv100-restart.h
 @@ -0,0 +1,40 @@

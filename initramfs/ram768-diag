@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+target=/tmp/ram768-area
+mkdir -p "$target"
+mount -t tmpfs -o size=600m tmpfs "$target"
+echo RAM768_MOUNT_READY tmpfs
+if ram768-probe; then
+    umount "$target"
+else
+    umount "$target"
+    exit 1
+fi
+echo RAM768_DIAG_COMPLETE file-and-mount-removed

@@ -1,6 +1,6 @@
 # TY1208Z kernel port status
 
-Updated: 2026-10-13. Existing Hinas booted; a read-only SSH baseline was collected.
+Updated: 2026-10-14. Existing Hinas booted; a read-only SSH baseline was collected.
 No flashing, persistent boot changes or OTP writes were performed by this project. Offline
 implementation and repository push are authorized.
 
@@ -15,6 +15,11 @@ physical DDR; the current RAM profile deliberately exposes only low 256 MiB.
 User requested an empty default root password on 2026-10-13; the built plain
 and router rootfs already use it. RAM setup must stop adding random passwords;
 only explicitly user-configured passwords are preserved on later restoration.
+The separate low-768-MiB memory profile now passes physical 512-MiB stress,
+all-page PFN bounds and automatic return/configuration restoration, with about
+745.18 MiB usable RAM; [memory report](verification/ram768-board-20261014.md).
+Its dedicated init area remains reserved. Current native-router memory still
+uses low 256 MiB; production integration and actual Docker remain pending.
 The user removed Kwrt customization and requires both Xray and sing-box in
 Passwall, plus unzip. Both cores and InfoZIP now build in the plain/router
 variants and pass both QEMU budgets, including actual Passwall SOCKS/TLS,

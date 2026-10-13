@@ -5,6 +5,8 @@ Chinese LuCI, Passwall with Xray and sing-box, unzip and board Wi-Fi/AP support.
 The board has 1 GiB of physical DDR and a 32-bit Cortex-A7/ARMv7 CPU. The
 current RAM experiment intentionally exposes only the low 256 MiB, with the
 low 16 MiB reserved. It is not a Docker installation candidate.
+An independent [768-MiB memory experiment](ram.md) now passes physical 512-MiB
+stress/PFN checks and autonomous return. Later native-router integration is separate.
 
 Before integration, establish usable higher memory and independently validate
 the eMMC driver, block I/O and filesystem/recovery plan. Storage installation

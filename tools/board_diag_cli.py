@@ -27,6 +27,7 @@ PROFILES = {
     "usb-clock-audit1": b"6.12.112-ty1208z-usb-clock-audit1",
     "usb-host1": b"6.12.112-ty1208z-usb-host1",
     "restart1": b"6.12.112-ty1208z-restart1",
+    "ram768": b"6.12.112-ty1208z-ram768",
 }
 
 
@@ -73,13 +74,30 @@ def run(args, serial_module):
                     raise TransferError("Kernel identity differs; diagnostic command not sent")
                 result["kernel_verified"] = True
                 diagnostic = (b"usb-diag; diag" if args.profile == "usb-host1" else
+                              b"ram768-diag; diag" if args.profile == "ram768" else
                               b"sd-ro-diag; diag" if args.profile == "sd-ro1" else
                               b"sd-diag; diag" if args.profile == "sd-ident1" else b"diag")
-                report = shell_command(exchange, diagnostic + b"; echo TY1208Z_DIAG_COMPLETE", timeout=30)
+                report = shell_command(exchange, diagnostic + b"; echo TY1208Z_DIAG_COMPLETE",
+                                       timeout=120 if args.profile == "ram768" else 30)
                 if not re.search(rb"(?:^|[\r\n])TY1208Z_DIAG_COMPLETE[\r\n]", report):
                     raise TransferError("Diagnostic report is incomplete")
                 if not re.search(rb"(?:^|[\r\n])TIME64_PASS sizeof\(time_t\)=8 ", report):
                     raise TransferError("Diagnostic time64 probe did not pass")
+                if args.profile == "ram768":
+                    memory = re.findall(rb"(?:^|[\r\n])RAM768_MEMORY_PASS bytes=536870912 high_pages=(\d+) pfn_min=(\d+) pfn_max=(\d+) memtotal_kib=(\d+) file-removed[\r\n]", report)
+                    if (len(memory) != 1 or not 65536 <= int(memory[0][0]) <= 131072 or
+                            not 4096 <= int(memory[0][1]) <= int(memory[0][2]) < 196608 or
+                            not 700 * 1024 <= int(memory[0][3]) <= 768 * 1024 or
+                            b"RAM768_MEMORY_FAILED" in report or
+                            b"RAM768_INIT_MEMORY_RETAINED low-16MiB-reservation" not in report or
+                            not all(re.search(rb"(?:^|[\r\n])" + marker + rb"[\r\n]", report) for marker in (
+                                b"RAM768_PATTERN_PASS pass=0 bytes=536870912",
+                                b"RAM768_PATTERN_PASS pass=1 bytes=536870912",
+                                b"RAM768_DIAG_COMPLETE file-and-mount-removed"))):
+                        raise TransferError("Memory extension stress/PFN/cleanup evidence incomplete")
+                    result.update(memory_bytes_verified=536870912, high_pages_verified=int(memory[0][0]),
+                                  pfn_min=int(memory[0][1]), pfn_max=int(memory[0][2]),
+                                  memtotal_kib=int(memory[0][3]))
                 if args.profile == "emmc-audit1" and b"EMMC_AUDIT_READ_ONLY_COMPLETE" not in report:
                     raise TransferError("eMMC register audit did not complete")
                 if args.profile == "sd-audit1" and (

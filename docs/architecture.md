@@ -15,6 +15,8 @@
 | 官方 OpenWrt 集成 | `openwrt/` 独立 RAM target、来源锁及原生构建入口 | 板级补丁、原生工具链/用户空间、固定应用 feeds | 原生镜像、QEMU time64、网络、防火墙、Passwall、DNS 与性能 |
 
 Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线配置。
+`make ram768` 单独构建低 768 MiB 内存压力测试及已测 MV100 重启门禁；
+启动前必须核对本次引导器的完整分配表，见 [内存实验](ram.md)。
 `make sd-audit` 单独观察板载 TF 控制器与 CRG39/LDO，关闭 MMC/BLOCK；
 它与 eMMC 的识别、读取候选分开验收，见 [SD/TF](sd.md)。
 `make emmc-audit` 和 `make emmc-ident` 使用各自内核输出目录；前者只读寄存器且

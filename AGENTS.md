@@ -32,6 +32,14 @@ board support. Keep assumptions separate from measured facts.
   request-level write denial; native-router integration and hotplug are pending.
   Other RAM profiles still
   need separate restart/shutdown support and acceptance.
+- The independent `ram768` profile requires the immediately preceding guarded
+  reboot's complete, hash-verified eleven-allocation table and fresh inspection.
+  It preserves low 16 MiB and excludes upper 256 MiB. Never extend the ordinary
+  router's memory merely from ddrfree or the presence of this build entry.
+  This profile now physically passes two complete 512-MiB patterns, all-page
+  PFN bounds, cleanup, command restart and exact router/configuration return.
+  Keep its init area reserved: normal ARM init reclamation otherwise exposes
+  pages below 16 MiB. Native higher-memory integration remains separate.
 
 ## Authorization
 

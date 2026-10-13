@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA bounded 768-MiB RAM experiment";
+	compatible = "tianyi,ty1208z-ca-ram768", "hi3798mv100-series";
+};
+
+/* Keep the upper 256 MiB, including every measured loader allocation, out.
+ * This is an independent experiment, not a complete secure-reservation map.
+ */
+&{/memory@0} {
+	reg = <0 0x30000000>;
+};
+
+&{/soc} {
+	ram-restart@f8a2c000 {
+		compatible = "tianyi,ty1208z-mv100-ram-restart";
+		reg = <0xf8a2c000 0x1000>, <0xf8000ee0 4>;
+	};
+};

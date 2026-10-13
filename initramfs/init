@@ -39,6 +39,18 @@ for arg in $(cat /proc/cmdline); do
             break
         fi
         case "$(uname -r)" in
+            *-ram768)
+                # Exercise the actual ARM mount/shell and low-memory denial.
+                # The 256-MiB QEMU guest must not allocate the physical test's file.
+                if /bin/ram768-diag; then
+                    echo RAM768_QEMU_LOW_MEMORY_DENIAL_FAIL
+                elif ! grep -q ' /tmp/ram768-area ' /proc/mounts &&
+                     test ! -e /tmp/ram768-area/memory-test; then
+                    echo RAM768_QEMU_LOW_MEMORY_DENIAL_PASS
+                else
+                    echo RAM768_QEMU_LOW_MEMORY_DENIAL_FAIL
+                fi
+                ;;
             *-usb-host1)
                 /bin/usb-diag || echo USB_HOST0_OBSERVER_FAIL
                 if [ -x /bin/rda-usb-identity ]; then

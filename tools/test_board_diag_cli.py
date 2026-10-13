@@ -48,10 +48,24 @@ class DiagnosticTests(unittest.TestCase):
                     if mode == "wrong-kernel":
                         return
                     diagnostic = (b"usb-diag; diag" if profile == "usb-host1" else
+                                  b"ram768-diag; diag" if profile == "ram768" else
                                   b"sd-ro-diag; diag" if profile == "sd-ro1" else
                                   b"sd-diag; diag" if profile == "sd-ident1" else b"diag")
                     self.assertEqual(read_command(), diagnostic + b"; echo TY1208Z_DIAG_COMPLETE\r")
                     time64 = b"TIME64_FAIL" if mode == "probe-failure" else b"TIME64_PASS sizeof(time_t)=8 file=2208988800"
+                    memory = (b"[0.3] RAM768_INIT_MEMORY_RETAINED low-16MiB-reservation\r\n"
+                              b"RAM768_PATTERN_PASS pass=0 bytes=536870912\r\n"
+                              b"RAM768_PATTERN_PASS pass=1 bytes=536870912\r\n"
+                              b"RAM768_MEMORY_PASS bytes=536870912 high_pages=80000 pfn_min=8192 pfn_max=195000 memtotal_kib=740000 file-removed\r\n"
+                              b"RAM768_DIAG_COMPLETE file-and-mount-removed\r\n")
+                    if mode == "memory-cleanup":
+                        memory = memory.replace(b"RAM768_DIAG_COMPLETE", b"INCOMPLETE")
+                    if mode == "memory-low":
+                        memory = memory.replace(b"high_pages=80000", b"high_pages=10")
+                    if mode == "memory-outside":
+                        memory = memory.replace(b"pfn_max=195000", b"pfn_max=250000")
+                    if mode == "memory-init-reservation":
+                        memory = memory.replace(b"RAM768_INIT_MEMORY_RETAINED", b"INIT_AREA_FREED")
                     audit = b"EMMC_AUDIT_READ_ONLY_COMPLETE" if mode != "missing-audit" else b"No audit driver"
                     sd = b"No SD audit" if mode == "missing-sd" else (
                         b"SD_AUDIT CRG39=00042103\r\nSD_AUDIT LDO=00000060\r\n"
@@ -151,6 +165,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\n" + (restart if profile == "restart1" else b""),
                                  b"\r\n" + (usb_clock if profile == "usb-clock-audit1" else b""),
                                  b"\r\n" + (usb_host if profile == "usb-host1" else b""),
+                                 b"\r\n" + (memory if profile == "ram768" else b""),
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -196,6 +211,11 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_complete_fragmented_report_is_captured(self):
         self.exercise("success")
+
+    def test_memory_stress_requires_actual_high_pages_and_cleanup(self):
+        for mode in ("success", "memory-cleanup", "memory-low", "memory-outside", "memory-init-reservation"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, profile="ram768")
 
     def test_emmc_profile_requires_audit_completion(self):
         self.exercise("missing-audit", profile="emmc-audit1")

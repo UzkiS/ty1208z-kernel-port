@@ -16,6 +16,7 @@ from restart_profile import restart_profile
 from sd_audit_profile import sd_audit_profile
 from sd_ident_profile import sd_ident_profile
 from sd_ro_profile import sd_ro_profile
+from ram768_profile import ram768_profile
 
 artifacts = Path(sys.argv[1]).resolve()
 evidence = artifacts / "checks"
@@ -53,6 +54,7 @@ usb_audit_profile(tree, config)
 usb_clock_audit_profile(tree, config)
 usb_host_profile(tree, config)
 restart_profile(tree, config)
+ram768_profile(tree, config)
 assert (artifacts / "zImage-appended-dtb").read_bytes() == raw + dtb
 assert (artifacts / "uImage-UNTESTED.bin").read_bytes()[64:] == raw + dtb
 assert len(image["device_trees"]) == 1

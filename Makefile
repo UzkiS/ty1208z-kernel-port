@@ -44,6 +44,7 @@ lint:
 	shellcheck initramfs/usb-diag
 	shellcheck initramfs/sd-diag
 	shellcheck initramfs/sd-ro-diag
+	shellcheck initramfs/ram768-diag
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
 	python3 tools/test_pinned_archives.py
@@ -55,6 +56,7 @@ lint:
 	python3 tools/test_sd_restart.py
 	python3 tools/test_sd_ident_profile.py
 	python3 tools/test_sd_ro_profile.py
+	python3 tools/test_ram768.py
 
 test-serial:
 	python3 tools/test_tftp_readonly.py
@@ -105,6 +107,10 @@ sd-ident:
 .PHONY: sd-ro
 sd-ro:
 	bash tools/build-sd-ro.sh $(if $(TASKBASE),"$(TASKBASE)")
+
+.PHONY: ram768
+ram768:
+	bash tools/build-ram768.sh $(if $(TASKBASE),"$(TASKBASE)")
 
 emmc-ident:
 	bash tools/build-emmc-ident.sh $(if $(TASKBASE),"$(TASKBASE)")

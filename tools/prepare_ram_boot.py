@@ -21,6 +21,7 @@ from restart_profile import restart_profile
 from sd_audit_profile import sd_audit_profile
 from sd_ident_profile import sd_ident_profile
 from sd_ro_profile import sd_ro_profile
+from ram768_profile import ram768_profile, memory_boot_evidence, END as RAM768_END
 from openwrt_apps_ram_profile import BOOTLOADER_BOUND_ADDRESS, applications_ram_profile
 
 ADDRESS = 0x01FFFFC0
@@ -33,7 +34,7 @@ DIAGNOSTIC_END = 0x10000000
 BOOT_ALLOCATIONS_START = 0x3E507000
 
 
-def prepare(artifacts, inspection):
+def prepare(artifacts, inspection, allocation_evidence=None):
     metadata = json.loads(inspection.read_text(encoding="utf-8"))
     raw = inspection.parent / metadata["raw_file"]
     response = raw.read_bytes()
@@ -66,7 +67,15 @@ def prepare(artifacts, inspection):
         raise ValueError("Transfer/decompressor workspace overlaps bounded memory ranges")
     tree = parse_fdt(dtb)
     properties = {node["path"]: node["properties"] for node in tree["nodes"]}
-    if properties["/memory@0"]["reg"]["cells"] != [0, DIAGNOSTIC_END]:
+    config = (artifacts / "linux.config").read_text()
+    extended = ram768_profile(tree, config)
+    memory_evidence_sha256 = None
+    if extended:
+        if allocation_evidence is None:
+            raise ValueError("Memory extension needs independent fresh loader allocation evidence")
+        memory_evidence_sha256 = memory_boot_evidence(allocation_evidence, metadata)
+    memory_end = RAM768_END if extended else DIAGNOSTIC_END
+    if properties["/memory@0"]["reg"]["cells"] != [0, memory_end]:
         raise ValueError("Unexpected diagnostic memory size/base")
     reserve_offset = struct.unpack_from(">I", dtb, 16)[0]
     reservations = []
@@ -78,12 +87,13 @@ def prepare(artifacts, inspection):
         reservations.append((start, length))
     if (0, DDR_START) not in reservations:
         raise ValueError("Low 16 MiB allocation reservation is missing")
+    if extended and reservations != [(0, DDR_START)]:
+        raise ValueError("Unexpected memory experiment reservation map")
     layout = json.loads((artifacts / "checks/kernel-layout.json").read_text())
     if (layout["zimage_sha256"] != hashlib.sha256(zimage).hexdigest()
             or layout["physical_start"] != 0x8000
             or not layout["physical_start"] < layout["physical_image_end"] <= layout["physical_bss_end"] < DDR_START):
         raise ValueError("Kernel layout does not match this image or exceeds the low bound")
-    config = (artifacts / "linux.config").read_text()
     ident = identification_profile(tree, config)
     sd_audit_profile(tree, config)
     sd_ident = sd_ident_profile(tree, config)
@@ -133,6 +143,8 @@ def prepare(artifacts, inspection):
         "boot_command": f"bootm {ADDRESS:x}",
         "persistent_writes": False,
     }
+    if extended:
+        plan.update(memory_end=memory_end, allocation_evidence_sha256=memory_evidence_sha256)
     if application_initrd is not None:
         start = application_initrd["address"]
         end = start + application_initrd["bytes"]
@@ -151,8 +163,9 @@ def main():
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--inspection", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument("--allocation-evidence", type=Path)
     args = parser.parse_args()
-    plan = prepare(args.artifacts, args.inspection)
+    plan = prepare(args.artifacts, args.inspection, args.allocation_evidence)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8", newline="\n") as stream:
         json.dump(plan, stream, indent=2)

@@ -103,7 +103,7 @@ def load_image(exchange, plan, data):
 def run(args, serial_module, tftp_factory=ReadOnlyTftp):
     # Rebuild the plan from current artifacts and verified raw inspection. No
     # caller-selected address or arbitrary bootloader command is accepted.
-    plan = prepare(args.artifacts, args.inspection)
+    plan = prepare(args.artifacts, args.inspection, getattr(args, "allocation_evidence", None))
     data = (args.artifacts / "uImage-UNTESTED.bin").read_bytes()
     network = server = None
     use_tftp = bool(args.tftp_host_ip)
@@ -206,6 +206,8 @@ def main():
     parser.add_argument("--port", required=True)
     parser.add_argument("--artifacts", type=Path, required=True)
     parser.add_argument("--inspection", type=Path, required=True)
+    parser.add_argument("--allocation-evidence", type=Path,
+                        help="Immediately preceding guarded reboot evidence; mandatory for ram768")
     parser.add_argument("--output", type=Path)
     parser.add_argument("--boot", action="store_true", help="Boot only after successful transfer size and RAM CRC checks")
     parser.add_argument("--boot-existing", action="store_true", help="Skip transfer; recheck current RAM CRC before boot")

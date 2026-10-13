@@ -90,6 +90,10 @@ jobs:
         run: |
           make emmc-read > logs/emmc-read.log 2>&1 || { tail -n 100 logs/emmc-read.log; exit 1; }
           tail -n 20 logs/emmc-read.log
+      - name: Build independent bounded 768-MiB memory candidate and check allocation/reset/probe/RAM gates
+        run: |
+          make ram768 > logs/ram768.log 2>&1 || { tail -n 100 logs/ram768.log; exit 1; }
+          tail -n 25 logs/ram768.log
       - name: Link optional RDA USB module and test manufacturing/key guards
         run: |
           make wifi-port > logs/wifi-port.log 2>&1 || { tail -n 100 logs/wifi-port.log; exit 1; }
@@ -148,6 +152,7 @@ jobs:
             artifacts/usb-host-compile/
             artifacts/usb-host1/
             artifacts/restart1/
+            artifacts/ram768/
             artifacts/wifi-port/
             logs/
           retention-days: 14
