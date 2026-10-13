@@ -70,6 +70,12 @@ until [ -f /var/lock/passwall_ready.lock ]; do
 done
 /etc/init.d/passwall stop > passwall-stop.log 2>&1
 echo PASSWALL_BOOT_READY
+# Check startup before clock synchronization as well as the future TLS tests.
+# This script is guarded to the isolated QEMU guest above.
+date -u -s @0
+xray version > xray-unsynchronized.txt 2>&1
+grep -q '^Xray 26\.10\.10 ' xray-unsynchronized.txt
+echo XRAY_UNSYNCHRONIZED_CLOCK_PASS
 sh /tmp/ntp-runtime-test.sh
 
 # A valid CA spans both dates. An old leaf certificate must expire in 2040.

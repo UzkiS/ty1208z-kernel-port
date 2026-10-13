@@ -6,7 +6,11 @@ Passwall TCP TPROXY HTTPS and bidirectional UDP delivery pass in isolated ARM
 QEMU at 2040, under both 512 MiB
 and 240 MiB usable-memory budgets. RAM packaging, resource/provenance mutations,
 actual FEMAC sanitizer and UART CRC/identity checks pass locally.
-**No physical boot or routing acceptance of this integrated candidate exists.**
+The artifact identities below describe the initial candidate. Physical boot
+revealed board-probe and Xray early-clock defects; corrected source and its
+separately identified image now have [physical RAM acceptance](openwrt-router-board-20261013.md),
+including real-ARM local forwarding/TPROXY. External Ethernet forwarding and
+performance remain unverified.
 
 ## Local artifact identity
 

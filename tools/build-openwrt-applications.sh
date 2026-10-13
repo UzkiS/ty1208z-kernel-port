@@ -47,6 +47,11 @@ make "${make_args[@]}" -j"$jobs" tools/install V=s
 make "${make_args[@]}" -j"$jobs" toolchain/install V=s
 make "${make_args[@]}" -j"$jobs" V=s
 "$python_cmd" "$project/tools/check_openwrt_applications.py" --source "$source_tree" --built
+xray_source=$(find "$source_tree/build_dir" -maxdepth 2 -type d -name 'Xray-core-26.10.10')
+test -n "$xray_source"
+"$python_cmd" "$project/tools/test_xray_browser_clock.py" --source "$xray_source" \
+    --go "$source_tree/staging_dir/hostpkg/lib/go-1.27/bin/go" \
+    --archive "$source_tree/dl/Xray-core-26.10.10.tar.gz"
 "$python_cmd" "$project/tools/test_openwrt_applications_qemu.py" --source "$source_tree"
 if [ "$stage" = ram ] || [ "$stage" = network ]; then
     "$python_cmd" "$project/tools/test_openwrt_applications_qemu.py" --source "$source_tree" --memory-mib 256

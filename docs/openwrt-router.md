@@ -10,9 +10,14 @@ and plain application trees retain their own configurations and outputs.
 The candidate includes Passwall/Xray/LuCI, fw4, dnsmasq-full, ip-full, ethtool
 and iperf3. Its modules match its exact native kernel. The rootfs uses the
 reviewed DHCP-client-only `probe` interface on eth0 and no DHCP-server interface.
+DHCP-supplied DNS is enabled for the installed resolver and NTP service.
 Kernel storage, USB, Wi-Fi, SMP, debugfs and restart experiments are excluded.
-Physical services, credentials, clock synchronization and routing policy still
-need hardware acceptance before normal use. There is no flash/install recipe.
+Physical RAM boot now establishes Ethernet, DHCP, local authenticated LuCI/
+Passwall UI, Xray startup before time synchronization and normal DNS/NTP after
+enabling peer DNS at runtime; see the [board report](../verification/openwrt-router-board-20261013.md).
+The delivered peer-DNS default still needs its own cold-boot acceptance.
+Management access and routing policy need configuration before normal use.
+There is no flash/install recipe.
 
 ## Application and forwarding acceptance
 

@@ -55,6 +55,8 @@ def make(source, output):
         if (kernel / name).read_bytes() != (PROJECT / "overlay" / name).read_bytes():
             raise ValueError(f"Native application kernel board source differs: {name}")
     if ethernet:
+        subprocess.run([sys.executable, str(PROJECT / "tools/test_ethernet_probe_guards.py"),
+                        "--linux", str(kernel)], check=True)
         subprocess.run([sys.executable, str(PROJECT / "tools/test_femac_datapath.py"),
                         "--linux", str(kernel)], check=True)
     subprocess.run([sys.executable, str(PROJECT / "tools/inspect_kernel_layout.py"),

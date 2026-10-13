@@ -113,6 +113,7 @@ def test(source, memory_mib=512):
                 raise ValueError(f"Application QEMU timeout; see {transcript_path.name}")
         report = bytes(transcript).replace(b"\r", b"")
         markers = (
+            b"XRAY_UNSYNCHRONIZED_CLOCK_PASS",
             b"NTP_ERA_TIME64_PASS", b"CERTIFICATE_TIME64_PASS", b"DNS_TIME64_PASS", b"HTTPS_TIME64_PASS",
             b"PASSWALL_LUCI_AUTH_TIME64_PASS",
             b"LUCI_RPCD_TIME64_PASS", b"PASSWALL_XRAY_SOCKS_TIME64_PASS",

@@ -19,7 +19,7 @@ BOOTARGS = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init
 BASE_PATHS = {"/", "/aliases", "/chosen", "/memory@0", "/cpus", "/cpus/cpu@0",
               "/clock-24m", "/clock-83m3", "/interrupt-controller@f8a01000", "/soc",
               "/soc/timer@f8a29000", "/soc/serial@f8b00000"}
-MARKERS = {"NTP_ERA_TIME64_PASS", "CERTIFICATE_TIME64_PASS", "DNS_TIME64_PASS", "HTTPS_TIME64_PASS",
+MARKERS = {"XRAY_UNSYNCHRONIZED_CLOCK_PASS", "NTP_ERA_TIME64_PASS", "CERTIFICATE_TIME64_PASS", "DNS_TIME64_PASS", "HTTPS_TIME64_PASS",
            "PASSWALL_LUCI_AUTH_TIME64_PASS", "LUCI_RPCD_TIME64_PASS",
            "PASSWALL_XRAY_SOCKS_TIME64_PASS", "PASSWALL_XRAY_TLS_TIME64_PASS",
            "NFT_EXPRESSIONS_AND_COUNTER_PASS", "OPENWRT_APPLICATIONS_QEMU_PASS"}

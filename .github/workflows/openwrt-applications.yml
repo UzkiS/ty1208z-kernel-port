@@ -18,6 +18,8 @@ on:
       - 'tools/inspect_kernel_layout.py'
       - 'tools/time64-probe.c'
       - 'tools/ntp-qemu-fixture.c'
+      - 'tools/test_xray_browser_clock.py'
+      - 'tools/test_ethernet_probe_guards.py'
       - 'Makefile'
       - '.github/workflows/openwrt-applications.yml'
   pull_request:
@@ -36,6 +38,8 @@ on:
       - 'tools/inspect_kernel_layout.py'
       - 'tools/time64-probe.c'
       - 'tools/ntp-qemu-fixture.c'
+      - 'tools/test_xray_browser_clock.py'
+      - 'tools/test_ethernet_probe_guards.py'
       - 'Makefile'
       - '.github/workflows/openwrt-applications.yml'
   workflow_dispatch:

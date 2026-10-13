@@ -1,0 +1,12 @@
+--- a/common/utils/browser.go
++++ b/common/utils/browser.go
+@@ -29,7 +29,8 @@
+ 	var timeStart int64 = time.Date(2026, 1, 13, 0, 0, 0, 0, time.UTC).Unix() / 86400
+ 	var timeCurrent int64 = time.Now().Unix() / 86400
+ 	var timeDiff int = int((timeCurrent - timeStart - 35)) - int(math.Floor(math.Pow(globalRng.Float64(), 2)*105))
+-	return startVersion + (timeDiff / 35) // It's 31.15 currently.
++	// A RAM-only board may start before clock synchronization.
++	return max(startVersion, startVersion+(timeDiff/35))
+ }
+ 
+ var safariMinorMap [25]int = [25]int{

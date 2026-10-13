@@ -9,6 +9,7 @@ import unittest
 
 from ethernet_net_profile import ethernet_net_profile, openwrt_ethernet_profile, NETWORK_NODES
 from inspect_images import parse_fdt
+from test_ethernet_probe_guards import run as execute_probe_guards
 
 ROOT = Path(__file__).resolve().parents[1]
 HARNESS = r"""
@@ -212,6 +213,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--artifacts", type=Path)
     args = parser.parse_args()
+    execute_probe_guards()
     execute_helpers()
     if args.artifacts:
         tree = parse_fdt((args.artifacts / "ty1208z-diagnostic.dtb").read_bytes())

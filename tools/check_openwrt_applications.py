@@ -42,7 +42,16 @@ def check(source, built=False):
     for item in lock.get("recipe_patches", []):
         if sha256(source / "feeds" / item["feed"] / item["path"]) != item["patched_sha256"]:
             raise ValueError(f"Patched recipe identity differs: {item['path']}")
+    for item in lock.get("source_patches", []):
+        feed = source / "feeds" / item["feed"]
+        if (sha256(feed / item["recipe"]) != item["recipe_sha256"] or
+                sha256(feed / item["path"]) != item["sha256"]):
+            raise ValueError(f"Application source patch identity differs: {item['path']}")
     if built:
+        for item in lock.get("source_patches", []):
+            patched = list((source / "build_dir").glob(f"target-*/{item['source_root']}/{item['source_file']}"))
+            if len(patched) != 1 or sha256(patched[0]) != item["patched_sha256"]:
+                raise ValueError(f"Actual application source lacks the checked patch: {item['source_file']}")
         kernels = list((source / "build_dir").glob(
             "target-*/linux-hi3798mv100_apps/linux-6.12.112/.config"))
         if len(kernels) != 1:
@@ -85,7 +94,7 @@ def check(source, built=False):
         if list(rootfs.rglob("ntp-qemu-fixture*")) or list(rootfs.rglob("ntp-runtime-test*")):
             raise ValueError("QEMU-only NTP fixture must not enter the delivered rootfs")
         if ethernet:
-            expected = (Path(__file__).resolve().parents[1] / "openwrt/ethernet/overlay/target/linux/"
+            expected = (Path(__file__).resolve().parents[1] / "openwrt/router/overlay/target/linux/"
                         "hi3798mv100/base-files/etc/config/network").read_bytes()
             if (rootfs / "etc/config/network").read_bytes() != expected:
                 raise ValueError("Integrated netifd rootfs differs from reviewed DHCP-client selection")

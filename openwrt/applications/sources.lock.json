@@ -62,5 +62,22 @@
       "patched_sha256": "ffbe40293cc4917a782f42af507f956e7b0e2aad239df0a7ad7a9cde14842272",
       "reason": "Xray TLS certificates require an array; preserve strict custom-CA hostname and expiry verification."
     }
+  ],
+  "source_patches": [
+    {
+      "feed": "passwall_packages",
+      "recipe": "xray-core/Makefile",
+      "recipe_sha256": "11d3bdc46651ed1c462b6fb0c3a284d533a506799e7fcc87915a65e6a0270aa6",
+      "path": "xray-core/patches/950-ty1208z-browser-clock.patch",
+      "patch": "patches/0003-xray-browser-clock.patch",
+      "sha256": "2c1f712993966369eed5ae04ce86eed097b72bffe63e39299059f68f0a08be87",
+      "source_archive": "Xray-core-26.10.10.tar.gz",
+      "source_sha256": "bc4b3fbe9f2612a7e8b7fffd4b7195f00ad4aa28478f3621fce925cb6190c036",
+      "source_root": "Xray-core-26.10.10",
+      "source_file": "common/utils/browser.go",
+      "original_sha256": "e7c8146627718c8b80f2bd353b1389f460b77810675f132bdbe933fbc665bc1c",
+      "patched_sha256": "80b1c8b639bd87818bc8fb5c2419e4afc256ada0d5838317cc368855226533bc",
+      "reason": "Bound the Chrome major version before GREASE array indexing when booting before clock synchronization."
+    }
   ]
 }

@@ -550,7 +550,7 @@
  		dev->stats.tx_dropped++;
  		dev->stats.tx_fifo_errors++;
  		netif_stop_queue(dev);
-@@ -757,12 +811,61 @@
+@@ -757,12 +811,62 @@
  	val |= MAX_FRAME_SIZE;
  	writel(val, priv->port_base + MAC_SET);
  
@@ -599,7 +599,8 @@
 +	unsigned int i;
 +
 +	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic") &&
-+	    !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-net"))
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-net") &&
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router-ram"))
 +		return -ENODEV;
 +	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
 +		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
@@ -615,7 +616,7 @@
  }
  
  static int hisi_femac_drv_probe(struct platform_device *pdev)
-@@ -784,6 +887,19 @@
+@@ -784,6 +888,19 @@
  	priv = netdev_priv(ndev);
  	priv->dev = dev;
  	priv->ndev = ndev;
@@ -635,7 +636,7 @@
  
  	priv->port_base = devm_platform_ioremap_resource(pdev, 0);
  	if (IS_ERR(priv->port_base)) {
-@@ -810,12 +926,19 @@
+@@ -810,12 +927,19 @@
  		goto out_free_netdev;
  	}
  
@@ -661,7 +662,7 @@
  
  	priv->phy_rst = devm_reset_control_get(dev, "phy");
  	if (IS_ERR(priv->phy_rst)) {
-@@ -945,6 +1068,7 @@
+@@ -945,6 +1069,7 @@
  #endif
  
  static const struct of_device_id hisi_femac_match[] = {
@@ -978,7 +979,7 @@
 +MACHINE_END
 --- /dev/null
 +++ b/drivers/clk/hisilicon/clk-ty1208z-ethernet.c
-@@ -0,0 +1,99 @@
+@@ -0,0 +1,100 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Measured TY1208Z inherited PHY state; no PHY reset or frequency claim. */
 +#include <linux/clk-provider.h>
@@ -1038,7 +1039,8 @@
 +	int ret;
 +
 +	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic") &&
-+	    !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-net"))
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-net") &&
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router-ram"))
 +		return -ENODEV;
 +	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
 +		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
@@ -1911,7 +1913,7 @@
 +#endif
 --- /dev/null
 +++ b/drivers/net/phy/festa-ty1208z.c
-@@ -0,0 +1,46 @@
+@@ -0,0 +1,47 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Inherited-state experiment. No PHY firmware/reset/expanded-register writes. */
 +#include <linux/module.h>
@@ -1923,7 +1925,8 @@
 +	int high, low;
 +
 +	if ((!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic") &&
-+	     !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-net")) ||
++	     !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-net") &&
++	     !of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router-ram")) ||
 +	    phy->mdio.addr != 1 || phy->phy_id != 0x20669823)
 +		return -ENODEV;
 +	high = phy_read(phy, MII_PHYSID1);

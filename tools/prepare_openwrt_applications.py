@@ -56,6 +56,23 @@ def pinned_feeds(project, taskbase):
                            cwd=destination, check=True, stdout=subprocess.PIPE)
         if sha256(recipe) != item["patched_sha256"]:
             raise ValueError(f"Recipe patch identity differs: {recipe}")
+    for item in lock.get("source_patches", []):
+        destination = destinations[item["feed"]]
+        recipe = destination / item["recipe"]
+        output = destination / item["path"]
+        patch = project / "openwrt/applications" / item["patch"]
+        if (not recipe.resolve().is_relative_to(destination.resolve()) or
+                not output.resolve().is_relative_to(destination.resolve()) or
+                not patch.resolve().is_relative_to((project / "openwrt/applications").resolve())):
+            raise ValueError("Source patch escapes its pinned application paths")
+        if (sha256(recipe) != item["recipe_sha256"] or
+                f"PKG_HASH:={item['source_sha256']}\n" not in recipe.read_text() or
+                sha256(patch) != item["sha256"]):
+            raise ValueError(f"Source patch/recipe identity differs: {item['path']}")
+        if output.exists() and sha256(output) != item["sha256"]:
+            raise ValueError(f"Existing source patch differs: {item['path']}")
+        output.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(patch, output)
     return "".join(lines), lock
 
 
@@ -108,10 +125,10 @@ def prepare_applications(project, taskbase, ethernet=False):
         path.write_text(merge_kernel_fragment(
             path.read_text(), (project / "openwrt/router/kernel.config").read_text()))
         manifest[relative] = sha256(path)
-        # The separate candidate is a DHCP client only. Reuse the reviewed
-        # netifd probe selection; routing configuration is a later runtime gate.
+        # The application candidate is a DHCP client only, with peer DNS for
+        # normal name resolution and the installed NTP service.
         relative = "target/linux/hi3798mv100/base-files/etc/config/network"
-        shutil.copyfile(project / "openwrt/ethernet/overlay" / relative, source / relative)
+        shutil.copyfile(project / "openwrt/router/overlay" / relative, source / relative)
         manifest[relative] = sha256(source / relative)
 
     relative = Path("target/linux/hi3798mv100/Makefile")
