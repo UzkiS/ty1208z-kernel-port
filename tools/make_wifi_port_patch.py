@@ -295,18 +295,8 @@ def transform(files):
     text = body(text, "wland_set_test_mode", "\t/* Manufacturing/test firmware is unavailable in this port. */\n")
     text = replace(text, "static u8 wifi_in_test_mode = 0;", "/* Test mode deliberately has no mutable state. */")
     result["rdawlan/wland_linux.c"] = text
-    text = files["rdawlan/wland_wid.c"]
-    text = replace(text, '''\tif (wland_nvram_read(RDA5995_TESTMODE_FILE, NULL, 0, 0) >= 0)
-\t\tstrcpy(rdawlan_firmware_path, "rf");''', '\t/* No filesystem trigger for manufacturing firmware. */')
-    text = replace(text, '''\tif (strncasecmp(rdawlan_firmware_path, "rf", strlen("rf")) == 0) {
-\t\tWLAND_DBG(RFTEST, INFO, "RF Test Mode!\\n");
-\t\twland_set_test_mode(1);
-\t} else
-\t\twland_set_test_mode(0);''', '''\tif (strcmp(rdawlan_firmware_path, "sta") &&
-\t    strcmp(rdawlan_firmware_path, "ap") &&
-\t    strcmp(rdawlan_firmware_path, "p2p"))
-\t\treturn -EPERM;''')
-    result["rdawlan/wland_wid.c"] = text
+    result["rdawlan/wland_wid.c"] = replace_definition(
+        files["rdawlan/wland_wid.c"], "wland_start_chip")
 
     text = files["rdawlan/wland_android.c"]
     text = body(text, "wland_android_priv_cmd", "\treturn -EOPNOTSUPP;\n")

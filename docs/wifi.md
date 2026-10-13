@@ -145,6 +145,12 @@ named-iovar 请求，当前模块因此仍不能正常启用无线接口。初�
 
 ## 后续实施顺序
 
+芯片启动现在要求固件状态、revision 和固件版本查询返回实际数据后才发布
+`chip_ready`；失败不再伪造 u04 或成功状态。实际 getter/解析器/启动函数的
+错误回复、重试和字符串边界已通过 sanitizer，完整模块和原生 APK 已重编译，
+见 [启动查询验收](../verification/wifi-chip-start-20261013.md)。这仍未解决
+cfg80211 的 named roaming/capability 初始化，也未证明实机无线可用。
+
 可选的 [原生 OpenWrt 打包入口](openwrt-wifi.md) 复用同一驱动补丁和
 `wifi/Kbuild`，在独立目录使用原生 Linux 6.12 cfg80211，不混用 backports。
 实际 APK 的模块、内核 ABI、自动加载与固件边界单独检查；编译/打包结果

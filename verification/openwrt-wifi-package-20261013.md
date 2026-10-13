@@ -73,9 +73,19 @@ standalone ARM module linking pass with the shared source changes. Core
 boot/TFTP regressions.
 
 The separate read-only, pinned-action native-package CI workflow rebuilds the
-fixed native compiler and the package from a fresh checkout. Its result is
-pending; the earlier successful parser diagnostic run excludes these new
-declaration/linkage and packaging changes.
+fixed native compiler and the package from a fresh checkout. Native package
+[run 38318338689](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38318338689)
+passed on `5aa1af4`. All 17 downloaded manifest files match their sizes/hashes,
+the shared patch matches that exact Git revision, and actual configuration,
+package and eight-case guard markers were verified. Its log SHA-256 is
+`d29b14425543c7d786407eb68599fce1a3ee685af12e607eb8fab5e073abab46`.
+Standalone diagnostic
+[run 38318338712](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38318338712)
+also passed on that revision; all six downloaded Wi-Fi manifest files and
+seven actual sanitizer markers were verified. Its Wi-Fi build-log SHA-256 is
+`24f7987aac0f5dae3ea1213cfb2994600ed5da21c5c2d0cf3e4b855d5d0c423e`.
+These runs cover the declarations and native package, and precede the later
+[chip-start acknowledgement changes](wifi-chip-start-20261013.md).
 
 No module/image has been loaded on the box during this work. Hardware USB
 audit/enumeration, actual RDA revision/firmware identity, named roaming/PHY
