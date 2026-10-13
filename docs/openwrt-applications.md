@@ -16,6 +16,12 @@ selected package roots and their dependencies are installed into the build.
 Passwall 26.10.4 selects Xray 26.10.10 and nftables; unused proxy engines and
 geodata are explicitly disabled rather than included by default.
 
+New application/router builds include the Simplified Chinese LuCI, firewall
+and Passwall translations. A first-boot UCI default selects `zh_cn`; browser
+language detection is not required. Users can change the language in LuCI
+afterward. The built-rootfs checks require the language default, actual LMO
+catalogues and installed translation packages.
+
 The application build reuses the completed native GCC 14.3.0/musl 1.2.5
 toolchain as an external compiler and records compiler/libc hashes. The pinned
 Xray requires Go 1.27. A checked recipe patch selects the versioned Go 1.27.1

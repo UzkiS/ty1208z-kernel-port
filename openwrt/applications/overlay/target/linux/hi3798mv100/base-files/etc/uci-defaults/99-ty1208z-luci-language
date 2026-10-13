@@ -1,0 +1,3 @@
+#!/bin/sh
+# Default the application/router interface to Simplified Chinese on first boot.
+uci set luci.main.lang='zh_cn' && uci commit luci

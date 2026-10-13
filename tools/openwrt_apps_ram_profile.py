@@ -25,6 +25,7 @@ MARKERS = {"XRAY_UNSYNCHRONIZED_CLOCK_PASS", "NTP_ERA_TIME64_PASS", "CERTIFICATE
            "NFT_EXPRESSIONS_AND_COUNTER_PASS", "OPENWRT_APPLICATIONS_QEMU_PASS"}
 ROUTER_MARKERS = {"OPENWRT_ROUTER_FORWARDING_TIME64_PASS", "PASSWALL_TPROXY_TCP_TIME64_PASS",
                   "PASSWALL_TPROXY_UDP_TIME64_PASS"}
+LANGUAGE_MARKER = "LUCI_CHINESE_DEFAULT_PASS"
 
 
 def digest(data):
@@ -38,6 +39,10 @@ def validate_pair(artifacts):
     report = json.loads((Path(artifacts) / "checks/applications-qemu-256.json").read_text())
     variant = report.get("application_variant", "qemu")
     markers = MARKERS | (ROUTER_MARKERS if variant == "ethernet" else set())
+    # Preserve acceptance of earlier measured images. New builds record the
+    # extra language check and must supply its actual console evidence too.
+    if LANGUAGE_MARKER in report.get("passed_markers", []):
+        markers = markers | {LANGUAGE_MARKER}
     if (report.get("result") != "OPENWRT_APPLICATIONS_QEMU_PASS" or
             variant not in {"qemu", "ethernet"} or
             report.get("machine") != "virt,cortex-a7,single-core" or

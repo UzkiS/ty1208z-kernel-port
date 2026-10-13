@@ -30,7 +30,7 @@ make_args=(-C "$source_tree" "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" COMMITCOUNT=
     # every unrelated LuCI app introduces upstream Kconfig dependency cycles.
     ./scripts/feeds uninstall -a
     ./scripts/feeds install -f -p passwall_packages xray-core
-    ./scripts/feeds install -p luci luci luci-ssl
+    ./scripts/feeds install -p luci luci luci-ssl luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn
     ./scripts/feeds install -f -p passwall luci-app-passwall luci-i18n-passwall-zh-cn
     ./scripts/feeds install -p packages curl
     if [[ "$stage" == network* ]]; then ./scripts/feeds install -p packages iperf3; fi

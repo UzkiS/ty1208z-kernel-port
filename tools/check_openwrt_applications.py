@@ -15,6 +15,8 @@ def check(source, built=False):
     for option in (
             "TARGET_hi3798mv100_apps", "TARGET_hi3798mv100_apps_DEVICE_ty1208z_apps",
             "TARGET_ROOTFS_INITRAMFS_SEPARATE", "USE_MUSL", "PACKAGE_luci-app-passwall",
+            "LUCI_LANG_zh_Hans", "PACKAGE_luci-i18n-base-zh-cn",
+            "PACKAGE_luci-i18n-firewall-zh-cn", "PACKAGE_luci-i18n-passwall-zh-cn",
             "PACKAGE_luci-app-passwall_Nftables_Transparent_Proxy", "PACKAGE_xray-core",
             "PACKAGE_firewall4", "PACKAGE_dnsmasq-full", "PACKAGE_ty1208z-time64",
             "LIBCURL_THREADED_RESOLVER"):
@@ -86,6 +88,16 @@ def check(source, built=False):
         if len(roots) != 1:
             raise ValueError("Expected one actual application rootfs")
         rootfs = roots[0]
+        language_default = Path("etc/uci-defaults/99-ty1208z-luci-language")
+        expected_language = (Path(__file__).resolve().parents[1] /
+                            "openwrt/applications/overlay/target/linux/hi3798mv100/base-files" /
+                            language_default).read_bytes()
+        if (rootfs / language_default).read_bytes() != expected_language:
+            raise ValueError("Application rootfs lacks the reviewed Chinese language default")
+        for name in ("base", "firewall", "passwall"):
+            translation = rootfs / f"usr/lib/lua/luci/i18n/{name}.zh-cn.lmo"
+            if not translation.is_file() or translation.stat().st_size == 0:
+                raise ValueError(f"Application rootfs lacks Chinese translation: {name}")
         ntpd = rootfs / "usr/sbin/ntpd"
         if (not ntpd.is_symlink() or ntpd.readlink() != Path("../../bin/busybox") or
                 not (rootfs / "bin/busybox").is_file() or
@@ -122,7 +134,9 @@ def check(source, built=False):
             raise ValueError("Expected one built application package manifest")
         manifest_path = manifests[0]
         packages = manifest_path.read_text()
-        for package in ("luci-app-passwall - ", "xray-core - ", "firewall4 - ", "dnsmasq-full - "):
+        for package in ("luci-app-passwall - ", "xray-core - ", "firewall4 - ", "dnsmasq-full - ",
+                        "luci-i18n-base-zh-cn - ", "luci-i18n-firewall-zh-cn - ",
+                        "luci-i18n-passwall-zh-cn - "):
             if package not in packages:
                 raise ValueError(f"Application not installed in actual rootfs: {package}")
     print("OPENWRT_APPLICATION_CONFIG_PASS variant=" + ("ethernet" if ethernet else "qemu") +

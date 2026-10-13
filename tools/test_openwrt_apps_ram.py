@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import select
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -17,7 +18,7 @@ import zlib
 
 from inspect_images import parse_fdt
 from openwrt_apps_ram_profile import (
-    BOOTLOADER_BOUND_ADDRESS, INITRD_ADDRESS, MAX_COMPRESSED,
+    BOOTLOADER_BOUND_ADDRESS, INITRD_ADDRESS, LANGUAGE_MARKER, MAX_COMPRESSED,
     applications_ram_profile, validate_pair,
 )
 from prepare_ram_boot import prepare
@@ -105,6 +106,8 @@ class ApplicationProfileTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "bounded-memory"):
                 validate_pair(root)
             for marker in report["passed_markers"]:
+                if marker == LANGUAGE_MARKER:
+                    continue  # Earlier measured images predate language acceptance.
                 changed = copy.deepcopy(report)
                 changed["passed_markers"].remove(marker)
                 record.write_text(json.dumps(changed))
@@ -113,6 +116,26 @@ class ApplicationProfileTests(unittest.TestCase):
             record.write_text(json.dumps(report))
             (root / "zImage").write_bytes(b"wrong kernel")
             with self.assertRaisesRegex(ValueError, "identity differs: kernel"):
+                validate_pair(root)
+
+    def test_language_marker_requires_actual_evidence_and_allows_earlier_images(self):
+        report = json.loads((ARTIFACTS / "checks/applications-qemu-256.json").read_text())
+        if LANGUAGE_MARKER not in report["passed_markers"]:
+            self.skipTest("The measured historical image predates Chinese defaults")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "candidate"
+            shutil.copytree(ARTIFACTS, root)
+            record = root / "checks/applications-qemu-256.json"
+            historical = copy.deepcopy(report)
+            historical["passed_markers"].remove(LANGUAGE_MARKER)
+            record.write_text(json.dumps(historical))
+            validate_pair(root)
+            console = root / "checks/qemu-applications-256.log"
+            data = console.read_bytes().replace(LANGUAGE_MARKER.encode(), b"LANGUAGE_EVIDENCE_REMOVED")
+            console.write_bytes(data)
+            report["artifacts"]["console"] = {"bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+            record.write_text(json.dumps(report))
+            with self.assertRaisesRegex(ValueError, "markers are absent"):
                 validate_pair(root)
 
     def test_unapproved_transfer_address_or_command_sends_nothing(self):

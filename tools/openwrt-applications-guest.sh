@@ -165,6 +165,11 @@ uci commit uhttpd
 /etc/init.d/uhttpd restart
 echo LUCI_PAGE_CHECK_START
 wait_luci_login
+test "$(uci get luci.main.lang)" = zh_cn
+grep -q 'lang="zh-cn"' luci.txt
+grep -q '用户名' luci.txt
+grep -q '密码' luci.txt
+echo LUCI_CHINESE_DEFAULT_PASS
 echo RPCD_SESSION_CHECK_START
 ubus call session create '{"timeout":60}' > session.json
 jsonfilter -i session.json -e @.ubus_rpc_session | grep -Eq '^[0-9a-f]{32}$'
