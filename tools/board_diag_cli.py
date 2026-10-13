@@ -22,6 +22,7 @@ PROFILES = {
     "ethernet-net1": b"6.12.112-ty1208z-ethernet-net1",
     "usb-audit1": b"6.12.112-ty1208z-usb-audit1",
     "usb-clock-audit1": b"6.12.112-ty1208z-usb-clock-audit1",
+    "usb-host1": b"6.12.112-ty1208z-usb-host1",
     "restart1": b"6.12.112-ty1208z-restart1",
 }
 
@@ -68,7 +69,8 @@ def run(args, serial_module):
                 if not re.search(rb"(?:^|[\r\n])" + re.escape(PROFILES[args.profile]) + rb"[\r\n]", identity):
                     raise TransferError("Kernel identity differs; diagnostic command not sent")
                 result["kernel_verified"] = True
-                report = shell_command(exchange, b"diag; echo TY1208Z_DIAG_COMPLETE", timeout=30)
+                diagnostic = b"usb-diag; diag" if args.profile == "usb-host1" else b"diag"
+                report = shell_command(exchange, diagnostic + b"; echo TY1208Z_DIAG_COMPLETE", timeout=30)
                 if not re.search(rb"(?:^|[\r\n])TY1208Z_DIAG_COMPLETE[\r\n]", report):
                     raise TransferError("Diagnostic report is incomplete")
                 if not re.search(rb"(?:^|[\r\n])TIME64_PASS sizeof\(time_t\)=8 ", report):
@@ -120,6 +122,17 @@ def run(args, serial_module):
                             b"USB_CLOCK_AUDIT_COMPLETE sdk-last-user-stop no-device-transactions no-dma no-firmware"))
                         or b"USB_CLOCK_AUDIT_FAILED" in report):
                     raise TransferError("Guarded USB clock/capability experiment did not complete")
+                if args.profile == "usb-host1" and (
+                        not all(marker in report for marker in (
+                            b"USB_HOST0_PREPARED sdk-host0-sequence",
+                            b"USB_HOST0_OBSERVATION ehci_root=1 ohci_root=1 rda=",
+                            b"USB_HOST0_OBSERVATION_COMPLETE no-class-driver no-firmware-loading"))
+                        or not all(re.search(pattern, report) for pattern in (
+                            rb"(?:^|[\r\n])f9890000\.usb driver=[^\r\n]+/ehci-platform[\r\n]",
+                            rb"(?:^|[\r\n])f9880000\.usb driver=[^\r\n]+/ohci-platform[\r\n]"))
+                        or any(marker in report for marker in (
+                            b"USB_HOST0_PREPARE_FAILED", b"USB_HOST0_SHUTDOWN_READBACK_FAILED"))):
+                    raise TransferError("USB host0 controllers/root hubs did not start completely")
                 result["report_complete"] = True
                 result["status"] = "diagnostic-captured"
             except (TransferError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:

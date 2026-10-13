@@ -1,5 +1,10 @@
 # USB host0 enumeration image: offline acceptance
 
+Update: the later [physical clock/capability experiment](usb-clock-audit-board-20261013.md)
+passed and its measurements were reviewed. The exact enumeration profile now
+passes the bounded RAM planner; the earlier denial below describes its original
+offline milestone. Enumeration itself remains separate physical acceptance.
+
 Date: 2026-10-13. **Built and emulated, not booted on TY1208Z.** The guarded RAM
 boot planner deliberately rejects the image pending the independent physical
 USB register/capability audit. There is no USB/RDA/Wi-Fi hardware acceptance.

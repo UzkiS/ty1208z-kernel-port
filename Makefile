@@ -31,7 +31,7 @@ help:
 	@echo 'make openwrt-app-ram - validate applications with a 240-MiB usable budget and package separate RAM initrd'
 	@echo 'make openwrt-router - build isolated applications plus measured Ethernet for RAM validation'
 	@echo 'make usb-host-compile - compile optional host0 clock/PHY plus generic EHCI/OHCI, no boot image'
-	@echo 'make usb-host - build offline host0 enumeration image; RAM boot remains blocked pending hardware audit'
+	@echo 'make usb-host - build isolated host0 enumeration RAM candidate after physical capability acceptance'
 
 lint:
 	python3 tools/check_repository.py

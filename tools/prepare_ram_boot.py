@@ -86,8 +86,10 @@ def prepare(artifacts, inspection):
     ethernet_clock_id_profile(tree, config)
     usb_audit_profile(tree, config)
     usb_clock_audit_profile(tree, config)
-    if usb_host_profile(tree, config):
-        raise ValueError("USB host0 image is offline-only pending physical USB register/capability audit")
+    # The 2026-10-13 physical clock experiment established host0 capabilities
+    # and verified SDK shutdown (verification/usb-clock-audit-board-20261013.md).
+    # Only this exact enumeration profile acquires USB_SUPPORT permission.
+    usb_host = usb_host_profile(tree, config)
     restart_profile(tree, config)
     application_initrd = applications_ram_profile(tree, config, artifacts)
     board = properties["/"]["compatible"].get("strings", [None])[0]
@@ -102,6 +104,8 @@ def prepare(artifacts, inspection):
     else:
         network = ethernet_net_profile(tree, config)
     for name in ("BLOCK", "MMC", "MTD", "ATA", "SCSI", "NET", "USB_SUPPORT", "MODULES", "SMP"):
+        if name == "USB_SUPPORT" and usb_host:
+            continue
         if name == "MMC" and ident:
             continue
         if name == "NET" and network:

@@ -81,6 +81,10 @@ does not establish physical USB acceptance.
 
 ## Next physical acceptance
 
+The later [physical report](usb-clock-audit-board-20261013.md) completes these
+clock/capability measurements and verified stop. The subsequent
+[host report](usb-host-board-20261013.md) records independent enumeration.
+
 Back up current RAM configuration, collect a fresh CA bootloader inspection,
 recheck DDR/bootcmd, receive the exact image and verify its device CRC while
 restoring temporary loader network settings. Then collect initial controls,

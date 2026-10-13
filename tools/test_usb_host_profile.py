@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Reject resource/clock/driver mutations in the actual offline host0 image."""
+"""Check exact enumeration RAM permission and reject host0 profile mutations."""
 import argparse
 import copy
 import hashlib
@@ -71,19 +71,23 @@ class HostProfileTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             usb_host_profile(self.tree, self.config.replace("-ty1208z-usb-host1", "-ty1208z-diag1"))
 
-    def test_built_image_has_no_ram_boot_permission(self):
+    def test_built_image_has_bounded_enumeration_ram_permission(self):
         raw = (b"Fastboot 3.3.0-dirty (vendor)\n"
                b"DDR free region baseaddr:0x1000000 size:0x3F000000\n"
                b"bootcmd=mmc read 0 0x1FFFFC0 0x7000 0xA000;bootm 0x1FFFFC0\n"
                b"loady [ off ] [ baud ]\ncrc32 address count [addr]\nbootm [addr [arg ...]]\n")
-        with tempfile.TemporaryDirectory(prefix="usb-host-denied-") as directory:
+        with tempfile.TemporaryDirectory(prefix="usb-host-plan-") as directory:
             path = Path(directory)
             (path / "inspection.rx").write_bytes(raw)
             record = path / "inspection.json"
             record.write_text(json.dumps({"stop_reason": "probe-complete", "raw_file": "inspection.rx",
                                           "raw_sha256": hashlib.sha256(raw).hexdigest()}))
-            with self.assertRaisesRegex(ValueError, "offline-only pending physical USB"):
-                prepare(self.artifacts, record)
+            plan = prepare(self.artifacts, record)
+            self.assertEqual(plan["image_sha256"], hashlib.sha256(
+                (self.artifacts / "uImage-UNTESTED.bin").read_bytes()).hexdigest())
+            self.assertFalse(plan["persistent_writes"])
+            self.assertNotIn("additional_loads", plan)
+            self.assertLess(plan["kernel_layout"]["physical_bss_end"], 0x01000000)
 
 
 if __name__ == "__main__":

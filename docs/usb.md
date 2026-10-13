@@ -63,9 +63,12 @@ The built candidate and completed local checks are recorded in the
 
 ## Remaining milestones
 
-Inherited controls and SYSID0 are measured; a separate bounded clock/PHY
-experiment must still establish capabilities. Then review the separately
-prepared host0 profile for RAM validation and test EHCI/OHCI enumeration.
+Inherited controls, SYSID0 and bounded clock/PHY capabilities are now measured;
+the [physical clock report](../verification/usb-clock-audit-board-20261013.md)
+records EHCI 1.0, two ports, OHCI 1.0 and verified shutdown. The exact separate
+host0 profile is now eligible for RAM validation and EHCI/OHCI enumeration.
+The later [physical host report](../verification/usb-host-board-20261013.md)
+confirms both HCDs/root hubs, RDA at 480 Mbps and shared-clock removal/rebind.
 Check exact RDA revision, firmware source/license/hash, bounded control and
 bulk transfers, firmware startup, scan/association and AP support separately.
 The Hinas log warned that the high-speed RDA bulk endpoints `03/83` advertise
@@ -95,8 +98,8 @@ accessed. The exact profile and separate collector identity prevent it from
 entering ordinary diagnostic/router images. Actual helper/probe sanitizer
 checks cover every initial-state bit, active foreign state, capability errors,
 initialization/stop failures, exact resource/mapping gates and error propagation.
-Physical capability acceptance remains outstanding; the `usb-host1` boot gate
-remains closed until those measurements are independently reviewed.
+Physical capability acceptance and review are complete; see the physical
+clock report. This opens only the exact `usb-host1` enumeration RAM profile.
 
 ## Optional compile experiment
 
@@ -148,10 +151,10 @@ under QEMU virt to check actual ARM shell behavior, where it correctly reports
 no board controllers/devices. Image/layout and time64 checks pass; see the
 [offline report](../verification/usb-host-offline-20261013.md).
 
-`prepare_ram_boot.py` explicitly rejects this actual built image before opening
-a serial port or emitting loader commands. This remains in place until the
-separate hardware USB audit establishes controls, SYSID0 and capabilities, and
-the measured values are reviewed against the prepared initialization recipe.
+Following the physical clock/capability acceptance, `prepare_ram_boot.py`
+accepts this exact profile with the ordinary CRC, measured bootloader and
+bounded RAM/layout gates. DT/config mutations still reject other resources,
+class drivers, storage, firmware loading and larger memory profiles.
 The currently bootable native-Ethernet and router images do not acquire USB
 permissions through this addition. No additional physical reboot is requested
 for this offline milestone.

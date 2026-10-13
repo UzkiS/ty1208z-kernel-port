@@ -1,4 +1,4 @@
-"""Exact offline USB host0 profile; this is not a RAM-boot permission."""
+"""Exact host0 enumeration profile following the physical capability audit."""
 import re
 
 HOST_NODES = {

@@ -1,5 +1,5 @@
 #!/bin/bash
-# Offline host0 image only. RAM boot remains blocked pending the hardware audit.
+# Independent host0 enumeration image following the physical capability audit.
 set -euo pipefail
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
 taskbase=$(realpath -m -- "${1:-"$project/.work"}")
@@ -52,4 +52,4 @@ if grep -q 'USB_HOST0_OBSERVER_FAIL' "$artifacts/checks/qemu-virt-boot.log"; the
     echo 'USB observer failed under actual ARM shell.' >&2
     exit 1
 fi
-echo 'USB HOST0 OFFLINE IMAGE; RAM boot blocked until hardware USB audit is accepted.'
+echo 'USB HOST0 ENUMERATION CANDIDATE; no class driver, Wi-Fi firmware or radio acceptance.'

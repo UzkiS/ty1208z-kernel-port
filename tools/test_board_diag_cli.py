@@ -47,7 +47,8 @@ class DiagnosticTests(unittest.TestCase):
                     os.write(master, b"uname -r\r\n" + kernel + b"\r\n# ")
                     if mode == "wrong-kernel":
                         return
-                    self.assertEqual(read_command(), b"diag; echo TY1208Z_DIAG_COMPLETE\r")
+                    diagnostic = b"usb-diag; diag" if profile == "usb-host1" else b"diag"
+                    self.assertEqual(read_command(), diagnostic + b"; echo TY1208Z_DIAG_COMPLETE\r")
                     time64 = b"TIME64_FAIL" if mode == "probe-failure" else b"TIME64_PASS sizeof(time_t)=8 file=2208988800"
                     audit = b"EMMC_AUDIT_READ_ONLY_COMPLETE" if mode != "missing-audit" else b"No audit driver"
                     ident = b"No card" if mode == "missing-ident" else (
@@ -88,6 +89,20 @@ class DiagnosticTests(unittest.TestCase):
                         usb_clock = usb_clock.replace(b"USB1=0000a801 error=0", b"USB1=0000a801 error=-5")
                     if mode == "missing-usb-clock-caps":
                         usb_clock = usb_clock.replace(b"USB_CLOCK_AUDIT_CAPS", b"CAPABILITIES_SKIPPED")
+                    usb_host = (
+                        b"USB_HOST0_PREPARED sdk-host0-sequence\r\n"
+                        b"f9890000.usb driver=../../../bus/platform/drivers/ehci-platform\r\n"
+                        b"f9880000.usb driver=../../../bus/platform/drivers/ohci-platform\r\n"
+                        b"USB_HOST0_OBSERVATION ehci_root=1 ohci_root=1 rda=1\r\n"
+                        b"USB_HOST0_OBSERVATION_COMPLETE no-class-driver no-firmware-loading")
+                    if mode == "missing-usb-root":
+                        usb_host = usb_host.replace(b"ohci_root=1", b"ohci_root=0")
+                    if mode == "unbound-usb-host":
+                        usb_host = usb_host.replace(b"driver=../../../bus/platform/drivers/ehci-platform", b"driver=unbound")
+                    if mode == "failed-usb-host":
+                        usb_host += b"\r\nUSB_HOST0_SHUTDOWN_READBACK_FAILED"
+                    if mode == "no-rda":
+                        usb_host = usb_host.replace(b"rda=1", b"rda=0")
                     # Fragment the output to exercise prompt/marker reassembly.
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
@@ -100,6 +115,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\n" + (usb if profile == "usb-audit1" else b""),
                                  b"\r\n" + (restart if profile == "restart1" else b""),
                                  b"\r\n" + (usb_clock if profile == "usb-clock-audit1" else b""),
+                                 b"\r\n" + (usb_host if profile == "usb-host1" else b""),
                                  b"\r\nTY1208Z_DIAG_", b"COMPLETE\r\n# "):
                         os.write(master, part)
                         time.sleep(0.01)
@@ -120,9 +136,9 @@ class DiagnosticTests(unittest.TestCase):
                 if errors:
                     raise errors[0]
                 self.assertFalse(select.select([master], [], [], 0.05)[0], "Unexpected extra command")
-                self.assertEqual(process.returncode, 0 if mode == "success" else 1, output.decode())
+                self.assertEqual(process.returncode, 0 if mode in ("success", "no-rda") else 1, output.decode())
                 report = json.loads(prefix.with_suffix(".json").read_text())
-                self.assertEqual(report["report_complete"], mode == "success")
+                self.assertEqual(report["report_complete"], mode in ("success", "no-rda"))
                 self.assertEqual(len(commands), 1 if mode == "bootloader" else 2 if mode == "wrong-kernel" else 3)
                 if mode == "success":
                     self.assertIn(b"file=2208988800", prefix.with_suffix(".rx").read_bytes())
@@ -205,6 +221,21 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_usb_clock_missing_capabilities_are_not_accepted(self):
         self.exercise("missing-usb-clock-caps", profile="usb-clock-audit1")
+
+    def test_usb_host_controllers_and_root_hubs_are_captured(self):
+        self.exercise("success", profile="usb-host1")
+
+    def test_usb_host_missing_root_hub_is_rejected(self):
+        self.exercise("missing-usb-root", profile="usb-host1")
+
+    def test_usb_host_unbound_controller_is_rejected(self):
+        self.exercise("unbound-usb-host", profile="usb-host1")
+
+    def test_usb_host_shutdown_failure_is_rejected(self):
+        self.exercise("failed-usb-host", profile="usb-host1")
+
+    def test_usb_host_controller_acceptance_does_not_invent_rda(self):
+        self.exercise("no-rda", profile="usb-host1")
 
 
 if __name__ == "__main__":
