@@ -13,9 +13,11 @@ from ymodem_sender import TransferError
 
 PROMPT = re.compile(rb"(?:^|[\r\n])root@[^\r\n ]+:[^\r\n]*# $")
 PROFILES = {
-    "net": (b"6.12.112-ty1208z-openwrt-net", b"hi3798mv100/net"),
-    "router": (b"6.12.112-ty1208z-openwrt-router", b"hi3798mv100/apps"),
+    "net": (b"6.12.112", b"hi3798mv100/net", b"tianyi,ty1208z-ca-openwrt-net"),
+    "router": (b"6.12.112", b"hi3798mv100/apps", b"tianyi,ty1208z-ca-openwrt-router-ram"),
 }
+SOURCE_REVISION = b"source-58efa9917d4cc53fceed173529a286187649e827"
+DT_IDENTITY = b"tr '\\000' '\\n' < /sys/firmware/devicetree/base/compatible"
 REPORT = (
     b"ubus call network.interface.probe status >/tmp/ty1208z-network.json && "
     b"cat /tmp/ty1208z-network.json && "
@@ -104,11 +106,15 @@ def run(args, serial_module):
             try:
                 command(exchange, b"")
                 identity = command(exchange, b"uname -r; cat /etc/openwrt_release")
-                release, target = PROFILES[args.profile]
+                release, target, compatible = PROFILES[args.profile]
                 if (not re.search(rb"(?:^|[\r\n])" + re.escape(release) + rb"[\r\n]", identity) or
                         not re.search(rb"(?:^|[\r\n])DISTRIB_ID='OpenWrt'[\r\n]", identity) or
+                        not re.search(rb"(?:^|[\r\n])DISTRIB_REVISION='" + re.escape(SOURCE_REVISION) + rb"'[\r\n]", identity) or
                         not re.search(rb"(?:^|[\r\n])DISTRIB_TARGET='" + re.escape(target) + rb"'[\r\n]", identity)):
                     raise TransferError("Native kernel/rootfs identity differs; experiment not sent")
+                board_identity = command(exchange, DT_IDENTITY)
+                if not re.search(rb"(?:^|[\r\n])" + re.escape(compatible) + rb"[\r\n]", board_identity):
+                    raise TransferError("Native board device-tree identity differs; experiment not sent")
                 result["kernel_verified"] = True
                 data, marker = {
                     "report": (REPORT, b"OPENWRT_ETHERNET_BOARD_PASS"),

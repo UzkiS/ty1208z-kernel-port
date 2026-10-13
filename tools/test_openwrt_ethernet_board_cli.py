@@ -12,7 +12,9 @@ import threading
 import time
 import unittest
 
-from openwrt_ethernet_board_cli import PROFILES, REPORT, START_IPERF, COLLECT_IPERF, iperf_summary
+from openwrt_ethernet_board_cli import (
+    PROFILES, SOURCE_REVISION, DT_IDENTITY, REPORT, START_IPERF, COLLECT_IPERF, iperf_summary,
+)
 from ymodem_sender import TransferError
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,13 +47,23 @@ class NativeSerialTests(unittest.TestCase):
                     if mode == "bootloader":
                         return
                     self.assertEqual(receive(), b"uname -r; cat /etc/openwrt_release\r")
-                    release, target = PROFILES[profile]
+                    release, target, compatible = PROFILES[profile]
+                    revision = b"source-foreign" if mode == "wrong-source" else SOURCE_REVISION
                     if mode == "wrong-kernel":
                         release = b"4.4.35"
                     if mode == "wrong-rootfs":
                         target = b"hi3798mv100/apps" if profile == "net" else b"hi3798mv100/net"
-                    os.write(master, b"\r\n" + release + b"\r\nDISTRIB_ID='OpenWrt'\r\nDISTRIB_TARGET='" + target + b"'" + prompt)
-                    if mode in ("wrong-kernel", "wrong-rootfs"):
+                    os.write(master, b"\r\n" + release + b"\r\nDISTRIB_ID='OpenWrt'\r\nDISTRIB_REVISION='"
+                             + revision + b"'\r\nDISTRIB_TARGET='" + target + b"'" + prompt)
+                    if mode in ("wrong-kernel", "wrong-rootfs", "wrong-source"):
+                        return
+                    self.assertEqual(receive(), DT_IDENTITY + b"\r")
+                    if mode == "wrong-board":
+                        compatible = b"linux,dummy-virt"
+                    if mode == "missing-board":
+                        compatible = b""
+                    os.write(master, b"\r\n" + compatible + prompt)
+                    if mode in ("wrong-board", "missing-board"):
                         return
                     payload, marker = {
                         "report": (REPORT, b"OPENWRT_ETHERNET_BOARD_PASS"),
@@ -106,8 +118,10 @@ class NativeSerialTests(unittest.TestCase):
                     self.assertEqual(metadata["iperf_summary"]["sum_received"]["bytes"], 1048576)
                 if mode == "bootloader":
                     self.assertEqual(len(commands), 1)
-                elif mode in ("wrong-kernel", "wrong-rootfs"):
+                elif mode in ("wrong-kernel", "wrong-rootfs", "wrong-source"):
                     self.assertEqual(len(commands), 2)
+                elif mode in ("wrong-board", "missing-board"):
+                    self.assertEqual(len(commands), 3)
                 else:
                     self.assertGreater(len(commands), 4)
             finally:
@@ -119,7 +133,7 @@ class NativeSerialTests(unittest.TestCase):
                 os.close(slave)
 
     def test_refuses_bootloader_and_foreign_kernel_rootfs(self):
-        for mode in ("bootloader", "wrong-kernel", "wrong-rootfs"):
+        for mode in ("bootloader", "wrong-kernel", "wrong-rootfs", "wrong-source", "wrong-board", "missing-board"):
             with self.subTest(mode=mode):
                 self.exercise(mode)
 
@@ -134,7 +148,7 @@ class NativeSerialTests(unittest.TestCase):
                 self.exercise("success", operation)
 
     def test_integrated_profile_rejects_foreign_kernel_rootfs(self):
-        for mode in ("wrong-kernel", "wrong-rootfs", "success"):
+        for mode in ("wrong-kernel", "wrong-rootfs", "wrong-source", "wrong-board", "missing-board", "success"):
             with self.subTest(mode=mode):
                 self.exercise(mode, profile="router")
 

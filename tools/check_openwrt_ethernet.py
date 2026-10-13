@@ -48,6 +48,9 @@ def check(source, built=False):
     if len(kernels) != 1 or len(images) != 1 or len(roots) != 1:
         raise ValueError("Expected one native Ethernet kernel, image and rootfs")
     kernel, image, root = kernels[0], images[0], roots[0]
+    release = (kernel / "include/generated/utsrelease.h").read_text().strip()
+    if release != '#define UTS_RELEASE "6.12.112"':
+        raise ValueError("Native Ethernet compiled kernel release differs from the measured OpenWrt release")
     output = PROJECT / "artifacts/openwrt-net1"
     checks = output / "checks"
     checks.mkdir(parents=True, exist_ok=True)
@@ -102,6 +105,7 @@ def check(source, built=False):
     (checks / "image.json").write_text(json.dumps(result, indent=2) + "\n")
     (output / "manifest.json").write_text(json.dumps({
         "status": "native RAM Ethernet candidate; hardware untested",
+        "kernel_release": "6.12.112",
         "files": {name: {"bytes": (output / name).stat().st_size, "sha256": sha256(output / name)}
                   for name in ("uImage-UNTESTED.bin", "zImage", "ty1208z-diagnostic.dtb", "linux.config")},
         "toolchain": json.loads((source / ".ty1208z-toolchain.json").read_text()),

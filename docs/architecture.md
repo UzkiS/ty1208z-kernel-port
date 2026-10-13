@@ -42,7 +42,9 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 内部 PHY/时钟待验证条件见 [Ethernet](ethernet.md)。原生 RAM target 已通过配置解析、
 OpenWrt 通用补丁叠加、完整原生 GCC/musl 镜像构建及核心用户空间 QEMU time64。
 新内核的基本网口收发已有[实机验收](../verification/ethernet-net-20261012.md)，
-原生 OpenWrt 实机网络和持续传输仍待验证。
+原生 OpenWrt 的独立网口镜像也已完成 RAM 启动、DHCP、双向 TCP 和网线重连；
+时钟与驱动计数的实测边界见[实机记录](../verification/openwrt-ethernet-board-20261013.md)。
+完整路由、无线和持久安装仍需分别验证。
 
 ## 源码与产物
 

@@ -8,8 +8,11 @@ application-validation tree keep their own output directories.
 
 The `net` subtarget inherits the measured single-core UART/timer/low-256-MiB
 memory description and the separate diagnostic Ethernet DTS. Its root
-compatible is `tianyi,ty1208z-ca-openwrt-net`, and its kernel local version is
-`-ty1208z-openwrt-net`. Clock, PHY and MAC guards explicitly recognize this
+compatible is `tianyi,ty1208z-ca-openwrt-net`. The native OpenWrt build fixes
+the actual UTS release to `6.12.112` despite the requested local-version
+configuration. Both the built-header checker and UART collector require that
+actual release; the collector also checks the pinned rootfs revision, native
+target and board-compatible identity. Clock, PHY and MAC guards recognize this
 profile while retaining exact measured resources, inherited-state controls,
 32-bit DMA, dedicated FESTAv220 identity and no-reset behavior. The original
 diagnostic profile cannot borrow the native profile's identity.
@@ -52,3 +55,8 @@ iperf server binds the lease address, accepts one test and has a 60-second
 idle timeout. Reports stay local until anonymized. Build acceptance does
 not establish physical OpenWrt networking or router/Passwall throughput;
 those require their own evidence.
+
+The separate native `net` image has now passed physical RAM startup, DHCP,
+bidirectional TCP and cable down/up recovery; see the [board report](../verification/openwrt-ethernet-board-20261013.md).
+That report also distinguishes measured host WSL clock drift and the driver's
+busy-queue counter semantics from hardware drops and router performance.

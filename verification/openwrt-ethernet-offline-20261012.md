@@ -8,7 +8,7 @@ image. No flashing or persistent boot changes were performed.
 
 | Item | Observed build result |
 |---|---|
-| Kernel | `6.12.112-ty1208z-openwrt-net` |
+| Kernel | `6.12.112`; actual native UTS release, corrected after the 2026-10-13 generated-header and board checks |
 | Native source | OpenWrt `58efa9917d4cc53fceed173529a286187649e827` |
 | Compiler / libc | Native GCC 14.3.0 / musl 1.2.5; completed fixed toolchain reused |
 | uImage bytes | 4689784 |
@@ -69,4 +69,6 @@ and a fresh live loader identity/DDR/bootcmd and device CRC must pass before
 boot. Then verify actual OpenWrt startup, PHY binding, netifd lease, gateway
 replies, bidirectional TCP transfers, errors/interrupts and cable reconnect.
 Complete PHY initialization, Passwall routing and Wi-Fi are separate unfinished
-milestones. This candidate remains hardware untested and is not flashable.
+milestones. This report records the original offline acceptance; subsequent
+physical results are in the [board report](openwrt-ethernet-board-20261013.md).
+No persistent installation has been validated.
