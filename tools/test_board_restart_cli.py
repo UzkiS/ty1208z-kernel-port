@@ -13,17 +13,20 @@ import time
 import unittest
 
 from bootloader_probe import BootloaderProbe
+from openwrt_ethernet_board_cli import DT_IDENTITY, SOURCE_REVISION
 
 ROOT = Path(__file__).resolve().parents[1]
 
 
 class RestartSerialTests(unittest.TestCase):
-    def exercise(self, mode):
+    def exercise(self, mode, profile="diagnostic"):
         with tempfile.TemporaryDirectory(prefix="restart-cli-") as directory:
             prefix = Path(directory) / "capture"
             master, slave = pty.openpty()
             errors = []
             sent = []
+            native = profile == "router"
+            prompt = b"root@OpenWrt:~# " if native else b"# "
 
             def read_command():
                 buffer = bytearray()
@@ -42,21 +45,39 @@ class RestartSerialTests(unittest.TestCase):
                     if mode == "bootloader":
                         os.write(master, b"\r\nfastboot# ")
                         return
-                    os.write(master, b"\r\n# ")
+                    os.write(master, b"\r\n" + prompt)
                     self.assertEqual(read_command(), b"uname -r\r")
-                    release = b"4.4.35_ecoo" if mode == "hinas" else b"6.12.112-ty1208z-restart1"
-                    os.write(master, b"uname -r\r\n" + release + b"\r\n# ")
+                    release = b"4.4.35_ecoo" if mode == "hinas" else b"6.12.112" if native else b"6.12.112-ty1208z-restart1"
+                    os.write(master, b"uname -r\r\n" + release + b"\r\n" + prompt)
                     if mode == "hinas":
                         return
+                    if native:
+                        self.assertEqual(read_command(), b"cat /etc/openwrt_release\r")
+                        revision = b"foreign" if mode == "source" else SOURCE_REVISION
+                        os.write(master, b"DISTRIB_TARGET='hi3798mv100/apps'\r\nDISTRIB_REVISION='" + revision + b"'\r\n" + prompt)
+                        if mode == "source":
+                            return
+                        self.assertEqual(read_command(), DT_IDENTITY + b"\r")
+                        dt = b"other,board" if mode == "dt" else b"tianyi,ty1208z-ca-openwrt-router-ram"
+                        os.write(master, dt + b"\r\n" + prompt)
+                        if mode == "dt":
+                            return
+                        binding = read_command()
+                        self.assertIn(b"readlink /sys/bus/platform/devices/", binding)
+                        os.write(master, (b"unbound" if mode == "unbound" else b"../../../bus/platform/drivers/ty1208z-sp805-restart") + b"\r\n" + prompt)
+                        if mode == "unbound":
+                            return
                     self.assertEqual(read_command(), b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE\r")
                     registration = b"not registered" if mode == "missing" else (
                         b"[0.4] driver: TY1208Z_RESTART_READY no-startup-writes explicit-restart-only")
+                    if native and mode != "missing-mv100":
+                        registration += b"\r\n[0.5] driver: TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes"
                     completion = (b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE" if mode == "echo-completion"
                                   else b"TY1208Z_RESTART_CHECK_COMPLETE")
-                    os.write(master, registration + b"\r\n" + completion + b"\r\n# ")
-                    if mode in {"missing", "echo-completion"}:
+                    os.write(master, registration + b"\r\n" + completion + b"\r\n" + prompt)
+                    if mode in {"missing", "echo-completion", "missing-mv100"}:
                         return
-                    self.assertEqual(read_command(), b"reboot -f\r")
+                    self.assertEqual(read_command(), b"reboot\r" if native else b"reboot -f\r")
                     if mode == "failed":
                         os.write(master, b"Reboot fai")
                         time.sleep(0.03)
@@ -75,6 +96,7 @@ class RestartSerialTests(unittest.TestCase):
             process = subprocess.Popen([
                 sys.executable, "-u", str(ROOT / "tools/board_restart_cli.py"),
                 "--port", os.ttyname(slave), "--output", str(prefix), "--timeout", "5",
+                "--profile", profile,
             ], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
             thread = threading.Thread(target=peer, daemon=True)
             thread.start()
@@ -109,6 +131,14 @@ class RestartSerialTests(unittest.TestCase):
 
     def test_fresh_bootloader_is_identified_and_inspected(self):
         self.exercise("success")
+
+    def test_native_router_requires_source_dt_bound_module_and_measured_guard(self):
+        for mode in ("source", "dt", "unbound", "missing-mv100"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, "router")
+
+    def test_native_router_uses_graceful_reboot_and_inspects_the_fresh_loader(self):
+        self.exercise("success", "router")
 
 
 if __name__ == "__main__":

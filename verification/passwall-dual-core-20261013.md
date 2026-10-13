@@ -71,9 +71,17 @@ and expanded archives, or removing all dual-core runtime evidence, are denied.
 The earlier measured single-core artifacts remain accepted by their older
 evidence without being relabeled as dual-core images.
 
-The new RAM candidates have no persistent installation recipe and have not
-booted on the box. The running Chinese system retains its existing credentials;
-future new images default to root with an empty password. Docker remains
+The plain RAM candidate remains hardware untested. The exact router identities
+below now pass physical RAM boot, both independent device CRCs, Chinese/empty-root
+login, real Passwall-generated Xray and sing-box VLESS/TLS SOCKS, ZIP64/Chinese/2040
+RAM extraction and the existing namespace forwarding/Xray TCP/UDP TPROXY fixture.
+The fixture restores the user configuration and never changes the board wall clock.
+Physical fixture SHA-256: `75a4fd5c3d7b1c3f0c0cf6a7c99030693a933db4c4c7a87a512d199c4e26986c`;
+actual received stream: `02737c3363db3e1295176bc8801a9c36b847ffd189f803fdffdce80cdca5c34d`.
+This does not establish external Ethernet forwarding or sing-box TPROXY.
+The router has no persistent installation recipe. Its root password remains empty
+after restoring the 14 current configuration/account/key files; the prior generated
+shadow was excluded. Docker remains
 required work, with higher-memory, storage, container-kernel and actual ARMv7
 container acceptance still pending. Wi-Fi firmware/startup and STA/AP also
 remain pending. Compiled packages and QEMU success do not close those gates.

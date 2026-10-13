@@ -18,6 +18,7 @@ from usb_audit_profile import usb_audit_profile
 from usb_clock_audit_profile import usb_clock_audit_profile
 from usb_host_profile import usb_host_profile
 from restart_profile import restart_profile
+from sd_audit_profile import sd_audit_profile
 from openwrt_apps_ram_profile import BOOTLOADER_BOUND_ADDRESS, applications_ram_profile
 
 ADDRESS = 0x01FFFFC0
@@ -82,6 +83,7 @@ def prepare(artifacts, inspection):
         raise ValueError("Kernel layout does not match this image or exceeds the low bound")
     config = (artifacts / "linux.config").read_text()
     ident = identification_profile(tree, config)
+    sd_audit_profile(tree, config)
     ethernet_audit_profile(tree, config)
     ethernet_clock_id_profile(tree, config)
     usb_audit_profile(tree, config)

@@ -26,12 +26,13 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,15 @@
+@@ -1,4 +1,16 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
 +dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb
 +dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb
++dtb-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-ty1208z-sd-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb
 +dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb
@@ -44,10 +45,17 @@
  dtb-$(CONFIG_ARCH_HIP01) += \
 --- a/drivers/soc/hisilicon/Kconfig
 +++ b/drivers/soc/hisilicon/Kconfig
-@@ -2,6 +2,47 @@
+@@ -2,6 +2,54 @@
  
  menu "Hisilicon SoC drivers"
  	depends on ARCH_HISI || COMPILE_TEST
++
++config HI3798MV100_SD_AUDIT
++	bool "Read-only TY1208Z onboard SD register audit"
++	depends on ARCH_HI3798MV100 && !MMC && !BLOCK
++	help
++	  Observe fixed SD clock/LDO controls and, only with an active
++	  clock, controller identity/detection. No writes or card commands.
 +
 +config HI3798MV100_EMMC_AUDIT
 +	bool "Read-only TY1208Z eMMC register audit"
@@ -94,9 +102,10 @@
  	tristate "HCCS driver on Kunpeng SoC"
 --- a/drivers/soc/hisilicon/Makefile
 +++ b/drivers/soc/hisilicon/Makefile
-@@ -1,2 +1,7 @@
+@@ -1,2 +1,8 @@
  # SPDX-License-Identifier: GPL-2.0-only
 +obj-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-emmc-audit.o
++obj-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-sd-audit.o
 +obj-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ethernet-audit.o
 +obj-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ethernet-clock-id.o
 +obj-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-usb-audit.o
@@ -921,6 +930,22 @@
 +	restart-controller@f8a2c000 {
 +		compatible = "tianyi,ty1208z-sp805-restart";
 +		reg = <0xf8a2c000 0x1000>;
++	};
++};
+--- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-sd-audit.dts
+@@ -0,0 +1,13 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-diagnostic.dts"
++
++/ {
++	model = "TY1208Z CA read-only SD register audit";
++};
++
++&{/soc} {
++	sd-audit@f9820000 {
++		compatible = "tianyi,ty1208z-sd-register-audit";
++		reg = <0xf9820000 0x1000>, <0xf8a2209c 4>, <0xf8a2011c 4>;
 +	};
 +};
 --- /dev/null
@@ -1998,8 +2023,51 @@
 +};
 +MODULE_DEVICE_TABLE(mdio, ty1208z_festa_ids);
 --- /dev/null
++++ b/drivers/power/reset/ty1208z-mv100-restart.h
+@@ -0,0 +1,40 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef TY1208Z_MV100_RESTART_H
++#define TY1208Z_MV100_RESTART_H
++
++#include "ty1208z-sp805-restart.h"
++
++/* MV100's original FDT supplies an AMBA ID override. On this physical board
++ * the ID cells are absent (zero); the actual inactive watchdog registers and
++ * independently measured SYSID0 provide the narrow RAM-experiment guard.
++ */
++static inline bool ty1208z_mv100_restart_ready(void __iomem *base,
++					     void __iomem *sysid)
++{
++	struct ty1208z_sp805_state state;
++
++	if (readl(sysid) != 0x37980100)
++		return false;
++	ty1208z_sp805_observe(base, &state);
++	return state.peripheral_id == 0 && state.cell_id == 0 &&
++		state.control == 0 && readl(base) == 0xffffffff &&
++		readl(base + 0x004) == 0xffffffff &&
++		readl(base + 0x010) == 0 && readl(base + 0x014) == 0 &&
++		readl(base + 0xc00) == 0;
++}
++
++static inline bool ty1208z_mv100_restart(void __iomem *base,
++				       void __iomem *sysid)
++{
++	if (!ty1208z_mv100_restart_ready(base, sysid))
++		return false;
++	/* Same source-backed WDG0 protocol; no clock/security/storage writes. */
++	writel(0x1acce551, base + 0xc00);
++	writel(0, base + 0x008);
++	writel(0x100, base);
++	writel(3, base + 0x008);
++	readl(base + 0xc00);
++	return true;
++}
++
++#endif
+--- /dev/null
 +++ b/drivers/power/reset/ty1208z-sp805-restart.c
-@@ -0,0 +1,66 @@
+@@ -0,0 +1,172 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Opt-in RAM experiment: SP805 system restart without a watchdog device. */
 +#include <linux/delay.h>
@@ -2009,10 +2077,25 @@
 +#include <linux/reboot.h>
 +
 +#include "ty1208z-sp805-restart.h"
++#ifdef TY1208Z_RAM_RESTART_MODULE
++#include <linux/slab.h>
++#include "ty1208z-mv100-restart.h"
++
++struct ty1208z_ram_restart_context {
++	void __iomem *base;
++	void __iomem *sysid;
++};
++#endif
 +
 +static int ty1208z_restart_callback(struct sys_off_data *data)
 +{
++#ifdef TY1208Z_RAM_RESTART_MODULE
++	struct ty1208z_ram_restart_context *context = data->cb_data;
++
++	if (!ty1208z_mv100_restart(context->base, context->sysid)) {
++#else
 +	if (!ty1208z_sp805_restart(data->cb_data)) {
++#endif
 +		pr_err("TY1208Z_RESTART_REFUSED watchdog identity/state changed\n");
 +		return NOTIFY_DONE;
 +	}
@@ -2028,25 +2111,61 @@
 +	struct resource *res;
 +	void __iomem *base;
 +	int ret;
++#ifdef TY1208Z_RAM_RESTART_MODULE
++	struct ty1208z_ram_restart_context *context;
++#endif
 +
++#ifdef TY1208Z_RAM_RESTART_MODULE
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router-ram"))
++#else
 +	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic"))
++#endif
 +		return -ENODEV;
 +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-+	if (!res || res->start != 0xf8a2c000 || resource_size(res) != 0x1000 ||
-+	    platform_get_resource(pdev, IORESOURCE_MEM, 1))
++	if (!res || res->start != 0xf8a2c000 || resource_size(res) != 0x1000)
 +		return -EINVAL;
++#ifdef TY1208Z_RAM_RESTART_MODULE
++	res = platform_get_resource(pdev, IORESOURCE_MEM, 1);
++	if (!res || res->start != 0xf8000ee0 || resource_size(res) != 4 ||
++	    platform_get_resource(pdev, IORESOURCE_MEM, 2))
++		return -EINVAL;
++	context = devm_kzalloc(dev, sizeof(*context), GFP_KERNEL);
++	if (!context)
++		return -ENOMEM;
++	context->sysid = devm_platform_ioremap_resource(pdev, 1);
++	if (IS_ERR(context->sysid))
++		return PTR_ERR(context->sysid);
++#else
++	if (platform_get_resource(pdev, IORESOURCE_MEM, 1))
++		return -EINVAL;
++#endif
 +	base = devm_platform_ioremap_resource(pdev, 0);
 +	if (IS_ERR(base))
 +		return PTR_ERR(base);
 +	ty1208z_sp805_observe(base, &state);
 +	dev_info(dev, "TY1208Z_RESTART_OBSERVED pid=%08x cid=%08x control=%08x\n",
 +		 state.peripheral_id, state.cell_id, state.control);
++#ifdef TY1208Z_RAM_RESTART_MODULE
++	dev_info(dev, "TY1208Z_RESTART_REGISTERS load=%08x value=%08x ris=%08x mis=%08x lock=%08x\n",
++		 readl(base), readl(base + 0x004), readl(base + 0x010),
++		 readl(base + 0x014), readl(base + 0xc00));
++	if (!ty1208z_mv100_restart_ready(base, context->sysid))
++		return dev_err_probe(dev, -ENODEV, "Unexpected MV100 identity/watchdog state; no writes\n");
++	context->base = base;
++	ret = devm_register_sys_off_handler(dev, SYS_OFF_MODE_RESTART,
++		SYS_OFF_PRIO_DEFAULT, ty1208z_restart_callback, context);
++#else
 +	if (!ty1208z_sp805_restart_ready(&state))
 +		return dev_err_probe(dev, -ENODEV, "Unexpected or active watchdog; no writes\n");
 +	ret = devm_register_sys_off_handler(dev, SYS_OFF_MODE_RESTART,
 +					   SYS_OFF_PRIO_DEFAULT, ty1208z_restart_callback, base);
++#endif
 +	if (ret)
 +		return ret;
++	platform_set_drvdata(pdev, base);
++#ifdef TY1208Z_RAM_RESTART_MODULE
++	dev_info(dev, "TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes\n");
++#endif
 +	dev_info(dev, "TY1208Z_RESTART_READY no-startup-writes explicit-restart-only\n");
 +	return 0;
 +}
@@ -2064,7 +2183,62 @@
 +		.of_match_table = ty1208z_restart_match,
 +	},
 +};
++#ifdef TY1208Z_RAM_RESTART_MODULE
++/* An explicit RAM-loaded module can supply the missing restart handler to
++ * the exact native router without changing its live DT or persistent boot.
++ * Probe checks measured MV100 identity and inactive watchdog state before binding.
++ */
++static struct platform_device *ty1208z_restart_device;
++
++static int __init ty1208z_ram_restart_init(void)
++{
++	static const struct resource resources[] = {
++		{
++			.start = 0xf8a2c000,
++			.end = 0xf8a2cfff,
++			.flags = IORESOURCE_MEM,
++		}, {
++			.start = 0xf8000ee0,
++			.end = 0xf8000ee3,
++			.flags = IORESOURCE_MEM,
++		},
++	};
++	int ret;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router-ram"))
++		return -ENODEV;
++	ret = platform_driver_register(&ty1208z_restart_driver);
++	if (ret)
++		return ret;
++	ty1208z_restart_device = platform_device_register_simple(
++		"ty1208z-sp805-restart", -1, resources, ARRAY_SIZE(resources));
++	if (IS_ERR(ty1208z_restart_device)) {
++		ret = PTR_ERR(ty1208z_restart_device);
++		goto unregister_driver;
++	}
++	/* Device registration alone does not propagate a failed probe. */
++	if (!platform_get_drvdata(ty1208z_restart_device)) {
++		platform_device_unregister(ty1208z_restart_device);
++		ret = -ENODEV;
++		goto unregister_driver;
++	}
++	return 0;
++
++unregister_driver:
++	platform_driver_unregister(&ty1208z_restart_driver);
++	return ret;
++}
++module_init(ty1208z_ram_restart_init);
++
++static void __exit ty1208z_ram_restart_exit(void)
++{
++	platform_device_unregister(ty1208z_restart_device);
++	platform_driver_unregister(&ty1208z_restart_driver);
++}
++module_exit(ty1208z_ram_restart_exit);
++#else
 +builtin_platform_driver(ty1208z_restart_driver);
++#endif
 +MODULE_LICENSE("GPL");
 --- /dev/null
 +++ b/drivers/power/reset/ty1208z-sp805-restart.h
@@ -2372,6 +2546,97 @@
 +};
 +module_platform_driver(hi3798mv100_ethernet_clock_id_driver);
 +MODULE_DESCRIPTION("TY1208Z guarded temporary MAC clock and PHY-ID experiment");
++MODULE_LICENSE("GPL");
+--- /dev/null
++++ b/drivers/soc/hisilicon/hi3798mv100-sd-audit.c
+@@ -0,0 +1,88 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Observe the onboard SD controller without starting the MMC subsystem. */
++#include <linux/io.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++
++static int hi3798mv100_sd_audit_probe(struct platform_device *pdev)
++{
++	static const resource_size_t addresses[] = {
++		0xf9820000, 0xf8a2209c, 0xf8a2011c,
++	};
++	static const resource_size_t sizes[] = { 0x1000, 4, 4 };
++	static const unsigned int rates[] = {
++		75000000, 100000000, 50000000, 15000000,
++	};
++	static const struct {
++		const char *name;
++		u32 offset;
++	} registers[] = {
++		{ "CLKDIV", 0x08 }, { "CLKSRC", 0x0c }, { "CLKENA", 0x10 },
++		{ "CTYPE", 0x18 }, { "FIFOTH", 0x4c }, { "CDETECT", 0x50 },
++		{ "WRTPRT", 0x54 }, { "USRID", 0x68 }, { "VERID", 0x6c },
++		{ "HCON", 0x70 },
++	};
++	struct device *dev = &pdev->dev;
++	struct resource *res;
++	void __iomem *controller, *crg, *ldo;
++	u32 value;
++	unsigned int i;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-diagnostic"))
++		return -ENODEV;
++	/* These are the original board FDT/SDK resources, not arbitrary MMIO. */
++	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++		if (!res || res->start != addresses[i] ||
++		    resource_size(res) != sizes[i])
++			return -EINVAL;
++	}
++	if (platform_get_resource(pdev, IORESOURCE_MEM, ARRAY_SIZE(addresses)))
++		return -EINVAL;
++
++	crg = devm_platform_ioremap_resource(pdev, 1);
++	if (IS_ERR(crg))
++		return PTR_ERR(crg);
++	ldo = devm_platform_ioremap_resource(pdev, 2);
++	if (IS_ERR(ldo))
++		return PTR_ERR(ldo);
++	value = readl(crg);
++	dev_info(dev, "SD_AUDIT CRG39=%08x sdk_source_hz=%u\n",
++		 value, rates[(value >> 8) & 3]);
++	dev_info(dev, "SD_AUDIT LDO=%08x\n", readl(ldo));
++
++	/* SDK clock enable sets bits 0/1 and deasserts reset bit 4. Leave an
++	 * inactive controller untouched, including its register reads.
++	 */
++	if ((value & 0x13) != 0x03) {
++		dev_info(dev, "SD_AUDIT_CONTROLLER_SKIPPED inactive-clock-or-reset\n");
++	} else {
++		controller = devm_platform_ioremap_resource(pdev, 0);
++		if (IS_ERR(controller))
++			return PTR_ERR(controller);
++		/* No FIFO, IRQ/status, command, DMA, clock or regulator writes. */
++		for (i = 0; i < ARRAY_SIZE(registers); i++)
++			dev_info(dev, "SD_AUDIT %s=%08x\n", registers[i].name,
++				 readl(controller + registers[i].offset));
++		dev_info(dev, "SD_AUDIT_CONTROLLER_READ_COMPLETE\n");
++	}
++	dev_info(dev, "SD_AUDIT_READ_ONLY_COMPLETE no-card-commands no-control-writes\n");
++	return 0;
++}
++
++static const struct of_device_id hi3798mv100_sd_audit_match[] = {
++	{ .compatible = "tianyi,ty1208z-sd-register-audit" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, hi3798mv100_sd_audit_match);
++
++static struct platform_driver hi3798mv100_sd_audit_driver = {
++	.probe = hi3798mv100_sd_audit_probe,
++	.driver = {
++		.name = "hi3798mv100-sd-audit",
++		.of_match_table = hi3798mv100_sd_audit_match,
++	},
++};
++builtin_platform_driver(hi3798mv100_sd_audit_driver);
 +MODULE_LICENSE("GPL");
 --- /dev/null
 +++ b/drivers/soc/hisilicon/hi3798mv100-usb-audit.c

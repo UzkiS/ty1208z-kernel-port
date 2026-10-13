@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-diagnostic.dts"
+
+/ {
+	model = "TY1208Z CA read-only SD register audit";
+};
+
+&{/soc} {
+	sd-audit@f9820000 {
+		compatible = "tianyi,ty1208z-sd-register-audit";
+		reg = <0xf9820000 0x1000>, <0xf8a2209c 4>, <0xf8a2011c 4>;
+	};
+};

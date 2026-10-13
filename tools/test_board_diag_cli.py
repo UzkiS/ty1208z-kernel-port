@@ -51,6 +51,13 @@ class DiagnosticTests(unittest.TestCase):
                     self.assertEqual(read_command(), diagnostic + b"; echo TY1208Z_DIAG_COMPLETE\r")
                     time64 = b"TIME64_FAIL" if mode == "probe-failure" else b"TIME64_PASS sizeof(time_t)=8 file=2208988800"
                     audit = b"EMMC_AUDIT_READ_ONLY_COMPLETE" if mode != "missing-audit" else b"No audit driver"
+                    sd = b"No SD audit" if mode == "missing-sd" else (
+                        b"SD_AUDIT CRG39=00042103\r\nSD_AUDIT LDO=00000060\r\n"
+                        b"SD_AUDIT_CONTROLLER_READ_COMPLETE\r\n"
+                        b"SD_AUDIT_READ_ONLY_COMPLETE no-card-commands no-control-writes")
+                    if mode == "inactive-sd":
+                        sd = sd.replace(b"SD_AUDIT_CONTROLLER_READ_COMPLETE",
+                                        b"SD_AUDIT_CONTROLLER_SKIPPED inactive-clock-or-reset")
                     ident = b"No card" if mode == "missing-ident" else (
                         b"EMMC_IDENT_GUARD_PASS\r\nUsing PIO mode.\r\nnew MMC card\r\n"
                         b"name=008G30\r\ntype=MMC\r\nBLOCK_DISABLED\r\n"
@@ -107,6 +114,7 @@ class DiagnosticTests(unittest.TestCase):
                     for part in (b"diag; echo TY1208Z_DIAG_COMPLETE\r\n", time64,
                                  b"\r\ndiagnostic output\r\n" * 1024,
                                  b"\r\n" + (audit if profile == "emmc-audit1" else b""),
+                                 b"\r\n" + (sd if profile == "sd-audit1" else b""),
                                  b"\r\n" + (ident if profile in ("emmc-ident1", "emmc-read1") else b""),
                                  b"\r\n" + (samples if profile == "emmc-read1" else b""),
                                  b"\r\n" + (ethernet if profile == "ethernet-audit1" else b""),
@@ -136,9 +144,9 @@ class DiagnosticTests(unittest.TestCase):
                 if errors:
                     raise errors[0]
                 self.assertFalse(select.select([master], [], [], 0.05)[0], "Unexpected extra command")
-                self.assertEqual(process.returncode, 0 if mode in ("success", "no-rda") else 1, output.decode())
+                self.assertEqual(process.returncode, 0 if mode in ("success", "no-rda", "inactive-sd") else 1, output.decode())
                 report = json.loads(prefix.with_suffix(".json").read_text())
-                self.assertEqual(report["report_complete"], mode in ("success", "no-rda"))
+                self.assertEqual(report["report_complete"], mode in ("success", "no-rda", "inactive-sd"))
                 self.assertEqual(len(commands), 1 if mode == "bootloader" else 2 if mode == "wrong-kernel" else 3)
                 if mode == "success":
                     self.assertIn(b"file=2208988800", prefix.with_suffix(".rx").read_bytes())
@@ -167,6 +175,11 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_emmc_profile_captures_completed_audit(self):
         self.exercise("success", profile="emmc-audit1")
+
+    def test_sd_register_audit_requires_real_completion_and_controller_disposition(self):
+        self.exercise("missing-sd", profile="sd-audit1")
+        self.exercise("success", profile="sd-audit1")
+        self.exercise("inactive-sd", profile="sd-audit1")
 
     def test_identification_requires_card_and_capacity(self):
         self.exercise("missing-ident", profile="emmc-ident1")

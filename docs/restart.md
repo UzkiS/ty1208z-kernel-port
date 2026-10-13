@@ -1,9 +1,39 @@
 # TY1208Z SP805 system restart experiment
 
-The current RAM diagnostics have no working board restart handler. A reboot
-cannot yet replace the user's power cycle. `make restart` builds an independent
-candidate to validate that missing facility; it does not change the pending
-native Ethernet image or claim physical restart acceptance.
+The native router now has a physically accepted, explicitly RAM-loaded restart
+module: a graceful `reboot` reaches the CA loader, the UART tool stops and inspects
+that fresh boot, and the exact router is transferred/CRC-checked and restored
+without another power cycle. See [physical acceptance](../verification/native-restart-board-20261013.md).
+Other independent diagnostic profiles still require their own restart integration.
+`make restart` retains the original isolated SP805-ID candidate described below.
+
+## Native router module and measured MV100 identity
+
+Physical WDG0 ID cells return zero on this board. The original Hinas/SDK DT
+uses `arm,primecell-periphid` to supply the SP805 ID; successful old-driver
+registration is not a measurement of those ID cells. The original strict-ID
+candidate remains hardware unaccepted and its guard is unchanged.
+
+The module variant additionally maps only the already measured SYSID0 at
+`0xf8000ee0`. It requires SYSID0 `0x37980100`, zero ID cells, disabled CONTROL,
+LOAD/VALUE `0xffffffff`, and RIS/MIS/LOCK zero, exactly as observed physically.
+Probe makes no control writes. The callback checks these conditions again before
+the same four unlock/control/load/reset writes and flush. No clock, card or
+security-state writes are needed. This variant is explicitly restricted to the
+native RAM-router board identity; it does not broaden the ordinary diagnostic.
+
+`tools/build_openwrt_restart_module.py` accepts the completed native router source,
+native taskbase and delivered router artifacts. It checks the actual config,
+zImage, symbols, native compiler/libc identity, ARM module ELF and vermagic before
+export. It never loads the module. Build with the actual compiler; the separate
+userspace wrapper's libc include flags are unsuitable for kernel modules.
+
+`tools/board_restart_cli.py --port COM9 --profile router` owns the UART throughout
+graceful OpenWrt shutdown and the next loader inspection. It checks the exact
+kernel, official source revision, live DT, bound module and measured registration
+first. Physical failure is never inferred as success or retried automatically.
+The module is temporary and must be loaded after a fresh RAM boot. Persistent
+installation and integration with other peripheral shutdown paths remain pending.
 
 The Hinas runtime FDT identifies an SP805 at `0xf8a2c000`, size `0x1000`, and
 its boot log reports successful `sp805-wdt` registration. Pinned SDK

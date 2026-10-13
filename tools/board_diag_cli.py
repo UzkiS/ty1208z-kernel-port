@@ -15,6 +15,7 @@ PROMPT = re.compile(rb"(?:^|[\r\n])(?:/ )?# $")
 PROFILES = {
     "diag1": b"6.12.112-ty1208z-diag1",
     "emmc-audit1": b"6.12.112-ty1208z-emmc-audit1",
+    "sd-audit1": b"6.12.112-ty1208z-sd-audit1",
     "emmc-ident1": b"6.12.112-ty1208z-emmc-ident1",
     "emmc-read1": b"6.12.112-ty1208z-emmc-read1",
     "ethernet-audit1": b"6.12.112-ty1208z-ethernet-audit1",
@@ -77,6 +78,14 @@ def run(args, serial_module):
                     raise TransferError("Diagnostic time64 probe did not pass")
                 if args.profile == "emmc-audit1" and b"EMMC_AUDIT_READ_ONLY_COMPLETE" not in report:
                     raise TransferError("eMMC register audit did not complete")
+                if args.profile == "sd-audit1" and (
+                        not all(marker in report for marker in (
+                            b"SD_AUDIT CRG39=", b"SD_AUDIT LDO=",
+                            b"SD_AUDIT_READ_ONLY_COMPLETE no-card-commands no-control-writes")) or
+                        not any(marker in report for marker in (
+                            b"SD_AUDIT_CONTROLLER_READ_COMPLETE",
+                            b"SD_AUDIT_CONTROLLER_SKIPPED inactive-clock-or-reset"))):
+                    raise TransferError("Read-only SD register audit did not complete")
                 if args.profile in ("emmc-ident1", "emmc-read1") and not all(marker in report for marker in (
                         b"EMMC_IDENT_GUARD_PASS", b"Using PIO mode.", b"new MMC card",
                         b"name=008G30", b"type=MMC", b"BLOCK_DISABLED",

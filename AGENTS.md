@@ -23,6 +23,10 @@ board support. Keep assumptions separate from measured facts.
   by default, as requested on 2026-10-13. Do not generate or install a random
   management password during RAM setup. Preserve a password explicitly set by
   the user only when restoring that user's configuration.
+- The user requested autonomous command reboots on 2026-10-13 to avoid repeated
+  manual power cycles. The native router RAM module and guarded UART reboot are
+  physically accepted; use that measured path when its exact prerequisites hold.
+  Other RAM profiles still need separate restart support and acceptance.
 
 ## Authorization
 

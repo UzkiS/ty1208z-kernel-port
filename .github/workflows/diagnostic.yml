@@ -70,6 +70,10 @@ jobs:
         run: |
           make emmc-audit > logs/emmc-audit.log 2>&1 || { tail -n 100 logs/emmc-audit.log; exit 1; }
           tail -n 20 logs/emmc-audit.log
+      - name: Build separate read-only onboard SD register audit and check MMIO/RAM/QEMU gates
+        run: |
+          make sd-audit > logs/sd-audit.log 2>&1 || { tail -n 100 logs/sd-audit.log; exit 1; }
+          tail -n 20 logs/sd-audit.log
       - name: Build restricted PIO eMMC identification and run policy/QEMU checks
         run: |
           make emmc-ident > logs/emmc-ident.log 2>&1 || { tail -n 100 logs/emmc-ident.log; exit 1; }
@@ -123,6 +127,7 @@ jobs:
           path: |
             artifacts/diag1/
             artifacts/emmc-audit1/
+            artifacts/sd-audit1/
             artifacts/emmc-ident1/
             artifacts/emmc-read1/
             artifacts/ethernet-audit1/

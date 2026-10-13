@@ -38,10 +38,17 @@ changes = {
         'dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb\n'
+        'dtb-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-ty1208z-sd-audit.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb\n'),
     "drivers/soc/hisilicon/Kconfig": (
         'config KUNPENG_HCCS\n',
+        'config HI3798MV100_SD_AUDIT\n'
+        '\tbool "Read-only TY1208Z onboard SD register audit"\n'
+        '\tdepends on ARCH_HI3798MV100 && !MMC && !BLOCK\n'
+        '\thelp\n'
+        '\t  Observe fixed SD clock/LDO controls and, only with an active\n'
+        '\t  clock, controller identity/detection. No writes or card commands.\n\n'
         'config HI3798MV100_EMMC_AUDIT\n'
         '\tbool "Read-only TY1208Z eMMC register audit"\n'
         '\tdepends on ARCH_HI3798MV100 && !MMC && !BLOCK\n'
@@ -66,6 +73,7 @@ changes = {
         '# SPDX-License-Identifier: GPL-2.0-only\n',
         '# SPDX-License-Identifier: GPL-2.0-only\n'
         'obj-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-emmc-audit.o\n'
+        'obj-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-sd-audit.o\n'
         'obj-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ethernet-audit.o\n'
         'obj-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ethernet-clock-id.o\n'),
     "drivers/clocksource/Kconfig": (

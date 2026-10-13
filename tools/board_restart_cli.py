@@ -12,6 +12,7 @@ from board_diag_cli import ShellExchange, shell_command
 from bootloader_probe import BootloaderProbe, ProbeError
 from serial_cli import console_text, open_receiver
 from ymodem_sender import TransferError
+from openwrt_ethernet_board_cli import command as native_command, DT_IDENTITY, SOURCE_REVISION
 
 
 def run(args, serial_module):
@@ -25,24 +26,41 @@ def run(args, serial_module):
     result = {"schema": 1, "port": args.port, "started_utc": started.isoformat(),
               "status": "starting", "kernel_verified": False, "restart_sent": False,
               "persistent_writes": False}
+    native = getattr(args, "profile", "diagnostic") == "router"
+    result["profile"] = "router" if native else "diagnostic"
+    command = native_command if native else shell_command
     probe = BootloaderProbe()
     with open_receiver(serial_module, args.port, 115200, 0.01) as port:
         with paths["raw"].open("xb") as raw, paths["journal"].open("x", encoding="utf-8") as journal:
             exchange = ShellExchange(port, raw, journal)
             try:
-                shell_command(exchange, b"")
-                identity = shell_command(exchange, b"uname -r")
-                if not re.search(rb"(?:^|[\r\n])6\.12\.112-ty1208z-restart1[\r\n]", identity):
+                command(exchange, b"")
+                identity = command(exchange, b"uname -r")
+                release = rb"6\.12\.112" if native else rb"6\.12\.112-ty1208z-restart1"
+                if not re.search(rb"(?:^|[\r\n])" + release + rb"[\r\n]", identity):
                     raise TransferError("Not the SP805 RAM experiment; no restart sent")
+                if native:
+                    system = command(exchange, b"cat /etc/openwrt_release")
+                    if (b"DISTRIB_TARGET='hi3798mv100/apps'" not in system or
+                            b"DISTRIB_REVISION='" + SOURCE_REVISION + b"'" not in system or
+                            not re.search(rb"(?:^|[\r\n])tianyi,ty1208z-ca-openwrt-router-ram[\r\n]",
+                                          command(exchange, DT_IDENTITY))):
+                        raise TransferError("Native router source/DT differs; no restart sent")
+                    binding = command(exchange, b"test -e /sys/module/ty1208z_sp805_restart && "
+                                      b"readlink /sys/bus/platform/devices/ty1208z-sp805-restart/driver")
+                    if b"../../../bus/platform/drivers/ty1208z-sp805-restart" not in binding:
+                        raise TransferError("Actual RAM restart module binding missing")
                 result["kernel_verified"] = True
-                report = shell_command(exchange, b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE")
+                report = command(exchange, b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE")
                 if (not re.search(rb"(?:^|[\r\n])[^\r\n]*TY1208Z_RESTART_READY "
                                   rb"no-startup-writes explicit-restart-only[\r\n]", report) or
                         not re.search(rb"(?:^|[\r\n])TY1208Z_RESTART_CHECK_COMPLETE[\r\n]", report)):
                     raise TransferError("Actual restart registration missing; no restart sent")
+                if native and b"TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes" not in report:
+                    raise TransferError("Measured MV100 restart guard missing")
                 # PID 1 is the diagnostic shell, not an init service manager.
                 # This fixed -f command enters the kernel restart syscall.
-                exchange.write(b"reboot -f\r")
+                exchange.write(b"reboot\r" if native else b"reboot -f\r")
                 result["restart_sent"] = True
                 result["status"] = "restart-sent"
                 deadline = time.monotonic() + args.timeout
@@ -80,6 +98,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
     parser.add_argument("--output", type=Path)
+    parser.add_argument("--profile", choices=("diagnostic", "router"), default="diagnostic")
     parser.add_argument("--timeout", type=int, default=60)
     args = parser.parse_args()
     if not 5 <= args.timeout <= 120:
