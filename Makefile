@@ -41,6 +41,7 @@ lint:
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
 	python3 tools/test_pinned_archives.py
+	python3 tools/test_rda_usb_identity.py
 
 test-serial:
 	python3 tools/test_tftp_readonly.py

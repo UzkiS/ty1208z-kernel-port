@@ -13,6 +13,7 @@ case "$(uname -r)" in
     *-usb-host1)
         echo 'USB host0 enumeration experiment; network/storage/class drivers disabled.'
         echo 'Run usb-diag for descriptor observations; no firmware is loaded.'
+        echo 'rda-usb-identity --probe performs three fixed identity queries only when explicitly invoked.'
         ;;
     *-ethernet-net1)
         echo 'Single core; inherited-PHY Ethernet experiment; storage disabled.'
@@ -38,7 +39,12 @@ for arg in $(cat /proc/cmdline); do
             break
         fi
         case "$(uname -r)" in
-            *-usb-host1) /bin/usb-diag || echo USB_HOST0_OBSERVER_FAIL ;;
+            *-usb-host1)
+                /bin/usb-diag || echo USB_HOST0_OBSERVER_FAIL
+                if [ -x /bin/rda-usb-identity ]; then
+                    /bin/rda-usb-identity --selftest || echo RDA_USB_IDENTITY_SELFTEST_FAIL
+                fi
+                ;;
         esac
         clock_ok=0
         /bin/time64-probe --set-clock-2040 && clock_ok=1

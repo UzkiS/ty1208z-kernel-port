@@ -20,12 +20,22 @@ for name in clk-ty1208z-usb.c ty1208z-usb-host0.h; do
 done
 python3 "$project/tools/fetch_references.py"
 python3 "$project/tools/test_usb_host0.py"
+python3 "$project/tools/test_rda_usb_identity.py"
 mkdir -p "$kout" "$rootfs"/{bin,sbin,dev,proc,sys,tmp,etc} "$artifacts/checks"
 install -m 755 "$project/artifacts/diag1/busybox.armhf" "$rootfs/bin/busybox"
 install -m 755 "$project/initramfs/init" "$rootfs/init"
 install -m 755 "$project/initramfs/diag" "$rootfs/bin/diag"
 install -m 755 "$project/initramfs/usb-diag" "$rootfs/bin/usb-diag"
 install -m 755 "$project/artifacts/diag1/time64-probe.armhf" "$rootfs/bin/time64-probe"
+"${cross}gcc" -std=c11 -Wall -Wextra -Werror -O2 -static \
+    "$project/tools/rda_usb_identity.c" -o "$artifacts/rda-usb-identity.armhf"
+"${cross}readelf" -h -l "$artifacts/rda-usb-identity.armhf" > "$artifacts/checks/rda-usb-identity-elf.txt"
+if grep -q INTERP "$artifacts/checks/rda-usb-identity-elf.txt"; then
+    echo 'RDA query tool unexpectedly requires a dynamic loader.' >&2
+    exit 1
+fi
+qemu-arm "$artifacts/rda-usb-identity.armhf" --selftest
+install -m 755 "$artifacts/rda-usb-identity.armhf" "$rootfs/bin/rda-usb-identity"
 ln -sf busybox "$rootfs/bin/sh"
 python3 "$project/tools/make_initramfs.py" "$rootfs" "$artifacts/initramfs.cpio"
 cp "$diagnostic/.config" "$kout/.config"
@@ -48,6 +58,7 @@ python3 "$project/tools/validate_artifacts.py" "$artifacts"
 python3 "$project/tools/test_usb_host_profile.py" --artifacts "$artifacts"
 bash "$project/tools/test-qemu.sh" "$artifacts"
 grep -q '^USB_HOST0_OBSERVATION_COMPLETE no-class-driver no-firmware-loading' "$artifacts/checks/qemu-virt-boot.log"
+grep -q '^RDA_USB_IDENTITY_SELFTEST_PASS wire-only no-device-access' "$artifacts/checks/qemu-virt-boot.log"
 if grep -q 'USB_HOST0_OBSERVER_FAIL' "$artifacts/checks/qemu-virt-boot.log"; then
     echo 'USB observer failed under actual ARM shell.' >&2
     exit 1

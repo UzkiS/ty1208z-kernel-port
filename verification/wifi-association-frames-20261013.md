@@ -75,3 +75,12 @@ passed on `45762c2`; all six Wi-Fi manifest files, both exact Git patches and
 the actual `RDA_ASSOC_FRAMES_PASS` marker were independently verified. See
 the [complete CI report](diagnostic-ci-latest-20261013.md). This does not
 replace native-package or physical radio acceptance.
+
+Native package [run 38370493561](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38370493561)
+also passed on `918366f`. All 17 actual manifest files, the shared patch and
+four checker/generator source identities match that Git revision. The actual
+configuration/package/eight-case guard markers were verified; build-log
+SHA-256 is `6a84a0bf2dfd4fa15e398448cc9effef24fec17c95f8c822257a3114e4dc75c9`.
+Its APK matches the 139270-byte local APK above. This proves native compilation
+and packaging of the association fix. It precedes `4904c2b`, which added the
+actual native parser sanitizer to CI; that later run remains pending.
