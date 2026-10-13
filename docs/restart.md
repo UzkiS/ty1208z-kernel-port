@@ -13,6 +13,12 @@ The distinct `sd-ro1` block/filesystem profile now also passes that return after
 actual read-only VFAT file access. Its UART guard additionally requires no card
 mounts and a read-only block state; [read-only report](../verification/sd-ro-board-20261013.md).
 `make restart` retains the original isolated SP805-ID candidate described below.
+The separate `emmc-ro1` RAM candidate builds with DW-host shutdown readback
+and an independent controller-quiescence guard before the measured MV100
+reset helper. Its UART profile checks exact board/binding, user-area RO,
+unmounted/cleaned state, actual shutdown and fresh loader return. Offline
+actual-function and PTY checks pass; physical eMMC restart is untested.
+See [RAM candidate report](../verification/emmc-ro-ram-offline-20261014.md).
 
 ## Native router module and measured MV100 identity
 

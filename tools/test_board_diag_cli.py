@@ -49,6 +49,7 @@ class DiagnosticTests(unittest.TestCase):
                         return
                     diagnostic = (b"usb-diag; diag" if profile == "usb-host1" else
                                   b"ram768-diag; diag" if profile == "ram768" else
+                                  b"emmc-ro-diag; diag" if profile == "emmc-ro1" else
                                   b"sd-ro-diag; diag" if profile == "sd-ro1" else
                                   b"sd-diag; diag" if profile == "sd-ident1" else b"diag")
                     self.assertEqual(read_command(), diagnostic + b"; echo TY1208Z_DIAG_COMPLETE\r")
@@ -106,6 +107,29 @@ class DiagnosticTests(unittest.TestCase):
                         b"EMMC_SAMPLE_HINAS_HEADER_MATCH crc32=2ba1a125\r\n"
                         b"EMMC_SAMPLE_EXT4 magic=ef53 block_size=4096\r\n"
                         b"EMMC_SAMPLE_READ_COMPLETE count=4 no-block-device")
+                    emmc_ro = (b"EMMC_RO_BOARD_VERIFIED\r\n"
+                               b"EMMC_RO_PARTITIONS_PASS count=9 sectors=15269888 no-boot-or-rpmb\r\n"
+                               b"EMMC_RO_BLOCK_READ_PASS bytes=7818182656 read_bytes=4096 ro=1\r\n"
+                               b"EMMC_RO_OVERLAPPING_READ_PASS read_bytes=1024\r\n"
+                               b"EMMC_RO_END_READ_PASS last_bytes=4096 eof=0\r\n"
+                               b"EMMC_RO_HINAS_HEADER_PASS crc32=2ba1a125 load=02000000 entry=02000000\r\n"
+                               b"EMMC_RO_EXT4_SUPERBLOCK_PASS magic=ef53 block_size=4096\r\n"
+                               b"EMMC_RO_FS_MOUNT_PASS ro=1 partition=9\r\n"
+                               b"EMMC_RO_FS_FILE_READ_PASS bytes=4096 content-and-name-excluded\r\n"
+                               b"EMMC_RO_FS_COMPLETE type=ext4 ro,noload mount-removed no-card-writes\r\n"
+                               b"EMMC_RO_DIAG_COMPLETE partitions=9 filesystems=1 no-card-writes")
+                    mutations = {"emmc-writable": (b"ro=1", b"ro=0"),
+                                 "emmc-capacity": (b"bytes=7818182656", b"bytes=4096"),
+                                 "emmc-partitions": (b"count=9", b"count=10"),
+                                 "emmc-header": (b"crc32=2ba1a125", b"crc32=ffffffff"),
+                                 "emmc-cleanup": (b"mount-removed", b"still-mounted"),
+                                 "emmc-oversized-file": (b"bytes=4096 content", b"bytes=8192 content")}
+                    if mode in mutations:
+                        emmc_ro = emmc_ro.replace(*mutations[mode])
+                    if mode == "emmc-no-file":
+                        emmc_ro = emmc_ro.replace(b"EMMC_RO_FS_FILE_READ_PASS", b"EMMC_RO_FS_NO_NONEMPTY_FILE")
+                    if mode == "emmc-refused":
+                        emmc_ro += b"\r\nEMMC_RO_PROBE_REFUSED device/readonly/capacity mismatch"
                     ethernet = b"No Ethernet audit" if mode == "missing-ethernet" else (
                         b"ETH_AUDIT CRG51=0000000b\r\nETH_AUDIT PHY_CRG=00000001\r\n"
                         b"ETH_AUDIT PHY_SELECT=00000000\r\nETH_AUDIT PHY_ADDRESS=00000001\r\n"
@@ -158,6 +182,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\n" + (sd_ident if profile in ("sd-ident1", "sd-ro1") else b""),
                                  b"\r\n" + (ident if profile in ("emmc-ident1", "emmc-read1") else b""),
                                  b"\r\n" + (samples if profile == "emmc-read1" else b""),
+                                 b"\r\n" + (emmc_ro if profile == "emmc-ro1" else b""),
                                  b"\r\n" + (ethernet if profile == "ethernet-audit1" else b""),
                                  b"\r\n" + (clock_id if profile == "ethernet-clock-id1" else b""),
                                  b"\r\n" + (network if profile == "ethernet-net1" else b""),
@@ -239,6 +264,12 @@ class DiagnosticTests(unittest.TestCase):
 
     def test_sector_reads_capture_verified_content(self):
         self.exercise("success", profile="emmc-read1")
+
+    def test_emmc_ro_requires_block_partition_content_filesystem_and_cleanup(self):
+        for mode in ("success", "emmc-writable", "emmc-capacity", "emmc-partitions", "emmc-header",
+                     "emmc-cleanup", "emmc-oversized-file", "emmc-no-file", "emmc-refused"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, profile="emmc-ro1")
 
     def test_ethernet_audit_requires_control_state_and_completion(self):
         self.exercise("missing-ethernet", profile="ethernet-audit1")

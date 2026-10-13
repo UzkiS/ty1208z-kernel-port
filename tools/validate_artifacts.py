@@ -7,6 +7,7 @@ import struct
 import sys
 from inspect_images import inspect_image, parse_fdt
 from emmc_profiles import identification_profile
+from emmc_ro_profile import emmc_ro_profile
 from ethernet_profiles import ethernet_audit_profile, ethernet_clock_id_profile
 from ethernet_net_profile import ethernet_net_profile
 from usb_audit_profile import usb_audit_profile
@@ -44,6 +45,7 @@ if "CONFIG_HI3798MV100_EMMC_AUDIT=y\n" in config:
 else:
     assert not audits, "Audit node must only appear in the explicit audit profile"
 identification_profile(tree, config)
+emmc_ro_profile(tree, config)
 sd_audit_profile(tree, config)
 sd_ident_profile(tree, config)
 sd_ro_profile(tree, config)

@@ -4,6 +4,12 @@
 运行 FDT 的 clock specifier 为 160（0xa0），时钟控制器基址 `0xf8a22000`。
 eMMC 型号 `008G30`，容量 7818182656 字节。分区布局已记录，尚无完整备份。
 
+`make emmc-ro` 已构建独立低256 RAM-root 只读候选，包含精确用户区分区、
+ext4 `ro,noload`、控制器 shutdown 和受限命令重启。实际函数、ARM shell、
+镜像/配置/布局、串口 PTY 与通用 QEMU 已通过；这一路径仍未实机启动，
+不能据此宣称可挂载硬盘、已备份或 Docker 存储可用。
+详见 [离线 RAM 候选报告](../verification/emmc-ro-ram-offline-20261014.md)。
+
 固定 SDK 中 `himciv200_def.h` 的寄存器布局对应 DesignWare MSHC：
 CTRL/PWREN/CLKDIV/CMD/RESP、VERID/HCON 和 IDMAC 地址均有对应主线定义。
 这是复用 `dw_mmc` 的依据，尚不能证明所有版本特性、FIFO/IDMAC 与时序兼容。
@@ -122,7 +128,8 @@ CMD17/CMD18 读取一起检查；仍拒绝所有数据写入、擦除、CMD6 分
 
 本地实际函数的 ASan/UBSan、ARM 对象编译、原识别/固定样本重建和 QEMU、
 七种原生 SD Kconfig 回归已通过，见 [编译报告](../verification/emmc-ro-offline-20261014.md)。
-该入口只输出对象和哈希记录，没有启动镜像；所有 eMMC 块配置仍被 RAM 启动
-规划器拒绝。独立设备树/配置/身份门禁、停止控制器和命令重启、分区/文件系统
-读取及实机恢复流程尚需完成。完整备份、文件系统完整性和 Docker 存储未验收；
+该对象入口仍不输出启动镜像。后续独立 `make emmc-ro` 已补齐设备树/配置/身份、
+停止控制器、命令重启和分区/文件系统探测，并通过离线构建及 RAM 规划检查，
+见 [RAM 候选报告](../verification/emmc-ro-ram-offline-20261014.md)。实机块读取、
+文件系统/重启/恢复、完整备份、文件系统完整性和 Docker 存储仍未验收；
 后续 ext4 挂载必须使用 `ro,noload`，不修复、不回放日志。

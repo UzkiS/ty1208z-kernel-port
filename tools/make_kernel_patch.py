@@ -54,6 +54,7 @@ changes = {
         'dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb\n'
         'dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb\n'
+        'dtb-$(CONFIG_HI3798MV100_EMMC_READ_ONLY) += hi3798mv100-ty1208z-emmc-ro.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-ty1208z-sd-audit.dtb\n'
         'dtb-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += hi3798mv100-ty1208z-sd-ident.dtb\n'
@@ -186,6 +187,22 @@ changes["drivers/power/reset/Kconfig"] = (
         '\t  Require measured SYSID0/zero ID cells/inactive watchdog state.\n'
         '\t  No startup writes; only explicit kernel restart arms WDG0.\n\n'
         'config POWER_RESET_AS3722\n'))
+
+changes["drivers/power/reset/Kconfig"] = (
+    changes["drivers/power/reset/Kconfig"][0],
+    changes["drivers/power/reset/Kconfig"][1].replace('config POWER_RESET_AS3722\n',
+        'config POWER_RESET_TY1208Z_MV100_EMMC_RO\n'
+        '\tbool "TY1208Z measured MV100 restart after eMMC read-only shutdown"\n'
+        '\tdepends on ARCH_HI3798MV100 && HI3798MV100_EMMC_READ_ONLY\n'
+        '\tdepends on MMC_DW_HI3798MV100_IDENT && !WATCHDOG\n'
+        '\thelp\n'
+        '\t  Check the stopped host and measured watchdog before explicit reset.\n'
+        '\t  No startup writes or watchdog service.\n\n'
+        'config POWER_RESET_AS3722\n'))
+changes["drivers/power/reset/Makefile"] = (
+    changes["drivers/power/reset/Makefile"][0],
+    changes["drivers/power/reset/Makefile"][1] +
+    'obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_EMMC_RO) += ty1208z-mv100-emmc-ro-restart.o\n')
 
 changes["drivers/power/reset/Kconfig"] = (
     changes["drivers/power/reset/Kconfig"][0],

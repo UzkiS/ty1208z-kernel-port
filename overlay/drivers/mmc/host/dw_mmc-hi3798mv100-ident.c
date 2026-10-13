@@ -124,7 +124,8 @@ static int mv100_ident_probe(struct platform_device *pdev)
 	crg = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 	if (!controller || controller->start != 0xf9830000 ||
 	    resource_size(controller) != 0x1000 || !crg ||
-	    crg->start != 0xf8a220a0 || resource_size(crg) != 4)
+	    crg->start != 0xf8a220a0 || resource_size(crg) != 4 ||
+	    platform_get_resource(pdev, IORESOURCE_MEM, 2))
 		return -EINVAL;
 
 	irq = platform_get_irq(pdev, 0);
@@ -163,6 +164,26 @@ static int mv100_ident_probe(struct platform_device *pdev)
 	return dw_mci_pltfm_register(pdev, &mv100_ident_data);
 }
 
+static void mv100_ident_shutdown(struct platform_device *pdev)
+{
+	struct dw_mci *host;
+
+	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))
+		return;
+	host = platform_get_drvdata(pdev);
+	/* Stop rescans/requests and mask IRQs before an explicit system reset.
+	 * The inherited CRG/pinmux are retained; policy still denies card writes.
+	 */
+	dw_mci_pltfm_remove(pdev);
+	if (mci_readl(host, INTMASK) || mci_readl(host, CLKENA) ||
+	    mci_readl(host, IDINTEN) ||
+	    (mci_readl(host, CTRL) & (SDMMC_CTRL_DMA_ENABLE | SDMMC_CTRL_USE_IDMAC))) {
+		dev_err(&pdev->dev, "EMMC_RO_SHUTDOWN_FAILED controller-not-quiesced\n");
+		return;
+	}
+	dev_info(&pdev->dev, "EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\n");
+}
+
 static const struct of_device_id mv100_ident_match[] = {
 	{ .compatible = "tianyi,ty1208z-emmc-identification" },
 	{ }
@@ -172,6 +193,7 @@ MODULE_DEVICE_TABLE(of, mv100_ident_match);
 static struct platform_driver mv100_ident_driver = {
 	.probe = mv100_ident_probe,
 	.remove_new = dw_mci_pltfm_remove,
+	.shutdown = mv100_ident_shutdown,
 	.driver = {
 		.name = "hi3798mv100-emmc-ident",
 		.of_match_table = mv100_ident_match,

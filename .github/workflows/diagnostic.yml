@@ -94,6 +94,10 @@ jobs:
         run: |
           make emmc-ro-compile > logs/emmc-ro-compile.log 2>&1 || { tail -n 100 logs/emmc-ro-compile.log; exit 1; }
           tail -n 25 logs/emmc-ro-compile.log
+      - name: Build user-area read-only eMMC RAM candidate and verify shutdown/reset/profile/QEMU gates
+        run: |
+          make emmc-ro > logs/emmc-ro.log 2>&1 || { tail -n 100 logs/emmc-ro.log; exit 1; }
+          tail -n 25 logs/emmc-ro.log
       - name: Build independent bounded 768-MiB memory candidate and check allocation/reset/probe/RAM gates
         run: |
           make ram768 > logs/ram768.log 2>&1 || { tail -n 100 logs/ram768.log; exit 1; }
@@ -149,6 +153,7 @@ jobs:
             artifacts/emmc-ident1/
             artifacts/emmc-read1/
             artifacts/emmc-ro-compile/
+            artifacts/emmc-ro1/
             artifacts/ethernet-audit1/
             artifacts/ethernet-clock-id1/
             artifacts/ethernet-net1/

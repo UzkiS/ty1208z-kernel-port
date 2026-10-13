@@ -10,6 +10,7 @@ import zlib
 
 from inspect_images import parse_fdt
 from emmc_profiles import identification_profile
+from emmc_ro_profile import emmc_ro_profile
 from ethernet_profiles import ethernet_audit_profile, ethernet_clock_id_profile
 from ethernet_net_profile import (
     ethernet_net_profile, openwrt_ethernet_profile, openwrt_router_ethernet_profile,
@@ -97,6 +98,7 @@ def prepare(artifacts, inspection, allocation_evidence=None):
             or not layout["physical_start"] < layout["physical_image_end"] <= layout["physical_bss_end"] < DDR_START):
         raise ValueError("Kernel layout does not match this image or exceeds the low bound")
     ident = identification_profile(tree, config)
+    emmc_ro = emmc_ro_profile(tree, config)
     sd_audit_profile(tree, config)
     sd_ident = sd_ident_profile(tree, config)
     sd_ro = sd_ro_profile(tree, config)
@@ -127,7 +129,7 @@ def prepare(artifacts, inspection, allocation_evidence=None):
             continue
         if name == "MMC" and (ident or sd_ident or sd_ro):
             continue
-        if name == "BLOCK" and sd_ro:
+        if name == "BLOCK" and (sd_ro or emmc_ro):
             continue
         if name == "NET" and network:
             continue

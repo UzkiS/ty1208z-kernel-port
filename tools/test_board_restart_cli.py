@@ -14,7 +14,7 @@ import unittest
 
 from bootloader_probe import BootloaderProbe
 from openwrt_ethernet_board_cli import DT_IDENTITY, SOURCE_REVISION
-from board_restart_cli import SD_DT_IDENTITY, SD_RO_RESTART_GUARD, RAM768_RESTART_GUARD
+from board_restart_cli import SD_DT_IDENTITY, SD_RO_RESTART_GUARD, RAM768_RESTART_GUARD, EMMC_RO_RESTART_GUARD
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -30,6 +30,7 @@ class RestartSerialTests(unittest.TestCase):
             sd_ident = profile in ("sd-ident1", "sd-ro1")
             sd_shutdown = sd_ident or profile == "router-sdro"
             memory = profile == "ram768"
+            emmc_ro = profile == "emmc-ro1"
             prompt = b"root@OpenWrt:~# " if native else b"# "
 
             def read_command():
@@ -52,7 +53,7 @@ class RestartSerialTests(unittest.TestCase):
                     os.write(master, b"\r\n" + prompt)
                     self.assertEqual(read_command(), b"uname -r\r")
                     release = (b"4.4.35_ecoo" if mode == "hinas" else b"6.12.112" if native else
-                               b"6.12.112-ty1208z-" + profile.encode() if sd_ident or memory else b"6.12.112-ty1208z-restart1")
+                               b"6.12.112-ty1208z-" + profile.encode() if sd_ident or memory or emmc_ro else b"6.12.112-ty1208z-restart1")
                     os.write(master, b"uname -r\r\n" + release + b"\r\n" + prompt)
                     if mode == "hinas":
                         return
@@ -105,6 +106,24 @@ class RestartSerialTests(unittest.TestCase):
                             os.write(master, (b"SD_RO_MOUNT_ACTIVE" if mode == "mounted" else b"SD_RO_RESTART_GUARD") + b"\r\n" + prompt)
                             if mode == "mounted":
                                 return
+                    if emmc_ro:
+                        self.assertEqual(read_command(), SD_DT_IDENTITY + b"\r")
+                        identity = b"foreign" if mode == "dt" else b"tianyi,ty1208z-ca-emmc-ro-ram\x00hi3798mv100-series\x00"
+                        os.write(master, identity + b"\r\n" + prompt)
+                        if mode == "dt":
+                            return
+                        self.assertEqual(read_command(), b"readlink /sys/bus/platform/devices/f8a2c000.emmc-ro-restart/driver\r")
+                        binding = b"unbound" if mode == "unbound" else b"../../../bus/platform/drivers/ty1208z-mv100-emmc-ro-restart"
+                        os.write(master, binding + b"\r\n" + prompt)
+                        if mode == "unbound":
+                            return
+                        self.assertEqual(read_command(), EMMC_RO_RESTART_GUARD + b"\r")
+                        state = b"EMMC_RO_MOUNT_ACTIVE" if mode in {"mounted", "cleanup"} else b"EMMC_RO_RESTART_GUARD"
+                        if mode in {"writable", "capacity"}:
+                            state = b""
+                        os.write(master, state + b"\r\n" + prompt)
+                        if mode in {"mounted", "cleanup", "writable", "capacity"}:
+                            return
                     if memory:
                         self.assertEqual(read_command(), SD_DT_IDENTITY + b"\r")
                         identity = b"foreign" if mode == "dt" else b"tianyi,ty1208z-ca-ram768\x00hi3798mv100-series\x00"
@@ -123,7 +142,7 @@ class RestartSerialTests(unittest.TestCase):
                     self.assertEqual(read_command(), b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE\r")
                     registration = b"not registered" if mode == "missing" else (
                         b"[0.4] driver: TY1208Z_RESTART_READY no-startup-writes explicit-restart-only")
-                    if (native or sd_ident or memory) and mode != "missing-mv100":
+                    if (native or sd_ident or memory or emmc_ro) and mode != "missing-mv100":
                         registration += b"\r\n[0.5] driver: TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes"
                     completion = (b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE" if mode == "echo-completion"
                                   else b"TY1208Z_RESTART_CHECK_COMPLETE")
@@ -137,10 +156,16 @@ class RestartSerialTests(unittest.TestCase):
                         os.write(master, b"led -- System halted\r\n")
                         return
                     if mode == "failed-shutdown":
-                        os.write(master, b"[0.7] driver: SD_IDENT_SHUTDOWN_FAILED controller-not-quiesced\r\n")
+                        tag = b"EMMC_RO" if emmc_ro else b"SD_IDENT"
+                        os.write(master, b"[0.7] driver: " + tag + b"_SHUTDOWN_FAILED controller-not-quiesced\r\n")
+                        return
+                    if mode == "restart-refused":
+                        os.write(master, b"EMMC_RO_RESTART_REFUSED controller-not-quiesced\r\n")
                         return
                     if sd_shutdown and mode != "missing-shutdown":
                         os.write(master, b"[0.7] driver: SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\r\n")
+                    if emmc_ro and mode != "missing-shutdown":
+                        os.write(master, b"[0.7] driver: EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\r\n")
                     os.write(master, b"Bootrom start\r\nFastboot 3.3.0-dirty (test)\r\n"
                              b"CPU: Hi3798Mv100 (CA)\r\nReserve Memory\r\n")
                     self.assertEqual(read_command(), b"\x03")
@@ -167,12 +192,14 @@ class RestartSerialTests(unittest.TestCase):
                 self.assertEqual(process.returncode, 0 if mode == "success" else 1, output.decode())
                 self.assertFalse(select.select([master], [], [], 0.05)[0], "Extra command")
                 report = json.loads(prefix.with_suffix(".json").read_text())
-                self.assertEqual(report["restart_sent"], mode in {"success", "failed", "missing-shutdown", "failed-shutdown"})
+                self.assertEqual(report["restart_sent"], mode in {"success", "failed", "missing-shutdown", "failed-shutdown", "restart-refused"})
                 if mode == "success":
                     self.assertEqual(report["probe"]["completed_commands"], len(BootloaderProbe.COMMANDS))
                     self.assertEqual(report["status"], "restart-bootloader-verified")
                     if sd_shutdown:
                         self.assertTrue(report["sd_shutdown_verified"])
+                    if emmc_ro:
+                        self.assertTrue(report["emmc_shutdown_verified"])
                 self.assertFalse(report["persistent_writes"])
             finally:
                 if process.poll() is None:
@@ -221,6 +248,12 @@ class RestartSerialTests(unittest.TestCase):
         for mode in ("mounted", "writable", "memory-active", "missing-shutdown", "failed-shutdown", "failed", "success"):
             with self.subTest(mode=mode):
                 self.exercise(mode, "router-sdro")
+
+    def test_emmc_ro_requires_exact_identity_binding_capacity_cleanup_and_shutdown(self):
+        for mode in ("dt", "unbound", "mounted", "cleanup", "writable", "capacity", "missing-mv100",
+                     "missing-shutdown", "failed-shutdown", "restart-refused", "failed", "success"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, "emmc-ro1")
 
 
 if __name__ == "__main__":

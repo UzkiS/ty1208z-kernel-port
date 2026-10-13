@@ -20,6 +20,7 @@ help:
 	@echo 'make emmc-ident - build a separate restricted PIO eMMC identification image'
 	@echo 'make emmc-read - build fixed four-sector read-only samples (no block device)'
 	@echo 'make emmc-ro-compile - compile isolated user-area RO blocks; no boot image'
+	@echo 'make emmc-ro - build separate user-area RO block/ext4/restart RAM candidate'
 	@echo 'make ethernet-audit - inspect inherited clocks/PHY IDs without network or reset writes'
 	@echo 'make ethernet-clock-id - temporarily enable the measured MAC clock bit, read PHY ID, restore'
 	@echo 'make ethernet-net - build inherited-PHY Ethernet RAM candidate (storage disabled)'
@@ -47,6 +48,7 @@ lint:
 	shellcheck initramfs/usb-diag
 	shellcheck initramfs/sd-diag
 	shellcheck initramfs/sd-ro-diag
+	shellcheck initramfs/emmc-ro-diag
 	shellcheck initramfs/ram768-diag
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
@@ -59,6 +61,9 @@ lint:
 	python3 tools/test_sd_restart.py
 	python3 tools/test_sd_ident_profile.py
 	python3 tools/test_sd_ro_profile.py
+	python3 tools/test_emmc_ro_profile.py
+	python3 tools/test_emmc_ro_restart.py
+	python3 tools/test_emmc_ro_probe.py
 	python3 tools/test_ram768.py
 
 test-serial:
@@ -124,6 +129,10 @@ emmc-read:
 .PHONY: emmc-ro-compile
 emmc-ro-compile:
 	bash tools/build-emmc-ro-compile.sh $(if $(TASKBASE),"$(TASKBASE)")
+
+.PHONY: emmc-ro
+emmc-ro:
+	bash tools/build-emmc-ro.sh $(if $(TASKBASE),"$(TASKBASE)")
 
 ethernet-audit:
 	bash tools/build-ethernet-audit.sh $(if $(TASKBASE),"$(TASKBASE)")

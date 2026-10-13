@@ -1,0 +1,21 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-emmc-ident.dts"
+
+/ {
+	model = "TY1208Z CA enforced read-only eMMC user-area RAM experiment";
+	compatible = "tianyi,ty1208z-ca-emmc-ro-ram", "hi3798mv100-series";
+	chosen {
+		/* Exact Hinas user-area layout, measured through sysfs; no disk
+		 * partition table or persistent boot environment is changed.
+		 */
+		bootargs = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=8 ignore_loglevel keep_bootcon panic=0 blkdevparts=mmcblk0:1M(boot)ro,1M(bootargs)ro,4M(baseparam)ro,4M(pqparam)ro,4M(logo)ro,20M(kernel)ro,64M(busybox)ro,512M(backup)ro,6846M(ubuntu)ro";
+	};
+};
+
+&{/soc} {
+	emmc-ro-restart@f8a2c000 {
+		compatible = "tianyi,ty1208z-mv100-emmc-ro-restart";
+		reg = <0xf8a2c000 0x1000>, <0xf8000ee0 4>,
+		      <0xf9830000 0x1000>, <0xf8a220a0 4>;
+	};
+};

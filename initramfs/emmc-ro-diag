@@ -1,0 +1,57 @@
+#!/bin/sh
+# All mounts are RO; no journal replay, repair or storage write tests.
+set -eu
+identity=$(sha256sum /sys/firmware/devicetree/base/compatible)
+# Hash the exact two NUL-terminated strings; the diagnostic shell has no tr.
+test "${identity%% *}" = 7a5bd57543ab75ee2aca73308a38cf556f8d2eb970571248bfd17e1d2d8f73c6
+echo EMMC_RO_BOARD_VERIFIED
+test -z "$(grep '^/dev/mmcblk0' /proc/mounts)"
+test "$(cat /sys/class/block/mmcblk0/ro)" = 1
+test "$(cat /sys/class/block/mmcblk0/size)" = 15269888
+count=0
+for block in /sys/class/block/*; do
+    name=${block##*/}
+    case "$name" in mmcblk0|mmcblk0p[1-9]) ;; *) echo EMMC_RO_UNEXPECTED_BLOCK; exit 1 ;; esac
+    test "$(cat "$block/ro")" = 1
+    count=$(awk -v count="$count" 'BEGIN { print count + 1 }')
+done
+test "$count" = 10
+index=0
+while read -r start size; do
+    index=$(awk -v part="$index" 'BEGIN { print part + 1 }')
+    test "$(cat "/sys/class/block/mmcblk0p$index/start")" = "$start"
+    test "$(cat "/sys/class/block/mmcblk0p$index/size")" = "$size"
+done <<'LAYOUT'
+0 2048
+2048 2048
+4096 8192
+12288 8192
+20480 8192
+28672 40960
+69632 131072
+200704 1048576
+1249280 14020608
+LAYOUT
+test "$index" = 9
+echo 'EMMC_RO_PARTITIONS_PASS count=9 sectors=15269888 no-boot-or-rpmb'
+emmc-ro-probe --blocks
+target=/tmp/emmc-ro-mount
+test ! -e "$target"
+mounted=0
+cleanup() {
+    if [ "$mounted" = 1 ]; then umount "$target" || return 1; mounted=0; fi
+    if [ -d "$target" ]; then
+        test -z "$(ls -A "$target")" || return 1
+        rm -r "$target" || return 1
+    fi
+}
+trap cleanup EXIT
+trap 'exit 1' HUP INT TERM
+mkdir "$target"
+mount -t ext4 -o ro,noload /dev/mmcblk0p9 "$target"
+mounted=1
+emmc-ro-probe --mounted "$target"
+cleanup
+test ! -e "$target"
+echo 'EMMC_RO_FS_COMPLETE type=ext4 ro,noload mount-removed no-card-writes'
+echo 'EMMC_RO_DIAG_COMPLETE partitions=9 filesystems=1 no-card-writes'

@@ -20,6 +20,7 @@ PROFILES = {
     "sd-ro1": b"6.12.112-ty1208z-sd-ro1",
     "emmc-ident1": b"6.12.112-ty1208z-emmc-ident1",
     "emmc-read1": b"6.12.112-ty1208z-emmc-read1",
+    "emmc-ro1": b"6.12.112-ty1208z-emmc-ro1",
     "ethernet-audit1": b"6.12.112-ty1208z-ethernet-audit1",
     "ethernet-clock-id1": b"6.12.112-ty1208z-ethernet-clock-id1",
     "ethernet-net1": b"6.12.112-ty1208z-ethernet-net1",
@@ -75,10 +76,11 @@ def run(args, serial_module):
                 result["kernel_verified"] = True
                 diagnostic = (b"usb-diag; diag" if args.profile == "usb-host1" else
                               b"ram768-diag; diag" if args.profile == "ram768" else
+                              b"emmc-ro-diag; diag" if args.profile == "emmc-ro1" else
                               b"sd-ro-diag; diag" if args.profile == "sd-ro1" else
                               b"sd-diag; diag" if args.profile == "sd-ident1" else b"diag")
                 report = shell_command(exchange, diagnostic + b"; echo TY1208Z_DIAG_COMPLETE",
-                                       timeout=120 if args.profile == "ram768" else 30)
+                                       timeout=120 if args.profile in ("ram768", "emmc-ro1") else 30)
                 if not re.search(rb"(?:^|[\r\n])TY1208Z_DIAG_COMPLETE[\r\n]", report):
                     raise TransferError("Diagnostic report is incomplete")
                 if not re.search(rb"(?:^|[\r\n])TIME64_PASS sizeof\(time_t\)=8 ", report):
@@ -142,6 +144,27 @@ def run(args, serial_module):
                             b"EMMC_SAMPLE_READ_COMPLETE count=4 no-block-device"))
                         or b"EMMC_SAMPLE_READ_FAILED" in report):
                     raise TransferError("Fixed read-only eMMC samples did not pass")
+                if args.profile == "emmc-ro1":
+                    markers = (
+                        b"EMMC_RO_BOARD_VERIFIED",
+                        b"EMMC_RO_PARTITIONS_PASS count=9 sectors=15269888 no-boot-or-rpmb",
+                        b"EMMC_RO_BLOCK_READ_PASS bytes=7818182656 read_bytes=4096 ro=1",
+                        b"EMMC_RO_OVERLAPPING_READ_PASS read_bytes=1024",
+                        b"EMMC_RO_END_READ_PASS last_bytes=4096 eof=0",
+                        b"EMMC_RO_HINAS_HEADER_PASS crc32=2ba1a125 load=02000000 entry=02000000",
+                        b"EMMC_RO_EXT4_SUPERBLOCK_PASS magic=ef53 block_size=4096",
+                        b"EMMC_RO_FS_MOUNT_PASS ro=1 partition=9",
+                        b"EMMC_RO_FS_COMPLETE type=ext4 ro,noload mount-removed no-card-writes",
+                        b"EMMC_RO_DIAG_COMPLETE partitions=9 filesystems=1 no-card-writes",
+                    )
+                    files = re.findall(rb"(?:^|[\r\n])EMMC_RO_FS_FILE_READ_PASS bytes=([1-9]\d*) content-and-name-excluded[\r\n]", report)
+                    if (not all(re.search(rb"(?:^|[\r\n])" + re.escape(marker) + rb"[\r\n]", report) for marker in markers) or
+                            len(files) != 1 or not 0 < int(files[0]) <= 4096 or
+                            any(marker in report for marker in (b"EMMC_RO_PROBE_REFUSED", b"EMMC_RO_PROBE_FAILED",
+                                                                 b"EMMC_RO_FS_PROBE_REFUSED", b"EMMC_RO_UNEXPECTED_BLOCK"))):
+                        raise TransferError("eMMC user-area read-only block/partition/filesystem/cleanup evidence incomplete")
+                    result.update(read_only_block_verified=True, mounted_filesystems=1, files_read=1,
+                                  user_area_bytes_verified=7818182656, partitions_verified=9)
                 if args.profile == "ethernet-audit1" and not all(marker in report for marker in (
                         b"ETH_AUDIT CRG51=", b"ETH_AUDIT PHY_CRG=", b"ETH_AUDIT PHY_SELECT=",
                         b"ETH_AUDIT PHY_ADDRESS=", b"ETH_AUDIT PHY_LDO=",

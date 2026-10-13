@@ -45,11 +45,12 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,19 @@
+@@ -1,4 +1,20 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
 +dtb-$(CONFIG_HI3798MV100_EMMC_READ_SAMPLES) += hi3798mv100-ty1208z-emmc-read.dtb
++dtb-$(CONFIG_HI3798MV100_EMMC_READ_ONLY) += hi3798mv100-ty1208z-emmc-ro.dtb
 +dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-ty1208z-sd-audit.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += hi3798mv100-ty1208z-sd-ident.dtb
@@ -160,7 +161,7 @@
  obj-$(CONFIG_KEYSTONE_TIMER)		+= timer-keystone.o
 --- a/drivers/power/reset/Kconfig
 +++ b/drivers/power/reset/Kconfig
-@@ -8,6 +8,32 @@
+@@ -8,6 +8,40 @@
  	  Say Y here to enable board reset and power off
  
  if POWER_RESET
@@ -183,6 +184,14 @@
 +	  Require measured SYSID0/zero ID cells/inactive watchdog state.
 +	  No startup writes; only explicit kernel restart arms WDG0.
 +
++config POWER_RESET_TY1208Z_MV100_EMMC_RO
++	bool "TY1208Z measured MV100 restart after eMMC read-only shutdown"
++	depends on ARCH_HI3798MV100 && HI3798MV100_EMMC_READ_ONLY
++	depends on MMC_DW_HI3798MV100_IDENT && !WATCHDOG
++	help
++	  Check the stopped host and measured watchdog before explicit reset.
++	  No startup writes or watchdog service.
++
 +config POWER_RESET_TY1208Z_MV100_RAM
 +	bool "TY1208Z bounded 768-MiB memory and measured restart experiment"
 +	depends on ARCH_HI3798MV100 && !WATCHDOG && !NET && !BLOCK && !MMC
@@ -195,10 +204,11 @@
  	bool "ams AS3722 power-off driver"
 --- a/drivers/power/reset/Makefile
 +++ b/drivers/power/reset/Makefile
-@@ -1,4 +1,7 @@
+@@ -1,4 +1,8 @@
  # SPDX-License-Identifier: GPL-2.0
 +obj-$(CONFIG_POWER_RESET_TY1208Z_SP805) += ty1208z-sp805-restart.o
 +obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_SD) += ty1208z-mv100-sd-restart.o
++obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_EMMC_RO) += ty1208z-mv100-emmc-ro-restart.o
 +obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) += ty1208z-mv100-ram-restart.o
  obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
  obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
@@ -1006,6 +1016,30 @@
 +
 +/ {
 +	model = "TY1208Z CA fixed four-sector read-only diagnostic";
++};
+--- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-emmc-ro.dts
+@@ -0,0 +1,21 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-emmc-ident.dts"
++
++/ {
++	model = "TY1208Z CA enforced read-only eMMC user-area RAM experiment";
++	compatible = "tianyi,ty1208z-ca-emmc-ro-ram", "hi3798mv100-series";
++	chosen {
++		/* Exact Hinas user-area layout, measured through sysfs; no disk
++		 * partition table or persistent boot environment is changed.
++		 */
++		bootargs = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=8 ignore_loglevel keep_bootcon panic=0 blkdevparts=mmcblk0:1M(boot)ro,1M(bootargs)ro,4M(baseparam)ro,4M(pqparam)ro,4M(logo)ro,20M(kernel)ro,64M(busybox)ro,512M(backup)ro,6846M(ubuntu)ro";
++	};
++};
++
++&{/soc} {
++	emmc-ro-restart@f8a2c000 {
++		compatible = "tianyi,ty1208z-mv100-emmc-ro-restart";
++		reg = <0xf8a2c000 0x1000>, <0xf8000ee0 4>,
++		      <0xf9830000 0x1000>, <0xf8a220a0 4>;
++	};
 +};
 --- /dev/null
 +++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-ethernet-audit.dts
@@ -1948,7 +1982,7 @@
 +#endif
 --- /dev/null
 +++ b/drivers/mmc/host/dw_mmc-hi3798mv100-ident.c
-@@ -0,0 +1,182 @@
+@@ -0,0 +1,204 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Restricted RAM diagnostic, not the production MV100 storage driver. */
 +#include <linux/io.h>
@@ -2075,7 +2109,8 @@
 +	crg = platform_get_resource(pdev, IORESOURCE_MEM, 1);
 +	if (!controller || controller->start != 0xf9830000 ||
 +	    resource_size(controller) != 0x1000 || !crg ||
-+	    crg->start != 0xf8a220a0 || resource_size(crg) != 4)
++	    crg->start != 0xf8a220a0 || resource_size(crg) != 4 ||
++	    platform_get_resource(pdev, IORESOURCE_MEM, 2))
 +		return -EINVAL;
 +
 +	irq = platform_get_irq(pdev, 0);
@@ -2114,6 +2149,26 @@
 +	return dw_mci_pltfm_register(pdev, &mv100_ident_data);
 +}
 +
++static void mv100_ident_shutdown(struct platform_device *pdev)
++{
++	struct dw_mci *host;
++
++	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))
++		return;
++	host = platform_get_drvdata(pdev);
++	/* Stop rescans/requests and mask IRQs before an explicit system reset.
++	 * The inherited CRG/pinmux are retained; policy still denies card writes.
++	 */
++	dw_mci_pltfm_remove(pdev);
++	if (mci_readl(host, INTMASK) || mci_readl(host, CLKENA) ||
++	    mci_readl(host, IDINTEN) ||
++	    (mci_readl(host, CTRL) & (SDMMC_CTRL_DMA_ENABLE | SDMMC_CTRL_USE_IDMAC))) {
++		dev_err(&pdev->dev, "EMMC_RO_SHUTDOWN_FAILED controller-not-quiesced\n");
++		return;
++	}
++	dev_info(&pdev->dev, "EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\n");
++}
++
 +static const struct of_device_id mv100_ident_match[] = {
 +	{ .compatible = "tianyi,ty1208z-emmc-identification" },
 +	{ }
@@ -2123,6 +2178,7 @@
 +static struct platform_driver mv100_ident_driver = {
 +	.probe = mv100_ident_probe,
 +	.remove_new = dw_mci_pltfm_remove,
++	.shutdown = mv100_ident_shutdown,
 +	.driver = {
 +		.name = "hi3798mv100-emmc-ident",
 +		.of_match_table = mv100_ident_match,
@@ -2667,6 +2723,124 @@
 +	{ }
 +};
 +MODULE_DEVICE_TABLE(mdio, ty1208z_festa_ids);
+--- /dev/null
++++ b/drivers/power/reset/ty1208z-mv100-emmc-ro-restart.c
+@@ -0,0 +1,115 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/* Explicit measured reset only after the independent eMMC host is stopped. */
++#include <linux/delay.h>
++#include <linux/bitops.h>
++#include <linux/kernel.h>
++#include <linux/module.h>
++#include <linux/of.h>
++#include <linux/platform_device.h>
++#include <linux/reboot.h>
++#include <linux/slab.h>
++
++#include "ty1208z-mv100-restart.h"
++
++struct ty1208z_emmc_ro_restart_context {
++	void __iomem *base;
++	void __iomem *sysid;
++	void __iomem *controller;
++	void __iomem *crg;
++};
++
++static bool ty1208z_emmc_ro_identity(struct ty1208z_emmc_ro_restart_context *c)
++{
++	return readl(c->crg) == 0x00040103 &&
++		readl(c->controller + 0x6c) == 0x5342270a &&
++		readl(c->controller + 0x70) == 0x00e44c81;
++}
++
++static int ty1208z_emmc_ro_restart_callback(struct sys_off_data *data)
++{
++	struct ty1208z_emmc_ro_restart_context *c = data->cb_data;
++
++	/* Repeat controller identity and quiescence checks at restart time.
++	 * A failed shutdown must never arm the reset watchdog.
++	 */
++	if (!ty1208z_emmc_ro_identity(c) || readl(c->controller + 0x24) ||
++	    readl(c->controller + 0x10) || readl(c->controller + 0x90) ||
++	    (readl(c->controller) & (BIT(5) | BIT(25)))) {
++		pr_err("EMMC_RO_RESTART_REFUSED controller-not-quiesced\n");
++		return NOTIFY_DONE;
++	}
++	if (!ty1208z_mv100_restart(c->base, c->sysid)) {
++		pr_err("TY1208Z_RESTART_REFUSED watchdog identity/state changed\n");
++		return NOTIFY_DONE;
++	}
++	mdelay(1000);
++	pr_err("TY1208Z_RESTART_TIMEOUT SP805 did not reset within one second\n");
++	return NOTIFY_DONE;
++}
++
++static int ty1208z_emmc_ro_restart_probe(struct platform_device *pdev)
++{
++	struct device *dev = &pdev->dev;
++	struct ty1208z_emmc_ro_restart_context *c;
++	struct resource *res;
++	static const resource_size_t starts[] = {
++		0xf8a2c000, 0xf8000ee0, 0xf9830000, 0xf8a220a0,
++	};
++	static const resource_size_t sizes[] = { 0x1000, 4, 0x1000, 4 };
++	unsigned int i;
++	int ret;
++
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram"))
++		return -ENODEV;
++	for (i = 0; i < ARRAY_SIZE(starts); i++) {
++		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
++		if (!res || res->start != starts[i] || resource_size(res) != sizes[i])
++			return -EINVAL;
++	}
++	if (platform_get_resource(pdev, IORESOURCE_MEM, i))
++		return -EINVAL;
++	c = devm_kzalloc(dev, sizeof(*c), GFP_KERNEL);
++	if (!c)
++		return -ENOMEM;
++	c->sysid = devm_platform_ioremap_resource(pdev, 1);
++	if (IS_ERR(c->sysid))
++		return PTR_ERR(c->sysid);
++	c->base = devm_platform_ioremap_resource(pdev, 0);
++	if (IS_ERR(c->base))
++		return PTR_ERR(c->base);
++	/* The eMMC driver owns these exact resources. Observe them without a
++	 * second exclusive reservation; this driver never writes either mapping.
++	 */
++	c->crg = devm_ioremap(dev, starts[3], sizes[3]);
++	if (!c->crg)
++		return -ENOMEM;
++	c->controller = devm_ioremap(dev, starts[2], sizes[2]);
++	if (!c->controller)
++		return -ENOMEM;
++	if (!ty1208z_mv100_restart_ready(c->base, c->sysid) ||
++	    !ty1208z_emmc_ro_identity(c))
++		return dev_err_probe(dev, -ENODEV, "Unexpected watchdog/eMMC identity; no writes\n");
++	ret = devm_register_sys_off_handler(dev, SYS_OFF_MODE_RESTART,
++		SYS_OFF_PRIO_DEFAULT, ty1208z_emmc_ro_restart_callback, c);
++	if (ret)
++		return ret;
++	dev_info(dev, "TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes\n");
++	dev_info(dev, "TY1208Z_RESTART_READY no-startup-writes explicit-restart-only\n");
++	return 0;
++}
++
++static const struct of_device_id ty1208z_emmc_ro_restart_match[] = {
++	{ .compatible = "tianyi,ty1208z-mv100-emmc-ro-restart" },
++	{ }
++};
++MODULE_DEVICE_TABLE(of, ty1208z_emmc_ro_restart_match);
++
++static struct platform_driver ty1208z_emmc_ro_restart_driver = {
++	.probe = ty1208z_emmc_ro_restart_probe,
++	.driver = {
++		.name = "ty1208z-mv100-emmc-ro-restart",
++		.of_match_table = ty1208z_emmc_ro_restart_match,
++	},
++};
++builtin_platform_driver(ty1208z_emmc_ro_restart_driver);
++MODULE_LICENSE("GPL");
 --- /dev/null
 +++ b/drivers/power/reset/ty1208z-mv100-ram-restart.c
 @@ -0,0 +1,80 @@
