@@ -66,8 +66,18 @@ enumeration image remains denied by the RAM preparation gate.
 
 Required local markers are `USB_CLOCK_AUDIT_HELPER_PASS`,
 `USB_CLOCK_AUDIT_PROBE_PASS`, `USB_CLOCK_AUDIT_RAM_PLAN_PASS` and
-`QEMU VIRT PASS`. The diagnostic CI workflow now builds and uploads this
-independent profile as UNTESTED; a remote run for this change is still pending.
+`QEMU VIRT PASS`. Diagnostic CI
+[38364481882](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38364481882)
+passed on `f7e9a615b79713e9c76a444cdbce1fd93797824c`, including the new
+independent profile. All twelve downloaded manifests and 119 listed files
+were verified by actual length/SHA-256, with eleven uImage CRC/structure
+checks and matching Git Wi-Fi patches. The actual USB log contains all four
+markers; its SHA-256 is
+`1759c8cae95c459e6f2c24935f486a516a5bb1e7b6a5753704b7518d537ebf80`.
+The downloaded USB image also passes the exact config/DT/CRC/layout RAM gate
+and mutation tests; its actual QEMU console contains the time64 marker.
+This remote build predates the later association-frame parser change and
+does not establish physical USB acceptance.
 
 ## Next physical acceptance
 
