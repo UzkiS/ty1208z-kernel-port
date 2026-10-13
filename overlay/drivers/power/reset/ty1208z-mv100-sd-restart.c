@@ -34,7 +34,9 @@ static int ty1208z_sd_restart_probe(struct platform_device *pdev)
 	struct resource *res;
 	int ret;
 
-	if (!of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
+	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ?
+	    !of_machine_is_compatible("tianyi,ty1208z-ca-sd-ro-ram") :
+	    !of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
 		return -ENODEV;
 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	if (!res || res->start != 0xf8a2c000 || resource_size(res) != 0x1000)

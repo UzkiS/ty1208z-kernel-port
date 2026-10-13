@@ -9,6 +9,9 @@ integration before unattended image switching.
 The later independent SD metadata profile now also carries the same measured
 MV100 helper and passes explicit command reboot, read-back-checked SD shutdown
 and automatic return to the native router; [SD board report](../verification/sd-ident-board-20261013.md).
+The distinct `sd-ro1` block/filesystem profile now also passes that return after
+actual read-only VFAT file access. Its UART guard additionally requires no card
+mounts and a read-only block state; [read-only report](../verification/sd-ro-board-20261013.md).
 `make restart` retains the original isolated SP805-ID candidate described below.
 
 ## Native router module and measured MV100 identity

@@ -16,6 +16,7 @@ help:
 	@echo 'make emmc-audit - build a separate read-only eMMC-register RAM diagnostic'
 	@echo 'make sd-audit - build a separate read-only onboard SD-register RAM diagnostic'
 	@echo 'make sd-ident - build restricted SD metadata-only RAM candidate with explicit restart'
+	@echo 'make sd-ro - build enforced read-only SD block/filesystem RAM candidate'
 	@echo 'make emmc-ident - build a separate restricted PIO eMMC identification image'
 	@echo 'make emmc-read - build fixed four-sector read-only samples (no block device)'
 	@echo 'make ethernet-audit - inspect inherited clocks/PHY IDs without network or reset writes'
@@ -42,6 +43,7 @@ lint:
 	shellcheck tools/*.sh initramfs/init initramfs/diag initramfs/ethernet-diag initramfs/ethernet-dhcp
 	shellcheck initramfs/usb-diag
 	shellcheck initramfs/sd-diag
+	shellcheck initramfs/sd-ro-diag
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
 	python3 tools/test_pinned_archives.py
@@ -52,6 +54,7 @@ lint:
 	python3 tools/test_sd_audit_module.py
 	python3 tools/test_sd_restart.py
 	python3 tools/test_sd_ident_profile.py
+	python3 tools/test_sd_ro_profile.py
 
 test-serial:
 	python3 tools/test_tftp_readonly.py
@@ -98,6 +101,10 @@ sd-audit:
 .PHONY: sd-ident
 sd-ident:
 	bash tools/build-sd-ident.sh $(if $(TASKBASE),"$(TASKBASE)")
+
+.PHONY: sd-ro
+sd-ro:
+	bash tools/build-sd-ro.sh $(if $(TASKBASE),"$(TASKBASE)")
 
 emmc-ident:
 	bash tools/build-emmc-ident.sh $(if $(TASKBASE),"$(TASKBASE)")

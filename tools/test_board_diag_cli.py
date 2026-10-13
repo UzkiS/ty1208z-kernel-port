@@ -48,6 +48,7 @@ class DiagnosticTests(unittest.TestCase):
                     if mode == "wrong-kernel":
                         return
                     diagnostic = (b"usb-diag; diag" if profile == "usb-host1" else
+                                  b"sd-ro-diag; diag" if profile == "sd-ro1" else
                                   b"sd-diag; diag" if profile == "sd-ident1" else b"diag")
                     self.assertEqual(read_command(), diagnostic + b"; echo TY1208Z_DIAG_COMPLETE\r")
                     time64 = b"TIME64_FAIL" if mode == "probe-failure" else b"TIME64_PASS sizeof(time_t)=8 file=2208988800"
@@ -69,6 +70,20 @@ class DiagnosticTests(unittest.TestCase):
                         sd_ident = sd_ident.replace(b"bus_width=0 timing=0", b"bus_width=2 timing=1")
                     if mode == "bad-sd-clock":
                         sd_ident = sd_ident.replace(b"clock=25000000", b"clock=50000000")
+                    if profile == "sd-ro1":
+                        sd_ident = sd_ident.replace(b"BLOCK_DISABLED", b"mmcblk0")
+                        sd_ident += (b"\r\nSD_RO_BLOCK_READ_PASS bytes=16008609792 read_bytes=4096 ro=1\r\n"
+                                     b"SD_RO_OVERLAPPING_READ_PASS read_bytes=1024\r\n"
+                                     b"SD_RO_FS_MOUNT_PASS ro=1 block_size=4096 blocks=1024\r\n"
+                                     b"SD_RO_FS_FILE_READ_PASS bytes=4096 content-and-name-excluded\r\n"
+                                     b"SD_RO_FS_COMPLETE type=vfat mount-removed no-card-writes\r\n"
+                                     b"SD_RO_DIAG_COMPLETE filesystems=1 no-card-writes\r\n")
+                        if mode == "sd-ro-incomplete":
+                            sd_ident = sd_ident.replace(b"SD_RO_DIAG_COMPLETE", b"INCOMPLETE")
+                        if mode == "sd-ro-capacity":
+                            sd_ident = sd_ident.replace(b"SD_RO_BLOCK_READ_PASS bytes=16008609792", b"SD_RO_BLOCK_READ_PASS bytes=512")
+                        if mode == "sd-ro-mount-incomplete":
+                            sd_ident = sd_ident.replace(b"SD_RO_FS_COMPLETE", b"INCOMPLETE_MOUNT")
                     ident = b"No card" if mode == "missing-ident" else (
                         b"EMMC_IDENT_GUARD_PASS\r\nUsing PIO mode.\r\nnew MMC card\r\n"
                         b"name=008G30\r\ntype=MMC\r\nBLOCK_DISABLED\r\n"
@@ -126,7 +141,7 @@ class DiagnosticTests(unittest.TestCase):
                                  b"\r\ndiagnostic output\r\n" * 1024,
                                  b"\r\n" + (audit if profile == "emmc-audit1" else b""),
                                  b"\r\n" + (sd if profile == "sd-audit1" else b""),
-                                 b"\r\n" + (sd_ident if profile == "sd-ident1" else b""),
+                                 b"\r\n" + (sd_ident if profile in ("sd-ident1", "sd-ro1") else b""),
                                  b"\r\n" + (ident if profile in ("emmc-ident1", "emmc-read1") else b""),
                                  b"\r\n" + (samples if profile == "emmc-read1" else b""),
                                  b"\r\n" + (ethernet if profile == "ethernet-audit1" else b""),
@@ -266,6 +281,11 @@ class DiagnosticTests(unittest.TestCase):
         for mode in ("no-sd-card", "bad-sd-mode", "bad-sd-clock", "success"):
             with self.subTest(mode=mode):
                 self.exercise(mode, profile="sd-ident1")
+
+    def test_sd_read_only_requires_exact_capacity_and_completed_mount_removal(self):
+        for mode in ("sd-ro-capacity", "sd-ro-incomplete", "sd-ro-mount-incomplete", "success"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, profile="sd-ro1")
 
 
 if __name__ == "__main__":

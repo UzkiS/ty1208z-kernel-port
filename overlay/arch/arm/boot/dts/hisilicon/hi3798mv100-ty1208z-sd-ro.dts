@@ -1,0 +1,7 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-sd-ident.dts"
+
+/ {
+	model = "TY1208Z CA enforced read-only SD block and filesystem RAM test";
+	compatible = "tianyi,ty1208z-ca-sd-ro-ram", "hi3798mv100-series";
+};

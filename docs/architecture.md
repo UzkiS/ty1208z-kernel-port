@@ -34,6 +34,8 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 `make sd-ident` 的独立 PIO/metadata/restart 候选已识别本机 SDHC，
 并通过命令重启自动返回；当前原生 router 的 MMC/BLOCK 仍关闭，
 生产系统的块设备/文件系统整合尚未完成。
+`make sd-ro` 在独立身份下启用块设备和受限只读文件系统；队列门禁继续拒绝卡
+写入。本机已完成块读取及 VFAT 文件读取/卸载，并自动返回原生 router。
 `make wifi-usb-audit` 使用单独的内核输出目录和配置，不改变诊断镜像；目前只编译
 `wland_usb.o`，不链接模块、不加载固件。来源锁与适配范围见 [Wi-Fi 说明](wifi.md)。
 `make wifi-port` 另行编译完整模块并执行制造入口/密钥回归；同样不改变诊断镜像，

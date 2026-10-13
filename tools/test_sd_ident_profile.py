@@ -55,9 +55,9 @@ class ProfileTests(unittest.TestCase):
             sd_ident_profile(self.tree, self.config.replace("sd-ident1", "diag1"))
 
 
-def check_built(artifacts):
-    assert sd_ident_profile(parse_fdt((artifacts / "ty1208z-diagnostic.dtb").read_bytes()),
-                            (artifacts / "linux.config").read_text())
+def check_built(artifacts, profile=sd_ident_profile):
+    assert profile(parse_fdt((artifacts / "ty1208z-diagnostic.dtb").read_bytes()),
+                   (artifacts / "linux.config").read_text())
     raw = (b"Fastboot 3.3.0-dirty (vendor)\nDDR free region baseaddr:0x1000000 size:0x3F000000\n"
            b"bootcmd=mmc read 0 0x1FFFFC0 0x7000 0xA000;bootm 0x1FFFFC0\n"
            b"loady [ off ] [ baud ]\ncrc32 address count [addr]\nbootm [addr [arg ...]]\n")

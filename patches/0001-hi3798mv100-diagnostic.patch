@@ -26,7 +26,7 @@
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,17 @@
+@@ -1,4 +1,18 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
@@ -34,6 +34,7 @@
 +dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-ty1208z-sd-audit.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += hi3798mv100-ty1208z-sd-ident.dtb
++dtb-$(CONFIG_HI3798MV100_SD_READ_ONLY) += hi3798mv100-ty1208z-sd-ro.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb
 +dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb
@@ -156,7 +157,7 @@
 +config POWER_RESET_TY1208Z_MV100_SD
 +	bool "TY1208Z measured MV100 restart for SD identification"
 +	depends on ARCH_HI3798MV100 && MMC_DW_HI3798MV100_SD_IDENT
-+	depends on !WATCHDOG && !BLOCK && !NET && !USB_SUPPORT
++	depends on !WATCHDOG && !NET && !USB_SUPPORT
 +	depends on !MODULES && !SMP && !DEBUG_FS
 +	help
 +	  Require measured SYSID0/zero ID cells/inactive watchdog state.
@@ -226,17 +227,24 @@
  				   sdio.o sdio_ops.o sdio_bus.o \
 --- a/drivers/mmc/host/Kconfig
 +++ b/drivers/mmc/host/Kconfig
-@@ -802,6 +802,30 @@
+@@ -802,6 +802,37 @@
  	  Synopsys DesignWare Memory Card Interface driver. Select this option
  	  for platforms based on Exynos4 and Exynos5 SoC's.
  
 +config MMC_DW_HI3798MV100_SD_IDENT
 +	bool "TY1208Z restricted SD identification diagnostic"
-+	depends on MMC_DW && ARCH_HI3798MV100 && !BLOCK
++	depends on MMC_DW && ARCH_HI3798MV100
 +	select MMC_DW_PLTFM
 +	help
 +	  PIO, 1-bit, legacy SD metadata only. No MMC/SDIO or sectors.
 +	  Reject card settings, data writes and unknown requests.
++
++config HI3798MV100_SD_READ_ONLY
++	bool "TY1208Z enforced read-only SD block and filesystem test"
++	depends on MMC_DW_HI3798MV100_SD_IDENT && BLOCK && MMC_BLOCK
++	help
++	  Report read-only and reject writes/settings before hardware queue.
++	  Allow bounded sector-addressed SD single/multi-block reads.
 +
 +config HI3798MV100_EMMC_READ_SAMPLES
 +	bool "TY1208Z fixed four-sector read-only diagnostic"
@@ -270,17 +278,18 @@
  obj-$(CONFIG_MMC_DW_K3)		+= dw_mmc-k3.o
 --- a/drivers/mmc/host/dw_mmc.h
 +++ b/drivers/mmc/host/dw_mmc.h
-@@ -588,6 +588,9 @@
+@@ -588,6 +588,10 @@
   * @common_caps: mmc subsystem specified capabilities applicable to all of
   *	the controllers
   * @init: early implementation specific initialization.
 + * @init_slot: final slot constraints before host registration.
 + * @validate_request: reject a request before hardware queueing.
 + * @force_pio: skip all DMA allocation and initialization.
++ * @force_ro: report read-only regardless of GPIO/controller input.
   * @set_ios: handle bus specific extensions.
   * @parse_dt: parse implementation specific device tree properties.
   * @execute_tuning: implementation specific tuning procedure.
-@@ -604,6 +607,10 @@
+@@ -604,6 +608,11 @@
  	u32		num_caps;
  	u32		common_caps;
  	int		(*init)(struct dw_mci *host);
@@ -288,6 +297,7 @@
 +	int		(*validate_request)(struct dw_mci *host,
 +					    struct mmc_request *mrq);
 +	bool		force_pio;
++	bool		force_ro;
  	void		(*set_ios)(struct dw_mci *host, struct mmc_ios *ios);
  	int		(*parse_dt)(struct dw_mci *host);
  	int		(*execute_tuning)(struct dw_mci_slot *slot, u32 opcode);
@@ -313,7 +323,20 @@
  	WARN_ON(slot->mrq);
  
  	/*
-@@ -3062,6 +3075,12 @@
+@@ -1598,7 +1611,11 @@
+ {
+ 	int read_only;
+ 	struct dw_mci_slot *slot = mmc_priv(mmc);
+-	int gpio_ro = mmc_gpio_get_ro(mmc);
++	int gpio_ro;
++
++	if (slot->host->drv_data && slot->host->drv_data->force_ro)
++		return 1;
++	gpio_ro = mmc_gpio_get_ro(mmc);
+ 
+ 	/* Use platform get_ro function, else try on board write protect */
+ 	if (gpio_ro >= 0)
+@@ -3062,6 +3079,12 @@
  		mmc->max_seg_size = mmc->max_req_size;
  	}
  
@@ -326,7 +349,7 @@
  	dw_mci_get_cd(mmc);
  
  	ret = mmc_add_host(mmc);
-@@ -3091,6 +3110,9 @@
+@@ -3091,6 +3114,9 @@
  {
  	int addr_config;
  	struct device *dev = host->dev;
@@ -336,7 +359,7 @@
  
  	/*
  	* Check tansfer mode from HCON[17:16]
-@@ -3549,9 +3571,11 @@
+@@ -3549,9 +3575,11 @@
  	 * Enable interrupts for command done, data over, data empty,
  	 * receive ready and error such as transmit, receive timeout, crc error
  	 */
@@ -1022,6 +1045,16 @@
 +		compatible = "tianyi,ty1208z-mv100-sd-ident-restart";
 +		reg = <0xf8a2c000 0x1000>, <0xf8000ee0 4>;
 +	};
++};
+--- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-sd-ro.dts
+@@ -0,0 +1,7 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-sd-ident.dts"
++
++/ {
++	model = "TY1208Z CA enforced read-only SD block and filesystem RAM test";
++	compatible = "tianyi,ty1208z-ca-sd-ro-ram", "hi3798mv100-series";
 +};
 --- /dev/null
 +++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-usb-audit.dts
@@ -1954,11 +1987,12 @@
 +MODULE_LICENSE("GPL");
 --- /dev/null
 +++ b/drivers/mmc/host/dw_mmc-hi3798mv100-sd-ident.c
-@@ -0,0 +1,193 @@
+@@ -0,0 +1,207 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Restricted RAM diagnostic, not the production MV100 storage driver. */
 +#include <linux/io.h>
 +#include <linux/irq.h>
++#include <linux/mmc/card.h>
 +#include <linux/mmc/host.h>
 +#include <linux/module.h>
 +#include <linux/of.h>
@@ -1967,6 +2001,7 @@
 +#include "dw_mmc.h"
 +#include "dw_mmc-pltfm.h"
 +#include "hi3798mv100-sd-ident-policy.h"
++#include "hi3798mv100-sd-ro-policy.h"
 +
 +static int mv100_sd_ident_init(struct dw_mci *host)
 +{
@@ -2013,9 +2048,9 @@
 +	mmc->pm_caps = 0;
 +	mmc->f_max = 25000000;
 +	mmc->max_blk_size = 512;
-+	mmc->max_blk_count = 1;
-+	mmc->max_req_size = 512;
-+	mmc->max_seg_size = 512;
++	mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ? 8 : 1;
++	mmc->max_req_size = 512 * mmc->max_blk_count;
++	mmc->max_seg_size = mmc->max_req_size;
 +	mmc->dsr_req = 0;
 +	return 0;
 +}
@@ -2023,6 +2058,15 @@
 +static int mv100_sd_ident_validate(struct dw_mci *host, struct mmc_request *mrq)
 +{
 +	int ret = hi3798mv100_sd_ident_request(mrq);
++
++	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY)) {
++		struct mmc_card *card = host->slot ? host->slot->mmc->card : NULL;
++		bool addressed = card && mmc_card_sd(card) &&
++			mmc_card_is_blockaddr(card) && card->csd.read_blkbits == 9;
++		u64 sectors = addressed ? card->csd.capacity : 0;
++
++		ret = hi3798mv100_sd_ro_request(mrq, addressed, sectors);
++	}
 +
 +	if (ret)
 +		dev_info_ratelimited(host->dev,
@@ -2046,6 +2090,7 @@
 +	.validate_request = mv100_sd_ident_validate,
 +	.switch_voltage = mv100_sd_ident_voltage,
 +	.force_pio = true,
++	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY),
 +};
 +
 +static int mv100_sd_ident_probe(struct platform_device *pdev)
@@ -2057,7 +2102,9 @@
 +	u32 value;
 +	int irq;
 +
-+	if (!of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
++	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ?
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-sd-ro-ram") :
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
 +		return -ENODEV;
 +	controller = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +	crg = platform_get_resource(pdev, IORESOURCE_MEM, 1);
@@ -2273,6 +2320,50 @@
 +
 +#endif
 --- /dev/null
++++ b/drivers/mmc/host/hi3798mv100-sd-ro-policy.h
+@@ -0,0 +1,41 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef HI3798MV100_SD_RO_POLICY_H
++#define HI3798MV100_SD_RO_POLICY_H
++
++#include "hi3798mv100-sd-ident-policy.h"
++
++/* Sector-addressed SDHC/SDXC only. Read at most one 4-KiB page per request.
++ * This is the hardware-queue barrier, independent of disk/sysfs read-only
++ * flags. Multi-block reads require the exact read STOP sidecar; no CMD23.
++ */
++static inline int hi3798mv100_sd_ro_request(struct mmc_request *mrq,
++					 bool sector_addressed, u64 sectors)
++{
++	struct mmc_command *cmd = mrq->cmd;
++	struct mmc_data *data = mrq->data;
++	u32 read_flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
++	u32 stop_flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
++
++	if (!hi3798mv100_sd_ident_request(mrq))
++		return 0;
++	if (!cmd || !sector_addressed || !sectors || sectors > (1ULL << 32) ||
++	    mrq->sbc || cmd->data != data)
++		return -EPERM;
++	/* Error recovery may explicitly stop an interrupted read. */
++	if (cmd->opcode == MMC_STOP_TRANSMISSION && !data && !mrq->stop)
++		return !cmd->arg && cmd->flags == stop_flags ? 0 : -EPERM;
++	if (!data || data->flags != MMC_DATA_READ || data->blksz != 512 ||
++	    !data->blocks || data->blocks > 8 || cmd->flags != read_flags ||
++	    cmd->arg >= sectors || data->blocks > sectors - cmd->arg)
++		return -EPERM;
++	if (data->blocks == 1)
++		return cmd->opcode == MMC_READ_SINGLE_BLOCK && !mrq->stop &&
++		       !data->stop ? 0 : -EPERM;
++	if (cmd->opcode != MMC_READ_MULTIPLE_BLOCK || !mrq->stop ||
++	    data->stop != mrq->stop || mrq->stop->opcode != MMC_STOP_TRANSMISSION ||
++	    mrq->stop->arg || mrq->stop->flags != stop_flags || mrq->stop->data)
++		return -EPERM;
++	return 0;
++}
++
++#endif
+--- /dev/null
 +++ b/drivers/net/ethernet/hisilicon/hi3798mv100-femac.h
 @@ -0,0 +1,41 @@
 +/* SPDX-License-Identifier: GPL-2.0-only */
@@ -2411,7 +2502,7 @@
 +#endif
 --- /dev/null
 +++ b/drivers/power/reset/ty1208z-mv100-sd-restart.c
-@@ -0,0 +1,80 @@
+@@ -0,0 +1,82 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Explicit reset for the separate, storage-disabled SD identification profile. */
 +#include <linux/delay.h>
@@ -2448,7 +2539,9 @@
 +	struct resource *res;
 +	int ret;
 +
-+	if (!of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
++	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ?
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-sd-ro-ram") :
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
 +		return -ENODEV;
 +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 +	if (!res || res->start != 0xf8a2c000 || resource_size(res) != 0x1000)

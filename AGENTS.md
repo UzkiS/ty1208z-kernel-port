@@ -26,8 +26,11 @@ board support. Keep assumptions separate from measured facts.
 - The user requested autonomous command reboots on 2026-10-13 to avoid repeated
   manual power cycles. The native router RAM module and guarded UART reboot are
   physically accepted; use that measured path when its exact prerequisites hold.
-  The separate `sd-ident1` profile also passes physical command restart, verified
-  DW shutdown and automatic return to the exact router. Other RAM profiles still
+  The separate `sd-ident1` and `sd-ro1` profiles also pass physical command
+  restart, verified DW shutdown and automatic return to the exact router.
+  `sd-ro1` physically accepts block reads and a VFAT file read with enforced
+  request-level write denial; native-router integration and hotplug are pending.
+  Other RAM profiles still
   need separate restart/shutdown support and acceptance.
 
 ## Authorization

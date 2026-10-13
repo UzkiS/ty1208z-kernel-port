@@ -15,6 +15,7 @@ from usb_host_profile import usb_host_profile
 from restart_profile import restart_profile
 from sd_audit_profile import sd_audit_profile
 from sd_ident_profile import sd_ident_profile
+from sd_ro_profile import sd_ro_profile
 
 artifacts = Path(sys.argv[1]).resolve()
 evidence = artifacts / "checks"
@@ -44,6 +45,7 @@ else:
 identification_profile(tree, config)
 sd_audit_profile(tree, config)
 sd_ident_profile(tree, config)
+sd_ro_profile(tree, config)
 ethernet_audit_profile(tree, config)
 ethernet_clock_id_profile(tree, config)
 ethernet_net_profile(tree, config)

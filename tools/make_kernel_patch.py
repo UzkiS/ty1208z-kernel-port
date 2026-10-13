@@ -40,6 +40,7 @@ changes = {
         'dtb-$(CONFIG_HI3798MV100_EMMC_AUDIT) += hi3798mv100-ty1208z-emmc-audit.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_SD_AUDIT) += hi3798mv100-ty1208z-sd-audit.dtb\n'
         'dtb-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += hi3798mv100-ty1208z-sd-ident.dtb\n'
+        'dtb-$(CONFIG_HI3798MV100_SD_READ_ONLY) += hi3798mv100-ty1208z-sd-ro.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb\n'),
     "drivers/soc/hisilicon/Kconfig": (
@@ -162,7 +163,7 @@ changes["drivers/power/reset/Kconfig"] = (
         'config POWER_RESET_TY1208Z_MV100_SD\n'
         '\tbool "TY1208Z measured MV100 restart for SD identification"\n'
         '\tdepends on ARCH_HI3798MV100 && MMC_DW_HI3798MV100_SD_IDENT\n'
-        '\tdepends on !WATCHDOG && !BLOCK && !NET && !USB_SUPPORT\n'
+        '\tdepends on !WATCHDOG && !NET && !USB_SUPPORT\n'
         '\tdepends on !MODULES && !SMP && !DEBUG_FS\n'
         '\thelp\n'
         '\t  Require measured SYSID0/zero ID cells/inactive watchdog state.\n'
@@ -199,11 +200,17 @@ changes.update({
         'config MMC_DW_HI3798CV200\n',
         'config MMC_DW_HI3798MV100_SD_IDENT\n'
         '\tbool "TY1208Z restricted SD identification diagnostic"\n'
-        '\tdepends on MMC_DW && ARCH_HI3798MV100 && !BLOCK\n'
+        '\tdepends on MMC_DW && ARCH_HI3798MV100\n'
         '\tselect MMC_DW_PLTFM\n'
         '\thelp\n'
         '\t  PIO, 1-bit, legacy SD metadata only. No MMC/SDIO or sectors.\n'
         '\t  Reject card settings, data writes and unknown requests.\n\n'
+        'config HI3798MV100_SD_READ_ONLY\n'
+        '\tbool "TY1208Z enforced read-only SD block and filesystem test"\n'
+        '\tdepends on MMC_DW_HI3798MV100_SD_IDENT && BLOCK && MMC_BLOCK\n'
+        '\thelp\n'
+        '\t  Report read-only and reject writes/settings before hardware queue.\n'
+        '\t  Allow bounded sector-addressed SD single/multi-block reads.\n\n'
         'config HI3798MV100_EMMC_READ_SAMPLES\n'
         '\tbool "TY1208Z fixed four-sector read-only diagnostic"\n'
         '\tdepends on MMC_DW_HI3798MV100_IDENT && !BLOCK\n'
@@ -230,14 +237,23 @@ changes.update({
          ' * @init_slot: final slot constraints before host registration.\n'
          ' * @validate_request: reject a request before hardware queueing.\n'
          ' * @force_pio: skip all DMA allocation and initialization.\n'),
+        (' * @set_ios: handle bus specific extensions.\n',
+         ' * @force_ro: report read-only regardless of GPIO/controller input.\n'
+         ' * @set_ios: handle bus specific extensions.\n'),
         ('\tint\t\t(*init)(struct dw_mci *host);\n',
          '\tint\t\t(*init)(struct dw_mci *host);\n'
          '\tint\t\t(*init_slot)(struct dw_mci_slot *slot);\n'
          '\tint\t\t(*validate_request)(struct dw_mci *host,\n'
          '\t\t\t\t\t    struct mmc_request *mrq);\n'
-         '\tbool\t\tforce_pio;\n'),
+         '\tbool\t\tforce_pio;\n'
+         '\tbool\t\tforce_ro;\n'),
     ],
     "drivers/mmc/host/dw_mmc.c": [
+        ('\tint gpio_ro = mmc_gpio_get_ro(mmc);\n',
+         '\tint gpio_ro;\n\n'
+         '\tif (slot->host->drv_data && slot->host->drv_data->force_ro)\n'
+         '\t\treturn 1;\n'
+         '\tgpio_ro = mmc_gpio_get_ro(mmc);\n'),
         ('\tWARN_ON(slot->mrq);\n',
          '\t/* Reject restricted diagnostic requests before any hardware queue. */\n'
          '\tif (host->drv_data && host->drv_data->validate_request) {\n'

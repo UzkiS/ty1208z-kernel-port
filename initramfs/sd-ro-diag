@@ -1,0 +1,31 @@
+#!/bin/sh
+# Read-only observations and mounts only; no filesystem repair or write probe.
+set -eu
+sd-diag
+test "$(cat /sys/class/block/mmcblk0/ro)" = 1
+sd-ro-probe /dev/mmcblk0
+mounted=0
+for block in /sys/class/block/mmcblk0 /sys/class/block/mmcblk0p*; do
+    [ -e "$block" ] || continue
+    name=${block##*/}
+    test "$(cat "$block/ro")" = 1
+    filesystem=$(sd-ro-probe --filesystem "/dev/$name")
+    case "$filesystem" in
+        ext4) options=ro,noload ;;
+        vfat|exfat) options=ro ;;
+        unknown) continue ;;
+        *) echo SD_RO_FS_UNEXPECTED_TYPE; exit 1 ;;
+    esac
+    target="/tmp/sd-ro-mount-$name"
+    mkdir -p "$target"
+    mount -t "$filesystem" -o "$options" "/dev/$name" "$target"
+    if sd-ro-probe --mounted "$target"; then
+        umount "$target"
+    else
+        umount "$target"
+        exit 1
+    fi
+    echo "SD_RO_FS_COMPLETE type=$filesystem mount-removed no-card-writes"
+    mounted=$(awk -v count="$mounted" 'BEGIN { print count + 1 }')
+done
+echo "SD_RO_DIAG_COMPLETE filesystems=$mounted no-card-writes"

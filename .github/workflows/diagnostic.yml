@@ -82,6 +82,10 @@ jobs:
         run: |
           make sd-ident > logs/sd-ident.log 2>&1 || { tail -n 100 logs/sd-ident.log; exit 1; }
           tail -n 30 logs/sd-ident.log
+      - name: Build enforced read-only SD block/filesystem profile and check queue/RO/RAM/QEMU gates
+        run: |
+          make sd-ro > logs/sd-ro.log 2>&1 || { tail -n 100 logs/sd-ro.log; exit 1; }
+          tail -n 30 logs/sd-ro.log
       - name: Build fixed read-only eMMC samples and run request/content/QEMU checks
         run: |
           make emmc-read > logs/emmc-read.log 2>&1 || { tail -n 100 logs/emmc-read.log; exit 1; }
@@ -133,6 +137,7 @@ jobs:
             artifacts/emmc-audit1/
             artifacts/sd-audit1/
             artifacts/sd-ident1/
+            artifacts/sd-ro1/
             artifacts/emmc-ident1/
             artifacts/emmc-read1/
             artifacts/ethernet-audit1/

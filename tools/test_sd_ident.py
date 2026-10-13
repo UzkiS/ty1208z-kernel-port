@@ -78,7 +78,7 @@ int main(void)
 '''
 
 
-def test(linuxsrc):
+def test(linuxsrc, harness=HARNESS):
     driver = (linuxsrc / "drivers/mmc/host/dw_mmc.c").read_text()
     request = "static void dw_mci_request(" + driver.split("static void dw_mci_request(", 1)[1].split("\nstatic void dw_mci_set_ios", 1)[0]
     assert request.index("validate_request(host, mrq)") < request.index("dw_mci_get_cd(mmc)") < request.index("dw_mci_queue_request(host, slot, mrq)")
@@ -98,7 +98,7 @@ def test(linuxsrc):
         (path / "linux/errno.h").write_text('#include <asm-generic/errno.h>\n')
         (path / "linux/types.h").write_text('#include <stdint.h>\n#include <stddef.h>\n#include <stdbool.h>\ntypedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32; typedef uint64_t u64; typedef int32_t s32;\n#define BIT(n) (1U << (n))\n')
         (path / "linux/completion.h").write_text('struct completion { int unused; };\n')
-        (path / "test.c").write_text(HARNESS.replace("/* REQUEST */", request))
+        (path / "test.c").write_text(harness.replace("/* REQUEST */", request))
         binary = path / "test"
         subprocess.run(["cc", "-std=c11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                         "-fsanitize=address,undefined", "-fno-pie", "-no-pie", "-I", str(path),

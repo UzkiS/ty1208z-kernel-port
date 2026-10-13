@@ -20,6 +20,10 @@ RESTART_PROPERTIES = {"compatible": {"strings": ["tianyi,ty1208z-mv100-sd-ident-
 
 def sd_ident_profile(tree, config):
     props = {node["path"]: node["properties"] for node in tree["nodes"]}
+    # Its distinct validator enforces the block/filesystem profile. The base
+    # driver's presence alone must not relax this metadata-only gate.
+    if "CONFIG_HI3798MV100_SD_READ_ONLY=y\n" in config:
+        return False
     enabled = "CONFIG_MMC_DW_HI3798MV100_SD_IDENT=y\n" in config
     if not enabled:
         if NODE in props or RESTART in props or "CONFIG_POWER_RESET_TY1208Z_MV100_SD=y\n" in config:

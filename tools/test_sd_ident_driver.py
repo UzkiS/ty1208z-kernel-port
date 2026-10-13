@@ -30,6 +30,9 @@ typedef uint32_t u32;
 #define MMC_CAP_NEEDS_POLL 1
 #define MMC_CAP2_NO_MMC 2
 #define MMC_CAP2_NO_SDIO 4
+static bool ro_mode;
+#define CONFIG_HI3798MV100_SD_READ_ONLY 1
+#define IS_ENABLED(config) ro_mode
 struct device { void *of_node; };
 struct platform_device { struct device dev; };
 struct resource { uint64_t start, end; };
@@ -49,7 +52,7 @@ static const char *property;
 static unsigned maps, reads, registered, removed;
 static unsigned completion, errors;
 static bool of_machine_is_compatible(const char *name)
-{ assert(!strcmp(name, "tianyi,ty1208z-ca-sd-ident-ram")); return board; }
+{ assert(!strcmp(name, ro_mode ? "tianyi,ty1208z-ca-sd-ro-ram" : "tianyi,ty1208z-ca-sd-ident-ram")); return board; }
 static struct resource *platform_get_resource(struct platform_device *p, int type, unsigned i)
 { assert(p && type == IORESOURCE_MEM && i < 4); return (int)i == missing || (i == 3 && !extra) ? NULL : &resources[i]; }
 static uint64_t resource_size(struct resource *r) { return r->end - r->start + 1; }
@@ -127,6 +130,13 @@ int main(void)
     assert(!mv100_sd_ident_slot(&slot));
     assert(mmc.caps == MMC_CAP_NEEDS_POLL && mmc.caps2 == (MMC_CAP2_NO_MMC | MMC_CAP2_NO_SDIO));
     assert(!mmc.pm_caps && mmc.f_max == 25000000 && mmc.max_blk_size == 512 && mmc.max_blk_count == 1 && mmc.max_req_size == 512 && mmc.max_seg_size == 512 && !mmc.dsr_req);
+    ro_mode = true;
+    initialize();
+    assert(!mv100_sd_ident_probe(&p));
+    assert(!mv100_sd_ident_slot(&slot));
+    assert(mmc.caps == MMC_CAP_NEEDS_POLL && mmc.caps2 == (MMC_CAP2_NO_MMC | MMC_CAP2_NO_SDIO));
+    assert(mmc.max_blk_count == 8 && mmc.max_req_size == 4096 && mmc.max_seg_size == 4096 && !mmc.dsr_req);
+    ro_mode = false;
     mv100_sd_ident_shutdown(&p); assert(removed == 1 && completion == 1 && !errors);
     const unsigned offsets[] = {SDMMC_INTMASK, SDMMC_CLKENA, SDMMC_IDINTEN, SDMMC_CTRL};
     for (unsigned i = 0; i < 4; i++) {

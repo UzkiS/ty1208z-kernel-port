@@ -1,7 +1,8 @@
 # 板载 SD/TF 卡槽
 
 独立 RAM 候选已实机识别 SDHC 卡，并可通过命令重启自动返回中文 OpenWrt。
-当前原生 OpenWrt 尚未整合 SD/TF 块设备，扇区读取与文件系统仍需验收。
+独立强制只读候选也已完成块读取及 VFAT 文件读取；当前原生 OpenWrt 尚未整合
+SD/TF 块设备，其他文件系统、插拔和生产系统整合仍需验收。
 eMMC 的实机识别与四扇区读取不能代替 TF 卡槽验收；两者使用不同控制器。
 2026-10-13 已在原生中文 RAM 路由系统中完成临时模块只读寄存器测量，
 见 [实机记录](../verification/sd-audit-board-20261013.md)。
@@ -66,3 +67,35 @@ BLOCK/MMC_BLOCK 关闭，没有块设备或挂载入口。扩展寄存器发现�
 `board_restart_cli.py --profile sd-ident1` 验证设备树、实际绑定、注册和实际
 shutdown 标记，不自动重试 reset。实机命令重启、CA 引导检查和自动返回中文
 OpenWrt 已完成，不需要人工断电。
+
+## 强制只读块设备与文件系统候选
+
+`make sd-ro` 构建独立 `sd-ro1`，专用身份为 `tianyi,ty1208z-ca-sd-ro-ram`。
+它沿用实测 SD 控制器、CRG39/LDO、PIO、单线/25 MHz 和 restart/shutdown，
+启用 MMC_BLOCK、DOS/GPT 分区及 ext4、VFAT、exFAT；原生 router 仍单独构建。
+
+DW 的 `force_ro` 在读取 GPIO/WRTPRT 前返回只读，但保护不限于这个标志。
+实际驱动验证已识别的 SD 卡、扇区寻址及 512 字节扇区容量；队列门禁只增加
+范围内 CMD17 和最多 8 扇区的 CMD18，后者必须附带准确的只读 CMD12 STOP。
+单独的只读错误恢复 STOP 也受参数/flags 检查。CMD23、写入、擦除、CMD6 SET、
+未知请求、越界、多余 sidecar 和超过一页的数据均拒绝，尚未进入硬件队列。
+即使用户清除块设备的只读标志，该请求门禁仍有效。SDHC/SDXC 之外的扇区
+读取被拒绝；不进行 SDSC 块长设置或任何电压/高速/缓存切换。
+
+Linux 6.12 的块队列要求 `max_hw_sectors >= PAGE_SECTORS`；沿用 metadata-only
+主机的单扇区上限会使队列注册失败。此候选设置 8 扇区/4096 字节上限，
+允许相应的受限多块读取，保留原识别候选的单块/无 BLOCK 配置。
+
+`sd-ro-probe` 只用 `O_RDONLY` 和 BLKROGET/BLKGETSIZE64 查询；确认块设备 major、
+minor、只读和容量后读取首页及跨页重叠区，并比较重叠内容。它不输出用户数据。
+`sd-ro-diag` 只把识别出的文件系统挂载到 RAM `/tmp`，强制 `ro`；ext4 另外
+使用 `noload` 禁止日志回放。文件读取有数量/深度上限，不跟随符号链接，不输出
+文件名或内容，随后卸载。禁止修复、格式化和物理写入探测。
+
+实际 policy/driver/队列和 `get_ro` 回调通过 ASan/UBSan；包括所有 opcode/方向、
+末尾扇区、flags/STOP 变异、缺失/非 SD 卡和 GPIO/WRTPRT 覆盖。DT/config、
+RAM/CRC、串口 PTY 和 QEMU 分别检查。物理结果需以该镜像的独立实机记录为准；
+QEMU 不模拟板载 SD 控制器。该镜像已完成本机只读块、VFAT 挂载/文件读取/卸载
+及自动返回，见 [实机报告](../verification/sd-ro-board-20261013.md)。第二分区的
+文件系统尚未识别，ext4/exFAT 仍只有编译结果。插拔、生产 router 整合和写入
+支持仍需后续验收。

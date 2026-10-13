@@ -2,6 +2,7 @@
 /* Restricted RAM diagnostic, not the production MV100 storage driver. */
 #include <linux/io.h>
 #include <linux/irq.h>
+#include <linux/mmc/card.h>
 #include <linux/mmc/host.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -10,6 +11,7 @@
 #include "dw_mmc.h"
 #include "dw_mmc-pltfm.h"
 #include "hi3798mv100-sd-ident-policy.h"
+#include "hi3798mv100-sd-ro-policy.h"
 
 static int mv100_sd_ident_init(struct dw_mci *host)
 {
@@ -56,9 +58,9 @@ static int mv100_sd_ident_slot(struct dw_mci_slot *slot)
 	mmc->pm_caps = 0;
 	mmc->f_max = 25000000;
 	mmc->max_blk_size = 512;
-	mmc->max_blk_count = 1;
-	mmc->max_req_size = 512;
-	mmc->max_seg_size = 512;
+	mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ? 8 : 1;
+	mmc->max_req_size = 512 * mmc->max_blk_count;
+	mmc->max_seg_size = mmc->max_req_size;
 	mmc->dsr_req = 0;
 	return 0;
 }
@@ -66,6 +68,15 @@ static int mv100_sd_ident_slot(struct dw_mci_slot *slot)
 static int mv100_sd_ident_validate(struct dw_mci *host, struct mmc_request *mrq)
 {
 	int ret = hi3798mv100_sd_ident_request(mrq);
+
+	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY)) {
+		struct mmc_card *card = host->slot ? host->slot->mmc->card : NULL;
+		bool addressed = card && mmc_card_sd(card) &&
+			mmc_card_is_blockaddr(card) && card->csd.read_blkbits == 9;
+		u64 sectors = addressed ? card->csd.capacity : 0;
+
+		ret = hi3798mv100_sd_ro_request(mrq, addressed, sectors);
+	}
 
 	if (ret)
 		dev_info_ratelimited(host->dev,
@@ -89,6 +100,7 @@ static const struct dw_mci_drv_data mv100_sd_ident_data = {
 	.validate_request = mv100_sd_ident_validate,
 	.switch_voltage = mv100_sd_ident_voltage,
 	.force_pio = true,
+	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY),
 };
 
 static int mv100_sd_ident_probe(struct platform_device *pdev)
@@ -100,7 +112,9 @@ static int mv100_sd_ident_probe(struct platform_device *pdev)
 	u32 value;
 	int irq;
 
-	if (!of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
+	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ?
+	    !of_machine_is_compatible("tianyi,ty1208z-ca-sd-ro-ram") :
+	    !of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
 		return -ENODEV;
 	controller = platform_get_resource(pdev, IORESOURCE_MEM, 0);
 	crg = platform_get_resource(pdev, IORESOURCE_MEM, 1);

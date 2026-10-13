@@ -20,6 +20,9 @@ HARNESS = r'''
 #define GFP_KERNEL 0
 #define SYS_OFF_MODE_RESTART 1
 #define SYS_OFF_PRIO_DEFAULT 0
+static bool ro_mode;
+#define CONFIG_HI3798MV100_SD_READ_ONLY 1
+#define IS_ENABLED(config) ro_mode
 #define IS_ERR(x) ((intptr_t)(x) == -EIO)
 #define PTR_ERR(x) (-EIO)
 struct device { int unused; };
@@ -40,7 +43,7 @@ static void mdelay(unsigned ms) { assert(ms == 1000); delays++; }
 static bool ty1208z_mv100_restart(void *base, void *id)
 { assert(base == &watchdog && id == &sysid); callback_calls++; return ready; }
 static bool of_machine_is_compatible(const char *name)
-{ assert(!strcmp(name, "tianyi,ty1208z-ca-sd-ident-ram")); return board; }
+{ assert(!strcmp(name, ro_mode ? "tianyi,ty1208z-ca-sd-ro-ram" : "tianyi,ty1208z-ca-sd-ident-ram")); return board; }
 static struct resource *platform_get_resource(struct platform_device *p, int type, unsigned i)
 { assert(p && type == IORESOURCE_MEM && i < 3); return (int)i == missing || (i == 2 && !extra) ? NULL : &resources[i]; }
 static uint64_t resource_size(struct resource *r) { return r->end - r->start + 1; }
@@ -88,6 +91,8 @@ int main(void)
     initialize(); registration_error = -EIO;
     assert(ty1208z_sd_restart_probe(&p) == -EIO && registrations == 1);
     initialize(); assert(!ty1208z_sd_restart_probe(&p) && registrations == 1);
+    ro_mode = true; initialize(); assert(!ty1208z_sd_restart_probe(&p) && registrations == 1);
+    ro_mode = false;
     struct sys_off_data data = {.cb_data = &context};
     ready = false; assert(!ty1208z_sd_restart_callback(&data) && callback_calls == 1 && !delays);
     ready = true; assert(!ty1208z_sd_restart_callback(&data) && callback_calls == 2 && delays == 1);

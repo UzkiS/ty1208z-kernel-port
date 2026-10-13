@@ -15,6 +15,9 @@ from ymodem_sender import TransferError
 from openwrt_ethernet_board_cli import command as native_command, DT_IDENTITY, SOURCE_REVISION
 
 SD_DT_IDENTITY = b"cat /sys/firmware/devicetree/base/compatible; echo"
+SD_RO_RESTART_GUARD = (b"if grep -q '^/dev/mmcblk0' /proc/mounts; then echo SD_RO_MOUNT_ACTIVE; "
+                       b"else if test -e /sys/class/block/mmcblk0; then test "
+                       b'"$(cat /sys/class/block/mmcblk0/ro)" = 1; else test ! -e /sys/class/block/mmcblk0; fi && echo SD_RO_RESTART_GUARD; fi')
 
 
 def run(args, serial_module):
@@ -30,7 +33,7 @@ def run(args, serial_module):
               "persistent_writes": False}
     profile = getattr(args, "profile", "diagnostic")
     native = profile == "router"
-    sd_ident = profile == "sd-ident1"
+    sd_ident = profile in ("sd-ident1", "sd-ro1")
     result["profile"] = profile
     command = native_command if native else shell_command
     probe = BootloaderProbe()
@@ -40,7 +43,7 @@ def run(args, serial_module):
             try:
                 command(exchange, b"")
                 identity = command(exchange, b"uname -r")
-                release = (rb"6\.12\.112" if native else rb"6\.12\.112-ty1208z-sd-ident1" if sd_ident
+                release = (rb"6\.12\.112" if native else re.escape(("6.12.112-ty1208z-" + profile).encode()) if sd_ident
                            else rb"6\.12\.112-ty1208z-restart1")
                 if not re.search(rb"(?:^|[\r\n])" + release + rb"[\r\n]", identity):
                     raise TransferError("Not the SP805 RAM experiment; no restart sent")
@@ -56,12 +59,17 @@ def run(args, serial_module):
                     if b"../../../bus/platform/drivers/ty1208z-sp805-restart" not in binding:
                         raise TransferError("Actual RAM restart module binding missing")
                 if sd_ident:
-                    if not re.search(rb"(?:^|[\r\n])tianyi,ty1208z-ca-sd-ident-ram\x00hi3798mv100-series\x00",
+                    board = b"sd-ro" if profile == "sd-ro1" else b"sd-ident"
+                    if not re.search(rb"(?:^|[\r\n])tianyi,ty1208z-ca-" + board + rb"-ram\x00hi3798mv100-series\x00",
                                      command(exchange, SD_DT_IDENTITY)):
                         raise TransferError("SD identification DT differs; no restart sent")
                     binding = command(exchange, b"readlink /sys/bus/platform/devices/f8a2c000.sd-restart/driver")
                     if b"../../../bus/platform/drivers/ty1208z-mv100-sd-restart" not in binding:
                         raise TransferError("Actual SD-profile restart binding missing")
+                    if profile == "sd-ro1":
+                        state = command(exchange, SD_RO_RESTART_GUARD)
+                        if not re.search(rb"(?:^|[\r\n])SD_RO_RESTART_GUARD[\r\n]", state):
+                            raise TransferError("SD read-only guard or unmounted state missing; no restart sent")
                 result["kernel_verified"] = True
                 report = command(exchange, b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE")
                 if (not re.search(rb"(?:^|[\r\n])[^\r\n]*TY1208Z_RESTART_READY "
@@ -115,7 +123,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--profile", choices=("diagnostic", "router", "sd-ident1"), default="diagnostic")
+    parser.add_argument("--profile", choices=("diagnostic", "router", "sd-ident1", "sd-ro1"), default="diagnostic")
     parser.add_argument("--timeout", type=int, default=60)
     args = parser.parse_args()
     if not 5 <= args.timeout <= 120:
