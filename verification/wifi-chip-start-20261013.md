@@ -52,7 +52,21 @@ Standalone release remains `6.12.112-ty1208z-wifi-port`. The native release
 remains `6.12.112`, with kernel ABI dependency
 `kernel=6.12.112~d16c03293ab72d701652b784b169e892-r1`. These modules are
 not interchangeable. This identity supersedes the earlier local package
-report; fresh CI for this chip-start change is pending.
+report. Standalone diagnostic CI subsequently passed on `6b53448`,
+[run 38342674256](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38342674256).
+All six downloaded Wi-Fi manifest files matched their actual bytes/hashes,
+the generated port patch matched that Git revision, and all eight actual
+sanitizer markers (including `RDA_CHIP_START_PASS`) appeared in the build log.
+Wi-Fi build-log SHA-256:
+`e5b9b177be72cc7226910283152ea744c8df59161ce8f06509b530a285d37ff8`.
+Native RDA package CI also passed on the same revision,
+[run 38342674314](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38342674314).
+All 17 actual manifest files, the matching Git port patch and actual
+config/package/guard markers were verified. All eight deliberately broken
+package cases were rejected. Native build-log SHA-256:
+`d18a11fc6593154a08416a037a24fa77933bb08c5b23d868781c3f433b719025`.
+The actual APK hash matches the local build above. Neither CI run establishes
+physical firmware or radio acceptance.
 
 No driver was loaded on the board. USB enumeration, real revision/firmware,
 named roaming/capability transport and radio acceptance remain outstanding.
