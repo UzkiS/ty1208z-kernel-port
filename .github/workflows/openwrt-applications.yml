@@ -8,6 +8,9 @@ on:
       - 'patches/0001-*'
       - 'patches/0002-*'
       - 'tools/*openwrt*'
+      - 'tools/build_native_router_module.py'
+      - 'tools/test_sd_audit*.py'
+      - 'tools/test_restart_module.py'
       - 'tools/*ram_boot*'
       - 'tools/*_profile.py'
       - 'tools/serial_cli.py'
@@ -30,6 +33,9 @@ on:
       - 'patches/0001-*'
       - 'patches/0002-*'
       - 'tools/*openwrt*'
+      - 'tools/build_native_router_module.py'
+      - 'tools/test_sd_audit*.py'
+      - 'tools/test_restart_module.py'
       - 'tools/*ram_boot*'
       - 'tools/*_profile.py'
       - 'tools/serial_cli.py'
@@ -98,6 +104,28 @@ jobs:
         run: |
           make ${{ matrix.target }} > logs/openwrt-applications.log 2>&1 || { tail -n 100 logs/openwrt-applications.log; exit 1; }
           tail -n 30 logs/openwrt-applications.log
+      - name: Compile exact router RAM restart and read-only SD audit modules
+        if: matrix.source_dir == 'router'
+        run: |
+          python3 tools/test_restart_module.py
+          python3 tools/test_sd_audit.py
+          python3 tools/test_sd_audit_module.py
+          source_tree=$(find .work/router/build -maxdepth 1 -type d -name 'openwrt-ram-*')
+          test -n "$source_tree"
+          python3 tools/build_openwrt_restart_module.py --taskbase .work --source "$source_tree" > logs/native-ram-restart.log 2>&1 || { tail -n 100 logs/native-ram-restart.log; exit 1; }
+          python3 tools/build_openwrt_sd_audit_module.py --taskbase .work --source "$source_tree" > logs/native-ram-sd-audit.log 2>&1 || { tail -n 100 logs/native-ram-sd-audit.log; exit 1; }
+      - name: Upload exact-kernel HARDWARE-UNTESTED RAM modules
+        if: always() && matrix.source_dir == 'router'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ty1208z-router-RAM-MODULES-HARDWARE-UNTESTED-${{ github.sha }}
+          path: |
+            artifacts/native-ram-restart/
+            artifacts/native-ram-sd-audit/
+            logs/native-ram-restart.log
+            logs/native-ram-sd-audit.log
+          retention-days: 14
+          if-no-files-found: warn
       - name: Upload QEMU-only artifacts and checks
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

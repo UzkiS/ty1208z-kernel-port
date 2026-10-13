@@ -15,7 +15,7 @@ Linux 报告的布局、引导器可用内存与高安校验状态是不同证�
 | RAM | `/proc/iomem` 与运行 FDT 报告 `0x00000000–0x3fffffff`，1 GiB；MemTotal 737352 KiB |
 | CMA / MMZ | CmaTotal 266240 KiB；启动参数 `mmz=ddr,0,0,256M`；两者不能直接视为安全保留区 |
 | eMMC | `008G30`，7818182656 字节；`himciv200`，根分区为 p9 |
-| SD/TF | 原 Hinas 已注册 `0xf9820000` 控制器/GIC 66，但当时未检测到卡；新 OpenWrt 尚未驱动/验收，见 [SD/TF](sd.md) |
+| SD/TF | 原 Hinas 已注册 `0xf9820000` 控制器/GIC 66，但当时未检测到卡；原生 RAM OpenWrt 临时模块只读测得 CRG39 `0x203`、VERID `0x5342270a`、CDETECT 零；卡协议/读取仍未验收，见 [SD/TF](sd.md) |
 | 网口 | `hieth`，当前 100 Mbps 全双工；运行 FDT 和日志给出内部 PHY 地址 **1**，与离线参考的 2 不同 |
 | Wi-Fi | USB `1e04:8888`，RDA Wlan，接口 FF/FF/FF；接口无驱动绑定，无无线网卡 |
 | 时钟源 | `hisp804`；日志报告 24 MHz，运行 FDT 给出同样频率 |

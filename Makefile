@@ -47,6 +47,7 @@ lint:
 	python3 tools/test_mv100_restart.py
 	python3 tools/test_restart_module.py
 	python3 tools/test_sd_audit.py
+	python3 tools/test_sd_audit_module.py
 
 test-serial:
 	python3 tools/test_tftp_readonly.py

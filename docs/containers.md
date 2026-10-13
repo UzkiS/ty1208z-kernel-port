@@ -30,6 +30,9 @@ the application QEMU or RAM packager. On successful compilation, the checker
 extracts real APKs, checks ARM EABI5, verifies source/recipe hashes and runs only
 `--version` through qemu-arm. It exports packages and provenance as compile-only
 artifacts; no daemon or container is started by that check.
+Clean remote compilation on `3e89e05` also passed; all 13 downloaded artifact
+files, five package/source records, checker identities and actual version-check
+marker were independently verified, [CI report](../verification/container-packages-ci-20261013.md).
 
 First acceptance should run one small `linux/arm/v7` container, exercise DNS
 and outbound/forwarded networking with fw4/Passwall, verify memory/CPU limits

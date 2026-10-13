@@ -62,6 +62,8 @@ static u32 readl(void *address)
 }
 static void dev_info(struct device *dev, const char *format, ...)
 { assert(dev && format); }
+static void platform_set_drvdata(struct platform_device *dev, void *data)
+{ assert(dev && data == &crg); }
 static void initialize(void)
 {
     const resource_size_t addresses[] = {0xf9820000, 0xf8a2209c, 0xf8a2011c};
@@ -106,14 +108,19 @@ def execute_probe():
     source = (ROOT / "overlay/drivers/soc/hisilicon/hi3798mv100-sd-audit.c").read_text()
     start = source.index("static int hi3798mv100_sd_audit_probe(")
     function = source[start:source.index("static const struct of_device_id", start)]
-    with tempfile.TemporaryDirectory(prefix="sd-audit-") as directory:
-        path = Path(directory)
-        (path / "test.c").write_text(HARNESS + function + MAIN)
-        binary = path / "test"
-        subprocess.run(["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
-                        "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
-                        str(path / "test.c"), "-o", str(binary)], check=True)
-        subprocess.run([binary], check=True)
+    for native in (False, True):
+        harness = HARNESS
+        if native:
+            harness = "#define TY1208Z_RAM_SD_AUDIT_MODULE\n" + HARNESS.replace(
+                "tianyi,ty1208z-ca-diagnostic", "tianyi,ty1208z-ca-openwrt-router-ram")
+        with tempfile.TemporaryDirectory(prefix="sd-audit-") as directory:
+            path = Path(directory)
+            (path / "test.c").write_text(harness + function + MAIN)
+            binary = path / "test"
+            subprocess.run(["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                            "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
+                            str(path / "test.c"), "-o", str(binary)], check=True)
+            subprocess.run([binary], check=True)
 
 
 class ProfileTests(unittest.TestCase):
