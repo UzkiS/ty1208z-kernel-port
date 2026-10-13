@@ -72,3 +72,12 @@ No driver was loaded on the board. USB enumeration, real revision/firmware,
 named roaming/capability transport and radio acceptance remain outstanding.
 The real unsupported cfg80211-startup regression still reproduces its
 initialization blocker. No hardware/storage/security-state writes occurred.
+
+Later native RDA CI [38351038830](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38351038830)
+also passed on `1ac00af24f1c01f89634547b8a4a203ef013f6f1`. All 17 downloaded
+manifest files, the exact Git port patch, actual configuration/package/guard
+log markers and all eight package rejection cases were independently checked.
+The APK SHA-256 remains the same as the local build above. Actual native log
+SHA-256: `d486471c11f85bae93547ae14ea726e9a276d4ffc0369134b094f5a46b8232f5`.
+This adds fresh package-build evidence; USB/firmware/STA/AP acceptance is still
+outstanding.

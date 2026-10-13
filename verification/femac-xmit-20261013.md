@@ -76,9 +76,74 @@ the previously validated Xray fix and router DHCP peer-DNS default.
 | 512 | 126611 | `37efdb000fa9b22e73269380a7874aee161d97d378c2fede4be3a80cb12c7601` |
 | 240 | 126669 | `17ebb9d76d53c395dc5472f6deeb35916ef0948c7392a787e1111927a41e5be7` |
 
-Physical acceptance of this new TX image, zero-drop traffic, external Ethernet
-forwarding/performance and fresh CI for the TX change remain pending. QEMU
-and ownership seams cannot establish MAC/PHY/DMA behavior on the board. The
-currently running physical router image has not acquired this kernel fix.
-No flashing, persistent boot change or future physical wall-clock change was
+## Physical corrected-image acceptance
+
+The exact kernel/initrd above now run on the physical TY1208Z. A fresh stopped
+CA-loader inspection, both immutable TFTP receipts, loader sizes and device
+CRCs passed. Temporary loader networking was restored before boot. The
+Linux/native identity, FESTAv220 ID `0x20669823` at address 1 and 100-Mbps
+full-duplex link were verified. The delivered peer-DNS default acquired the
+gateway DNS automatically; the installed NTP service set the current 2026
+date without a manual date command. The latest user RAM configuration and
+credentials were restored with all 15 selected file hashes verified.
+
+Both physical TCP directions completed using the installed iperf3 3.20 and
+the source-verified host executable. The host path includes WLAN and WSL NAT.
+The earlier [independent clock check](openwrt-ethernet-board-20261013.md)
+established WSL clock drift; board seconds below come from its actual endpoint.
+
+| Direction | Actual receiver bytes | Board iperf seconds | Windows-sampled board/host elapsed ratio | TX drop / FIFO delta |
+|---|---:|---:|---:|---|
+| Host to board | 643956736 | 55.156649 | 1.000033 | 0 / 0 |
+| Board to host | 644481024 | 55.056604 | 0.999673 | 0 / 0 |
+
+RX errors/drops/FIFO/frame and TX errors/carrier also had zero increments in
+both runs. The initial cumulative `tx_dropped` was 3 and remained 3; its cause
+has not been established. This is zero additional drop accounting during the
+measured traffic, not a zero lifetime drop claim. The real DMA-failure path
+still counts drops. TCP sender retransmits were 102 forward and 13 reverse;
+the WLAN/NAT endpoint test does not locate their cause.
+
+Every timestamped sample and both endpoint JSON files were saved and
+independently compared with the summary and counter deltas. SSH round trips
+reached 5.04 seconds during forward load and 0.434 seconds during reverse
+load, so individual midpoint samples are not precise clock calibration. The
+overall elapsed observations are consistent with the earlier UART result.
+The initial harness mistakenly required receive bytes from the reverse
+server, which is the sender. It cleaned its temporary rule on failure; the
+corrected direction-aware harness then completed both directions and cleanup.
+
+Configuration hashes remained unchanged, the source/port-limited temporary
+input rule was removed, gateway ping passed 4/4 and the RAM-file time64 probe
+passed. The installed Passwall HTTPS/SOCKS/forwarding/TCP/UDP TPROXY namespace
+fixture also passed again on this exact kernel, with independent configuration,
+namespace and counter-table cleanup checks. See the
+[updated board report](openwrt-router-board-20261013.md).
+
+| Local evidence | SHA-256 |
+|---|---|
+| Corrected TFTP/boot stream | `b891e380672c86a24a981b008e3a790b0be7e2fcfff16fb9c1e37033b6e7bde6` |
+| Cold-default DNS/NTP observation | `594cf3b148d9acbd991dd0a1ecab026d371ba5817d1b2d5e234a46a46e2081dc` |
+| Full traffic summary and samples | `13b488494ab5c96ca1c517d923b58036392c3892cc479d2d026b6b25a467b13c` |
+| Post-traffic gateway/time64/config checks | `bb84d581af87f4bc937c98d8934291d00dbe256984dbbdd61c69a604350e8410` |
+
+External Ethernet forwarding/performance remains pending. These are physical
+TCP endpoint and local veth application tests, not a routing benchmark. No
+flashing, persistent boot change or future physical wall-clock change was
 performed.
+
+## Fresh remote TX regression
+
+Diagnostic CI [38354999973](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38354999973)
+completed successfully on `b9b1fe351c804eb9105e8041451e20cdeebba2fb`.
+All 11 downloaded profile manifests and their 109 files were independently
+checked against actual bytes/SHA-256. Ten uImages passed header/payload CRC,
+load/entry and exact zImage-plus-DTB checks. The downloaded Wi-Fi patches
+matched this exact Git revision; its eight actual sanitizer markers passed.
+
+The actual Ethernet log contains `ETHERNET_PROBE_GUARDS_PASS`,
+`ETHERNET_NET_HELPERS_PASS`, `FEMAC_DATAPATH_PASS` and `FEMAC_XMIT_PASS`;
+SHA-256 `d8a28b72eb4c0d47673df25af837d3c003d94b9b8569394fedc2d3a0dc4ef57a`.
+This is fresh standalone diagnostic/Ethernet software acceptance, separate
+from the physical native-router image above. Native/application CI for this
+revision remains queued and does not inherit this run's result.

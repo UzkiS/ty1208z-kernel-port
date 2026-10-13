@@ -7,7 +7,7 @@ passed on the board. Actual Passwall forwarding/TCP/UDP TPROXY also passed
 using local network namespaces on the physical ARM/SoC. Those namespace
 tests do not establish external Ethernet forwarding or throughput.
 
-## Booted image
+## Initial booted image
 
 | Item | Bytes / value | SHA-256 |
 |---|---|---|
@@ -62,8 +62,8 @@ The router build now has its own DHCP-client configuration with peer DNS
 enabled. Its rebuilt kernel/initrd, installed network bytes, both QEMU budgets
 and packaging/profile/CRC checks pass. The resulting wrapper differs from the
 booted wrapper because the external-initrd length changed. This delivered DNS
-default still needs a separate cold-boot check; the service evidence above
-uses the equivalent runtime configuration on the booted image.
+default received its separate cold-boot acceptance in the later TX image
+below; the earlier service evidence above used a runtime configuration.
 
 ## Physical ARM application and forwarding fixture
 
@@ -122,3 +122,64 @@ SSH and LuCI continued working. PL011 counters remained TX 47498/RX 23911
 across the subsequent observations. This isolates the symptom from a board
 crash but does not establish whether it originates in the TTL adapter, Windows
 serial path or board UART; no guessed UART/clock register change was made.
+
+## Later corrected-TX image and cold-default acceptance
+
+The current physical RAM image contains the
+[FEMAC BUSY accounting correction](femac-xmit-20261013.md) and delivered
+peer-DNS default. It supersedes the initial image for current runtime checks.
+
+| Payload | Bytes | SHA-256 | Device CRC32 |
+|---|---:|---|---|
+| uImage | 3436544 | `84a4abd0ce8877bed213f97475adf23cab5f6a7cf9e03c57ecff71b3ee44d18f` | `5d9e16b0` |
+| External initrd | 21045256 | `abaf0f42801d72ee350eaed080c4bd017f2616f87e6616230fbf4fd169b2452f` | `79944e6b` |
+
+The actual rebuilt FEMAC source is byte-equal to the checked generator result,
+SHA-256 `241e02357337d81575a09d2abac0da85732f250fe6dab2b324155c997bfc588f`.
+The booted raw zImage is
+`329b834337b842113001984da7d13b16f601aed49694da89e5bdc79aeeeafab2`.
+Fresh CA inspection, two TFTP receipts/sizes/device CRCs and temporary-loader
+network restoration passed again. Native release/target/revision/router DT,
+PHY ID/address/link, DHCP and 4/4 gateway replies were checked.
+
+Before restoring user configuration, the untouched delivered network showed
+`network.probe.peerdns='1'` and the automatically supplied gateway resolver.
+The installed NTP service synchronized the current 2026 date without a manual
+clock change; the 2040 RAM-file round trip and Xray version passed. This closes
+the delivered peer-DNS cold-boot check. All 15 latest pre-reboot user files
+were then restored and independently hash-verified, retaining fresh RAM SSH
+server keys. Authenticated host LuCI passed again. Credentials remain private.
+
+Corrected-image sustained TCP received 643956736 bytes host-to-board and
+644481024 bytes board-to-host. All error/drop/FIFO/carrier counter increments
+were zero; cumulative TX drop was 3 before and after. Its earlier cause is
+unknown. The detailed clock/path/accounting limits are in the TX report.
+
+The physical ARM namespace fixture was rerun against this exact kernel. All
+seven completion/cleanup markers and exit zero passed, including strict-CA
+HTTPS, VLESS/TLS SOCKS, fw4 forwarding and TCP/UDP TPROXY. Forwarding counted
+16 packets/1353 bytes; TPROXY counted TCP 3/180 and UDP 96/50824. The fixture
+used a new snapshot of the current user network/firewall/Passwall files.
+Independent post-run hashes, saved `ip_forward`, absence of test namespaces
+and removal of its counter table all matched. Passwall returned to disabled.
+
+The Windows serial issue recurred with pyserial RX zero. A bounded local
+`.NET System.IO.Ports.SerialPort` bridge immediately received the stopped
+`fastboot#` prompt and completed fresh inspection, both TFTP/CRC gates, boot
+and native shell interaction. Later serial timeouts still occurred, while
+SSH/LuCI remained usable; COM9 was released and Ethernet used for follow-up.
+This alternative working path does not establish a single serial root cause.
+
+| Later evidence | SHA-256 |
+|---|---|
+| Exact new TFTP/boot stream | `b891e380672c86a24a981b008e3a790b0be7e2fcfff16fb9c1e37033b6e7bde6` |
+| Untouched DNS/NTP default | `594cf3b148d9acbd991dd0a1ecab026d371ba5817d1b2d5e234a46a46e2081dc` |
+| Latest user restoration record | `9b645764e6a0c70b47e1c6a63acf4b25fcbb30a8ad6f726bff6f8bbc2b97bc13` |
+| Corrected physical fixture source | `0db56700c3c05615999ee95a5b6ea9c218b2c3a3d43cfe92ff3d2e62b627b8fb` |
+| Actual corrected-image fixture stream | `5ea854f6fc203fcf3c6c93e64d8c421484861a02954e76ac941576fe1ede7696` |
+| Post-fixture identity/time64 | `ee585c46c14bc21a79e5f1d86356a783e331eaabab6cf650f779ba412652142b` |
+| Independent configuration/table cleanup | `8b672e816d66d30c1b1432e49c053407ebe6dd316a49806e1ee5d941c1c32c75` |
+
+Full physical DDR is 1 GiB; the experimental image still exposes only low
+256 MiB with low 16 MiB reserved. Higher memory, external Ethernet routing,
+USB/Wi-Fi/AP, storage, SMP and optional Docker remain separate milestones.

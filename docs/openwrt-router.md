@@ -13,9 +13,11 @@ reviewed DHCP-client-only `probe` interface on eth0 and no DHCP-server interface
 DHCP-supplied DNS is enabled for the installed resolver and NTP service.
 Kernel storage, USB, Wi-Fi, SMP, debugfs and restart experiments are excluded.
 Physical RAM boot now establishes Ethernet, DHCP, local authenticated LuCI/
-Passwall UI, Xray startup before time synchronization and normal DNS/NTP after
-enabling peer DNS at runtime; see the [board report](../verification/openwrt-router-board-20261013.md).
-The delivered peer-DNS default still needs its own cold-boot acceptance.
+Passwall UI, Xray startup before time synchronization and automatic normal
+DNS/NTP from the delivered peer-DNS default; see the
+[board report](../verification/openwrt-router-board-20261013.md). The corrected
+TX image also passes physical TCP in both directions with zero additional
+error/drop/FIFO counts and repeated local-namespace Passwall TCP/UDP TPROXY.
 Management access and routing policy need configuration before normal use.
 There is no flash/install recipe.
 
