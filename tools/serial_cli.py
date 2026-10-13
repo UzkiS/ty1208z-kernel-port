@@ -35,11 +35,16 @@ def open_receiver(serial_module, port, baud, timeout=0.2):
 
 def console_text(text):
     # Preserve logs, but do not let device bytes execute host terminal escapes.
-    return "".join(
+    escaped = "".join(
         char if char in "\r\n\t" or (char.isprintable() and char != "\x7f")
         else f"\\x{ord(char):02x}"
         for char in text
     )
+    # A byte stream may decode to printable Unicode absent from a Windows
+    # console's legacy encoding. Escape only those display characters; raw
+    # bytes and the separate UTF-8 text log remain unchanged.
+    encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+    return escaped.encode(encoding, errors="backslashreplace").decode(encoding)
 
 
 def capture(args, serial_module, probe=None):

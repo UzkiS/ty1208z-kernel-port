@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise capture and guarded inspection against a Linux PTY, without hardware."""
 import hashlib
+import io
 import json
 import os
 from pathlib import Path
@@ -10,10 +11,27 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 import serial
+from serial_cli import console_text
 
 CLI = Path(__file__).with_name("serial_cli.py")
+
+
+class ConsoleEncodingTests(unittest.TestCase):
+    def test_legacy_console_escapes_unrepresentable_device_text(self):
+        output = io.TextIOWrapper(io.BytesIO(), encoding="gbk", errors="strict")
+        with patch("sys.stdout", output):
+            text = console_text("中文\u061f\x1b[31m\x00\r\n")
+            self.assertEqual(text, "中文\\u061f\\x1b[31m\\x00\r\n")
+            output.write(text)
+            output.flush()
+
+    def test_utf8_console_preserves_printable_unicode(self):
+        output = io.TextIOWrapper(io.BytesIO(), encoding="utf-8", errors="strict")
+        with patch("sys.stdout", output):
+            self.assertEqual(console_text("中文\u061f\r\n"), "中文\u061f\r\n")
 
 
 def await_condition(predicate, seconds=10):
