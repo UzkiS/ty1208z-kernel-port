@@ -112,8 +112,11 @@ Subsequent clean native package CI on `3e89e05` passed for both
 [RDA module/APK](verification/openwrt-wifi-ci-latest-20261013.md).
 All 13 container and 17 RDA downloaded manifest files, exact source identities
 and actual log markers were independently verified. Docker runtime and Wi-Fi
-firmware/radio remain unverified. The newer `7c4b816` native application/core
-runs are still pending and its diagnostic/container runs still in progress.
+firmware/radio remain unverified. The complete `7c4b816` diagnostic run
+[38425001836](verification/diagnostic-sd-ci-20261013.md) also passed; 13 downloaded
+manifests/130 declared files, twelve uImage checks and actual SD/Wi-Fi/Ethernet/
+USB test markers were independently verified. Its pending native application/
+core runs were replaced by newer `c7cec7e` runs; native runtime CI remains separate.
 
 The later diagnostic CI on `45762c2`,
 [run 38374147701](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38374147701),
