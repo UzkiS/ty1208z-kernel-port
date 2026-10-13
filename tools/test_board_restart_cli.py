@@ -26,8 +26,9 @@ class RestartSerialTests(unittest.TestCase):
             master, slave = pty.openpty()
             errors = []
             sent = []
-            native = profile in ("router", "router768")
+            native = profile in ("router", "router768", "router-sdro")
             sd_ident = profile in ("sd-ident1", "sd-ro1")
+            sd_shutdown = sd_ident or profile == "router-sdro"
             memory = profile == "ram768"
             prompt = b"root@OpenWrt:~# " if native else b"# "
 
@@ -63,6 +64,7 @@ class RestartSerialTests(unittest.TestCase):
                             return
                         self.assertEqual(read_command(), DT_IDENTITY + b"\r")
                         dt = (b"other,board" if mode == "dt" else
+                              b"tianyi,ty1208z-ca-openwrt-sdro-ram" if profile == "router-sdro" else
                               b"tianyi,ty1208z-ca-openwrt-router768-ram" if profile == "router768" else
                               b"tianyi,ty1208z-ca-openwrt-router-ram")
                         os.write(master, dt + b"\r\n" + prompt)
@@ -73,6 +75,19 @@ class RestartSerialTests(unittest.TestCase):
                         os.write(master, (b"unbound" if mode == "unbound" else b"../../../bus/platform/drivers/ty1208z-sp805-restart") + b"\r\n" + prompt)
                         if mode == "unbound":
                             return
+                        if profile == "router-sdro":
+                            self.assertEqual(read_command(), SD_RO_RESTART_GUARD + b"\r")
+                            state = b"SD_RO_MOUNT_ACTIVE" if mode == "mounted" else b"SD_RO_RESTART_GUARD"
+                            if mode == "writable":
+                                state = b""
+                            os.write(master, state + b"\r\n" + prompt)
+                            if mode in {"mounted", "writable"}:
+                                return
+                            self.assertEqual(read_command(), RAM768_RESTART_GUARD + b"\r")
+                            state = b"RAM768_MOUNT_ACTIVE" if mode == "memory-active" else b"RAM768_RESTART_GUARD"
+                            os.write(master, state + b"\r\n" + prompt)
+                            if mode == "memory-active":
+                                return
                     if sd_ident:
                         self.assertEqual(read_command(), SD_DT_IDENTITY + b"\r")
                         board = b"sd-ro" if profile == "sd-ro1" else b"sd-ident"
@@ -124,7 +139,7 @@ class RestartSerialTests(unittest.TestCase):
                     if mode == "failed-shutdown":
                         os.write(master, b"[0.7] driver: SD_IDENT_SHUTDOWN_FAILED controller-not-quiesced\r\n")
                         return
-                    if sd_ident and mode != "missing-shutdown":
+                    if sd_shutdown and mode != "missing-shutdown":
                         os.write(master, b"[0.7] driver: SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\r\n")
                     os.write(master, b"Bootrom start\r\nFastboot 3.3.0-dirty (test)\r\n"
                              b"CPU: Hi3798Mv100 (CA)\r\nReserve Memory\r\n")
@@ -156,7 +171,7 @@ class RestartSerialTests(unittest.TestCase):
                 if mode == "success":
                     self.assertEqual(report["probe"]["completed_commands"], len(BootloaderProbe.COMMANDS))
                     self.assertEqual(report["status"], "restart-bootloader-verified")
-                    if sd_ident:
+                    if sd_shutdown:
                         self.assertTrue(report["sd_shutdown_verified"])
                 self.assertFalse(report["persistent_writes"])
             finally:
@@ -178,7 +193,7 @@ class RestartSerialTests(unittest.TestCase):
         self.exercise("success")
 
     def test_native_router_requires_source_dt_bound_module_and_measured_guard(self):
-        for profile in ("router", "router768"):
+        for profile in ("router", "router768", "router-sdro"):
             for mode in ("source", "dt", "unbound", "missing-mv100"):
                 with self.subTest(mode=mode, profile=profile):
                     self.exercise(mode, profile)
@@ -201,6 +216,11 @@ class RestartSerialTests(unittest.TestCase):
         for mode in ("dt", "unbound", "mounted", "missing-mv100", "failed", "success"):
             with self.subTest(mode=mode):
                 self.exercise(mode, "ram768")
+
+    def test_native_sd_requires_read_only_unmounted_cleanup_and_actual_shutdown(self):
+        for mode in ("mounted", "writable", "memory-active", "missing-shutdown", "failed-shutdown", "failed", "success"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, "router-sdro")
 
 
 if __name__ == "__main__":

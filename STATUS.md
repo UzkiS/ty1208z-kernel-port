@@ -23,7 +23,16 @@ variant now physically passes 512-MiB/PFN stress with about 744.43 MiB usable,
 64 MiB of verified TCP data in each direction, both proxy cores and automatic
 return/configuration restoration; [native report](verification/openwrt-router768-board-20261014.md).
 The restored ordinary router still uses low 256 MiB. Storage/production
-integration and actual Docker remain pending. Downloaded clean diagnostic
+integration and actual Docker remain pending.
+The independent native read-only SD router now physically passes SD block/
+VFAT reads, 512-MiB/PFN stress, both physical TCP directions and both proxy
+cores. Its first exact-image trial completed command restart and original
+router/configuration return; the second completed runtime trial remains
+healthy over SSH while host serial RX-zero is investigated before final
+return. No card/persistent writes occurred;
+[native SD report](verification/openwrt-sdro-board-20261014.md).
+Clean remote native SD CI, eMMC blocks/backups and Docker runtime remain pending.
+Downloaded clean diagnostic
 CI on f48bb5e passed 16 manifests/162 files and 15 uImage CRCs, including
 actual memory/SD/ARM-mount checks; [CI report](verification/ram768-ci-20261014.md).
 The new native memory integration has not yet completed clean remote CI.

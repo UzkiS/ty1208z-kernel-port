@@ -34,6 +34,7 @@ help:
 	@echo 'make openwrt-app-ram - validate applications with a 240-MiB usable budget and package separate RAM initrd'
 	@echo 'make openwrt-router - build isolated applications plus measured Ethernet for RAM validation'
 	@echo 'make openwrt-router768 - build independent measured higher-memory router; fresh loader evidence required'
+	@echo 'make openwrt-router-sdro - build independent higher-memory router with enforced read-only SD'
 	@echo 'make usb-host-compile - compile optional host0 clock/PHY plus generic EHCI/OHCI, no boot image'
 	@echo 'make usb-host - build isolated host0 enumeration RAM candidate after physical capability acceptance'
 	@echo 'make openwrt-container-packages - compile/check separate native Docker APKs; no boot/runtime acceptance'
@@ -189,3 +190,7 @@ openwrt-container-packages:
 .PHONY: openwrt-router768
 openwrt-router768:
 	bash tools/build-openwrt-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" network-ram768
+
+.PHONY: openwrt-router-sdro
+openwrt-router-sdro:
+	bash tools/build-openwrt-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" network-sdro

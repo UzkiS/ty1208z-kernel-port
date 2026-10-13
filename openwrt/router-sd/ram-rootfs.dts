@@ -1,0 +1,22 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "../router768/ram-rootfs.dts"
+
+/ {
+	model = "TY1208Z CA native higher-memory enforced read-only SD router";
+	compatible = "tianyi,ty1208z-ca-openwrt-sdro-ram", "hi3798mv100-series";
+};
+
+&{/soc} {
+	mmc@f9820000 {
+		compatible = "tianyi,ty1208z-sd-identification";
+		reg = <0xf9820000 0x1000>, <0xf8a2209c 4>, <0xf8a2011c 4>;
+		reg-names = "controller", "crg39", "ldo";
+		interrupts = <0 34 4>;
+		clock-frequency = <50000000>;
+		fifo-depth = <256>;
+		bus-width = <1>;
+		max-frequency = <25000000>;
+		no-mmc;
+		no-sdio;
+	};
+};

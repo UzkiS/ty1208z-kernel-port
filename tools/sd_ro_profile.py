@@ -11,6 +11,9 @@ OPTIONS = {"MMC", "MMC_DW", "MMC_DW_PLTFM", "MMC_DW_HI3798MV100_SD_IDENT",
 
 
 def sd_ro_profile(tree, config):
+    if "CONFIG_TY1208Z_ROUTER_SD_RO=y\n" in config:
+        from ethernet_net_profile import openwrt_router_sdro_ethernet_profile
+        return openwrt_router_sdro_ethernet_profile(tree, config)
     props = {node["path"]: node["properties"] for node in tree["nodes"]}
     enabled = "CONFIG_HI3798MV100_SD_READ_ONLY=y\n" in config
     identity = props.get("/", {}).get("compatible", {}).get("strings", [])

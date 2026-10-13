@@ -22,6 +22,15 @@ error/drop/FIFO counts and repeated local-namespace Passwall TCP/UDP TPROXY.
 Management access and routing policy need configuration before normal use.
 There is no flash/install recipe.
 
+`make openwrt-router-sdro` is a separate measured low-768-MiB/read-only SD
+variant. It uses its own board/configuration/output identity, keeps the SD
+request-level write filter, and requires fresh preceding loader allocations
+before every higher-memory boot. Its SD/VFAT, memory/PFN, real TCP and dual-core
+application tests pass physically; first-trial autonomous shutdown/return also
+passes. Final second-trial return awaits host serial recovery;
+[native SD report](../verification/openwrt-sdro-board-20261014.md).
+The ordinary router's storage permissions remain separate.
+
 The user's default is Simplified Chinese with username `root` and an empty
 password. Both current plain and router rootfs builds already have an empty
 root shadow field; the build checker now requires it. Physical RAM management

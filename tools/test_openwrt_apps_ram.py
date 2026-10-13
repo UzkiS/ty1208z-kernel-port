@@ -28,6 +28,8 @@ from test_ram768 import boot_fixture
 from ram_boot_cli import load_image
 from tftp_readonly import ReadOnlyTftp
 from ymodem_sender import TransferError
+from native_sd_profile import REQUIRED as SD_REQUIRED
+from sd_ident_profile import NODE as SD_NODE, PROPERTIES as SD_PROPERTIES
 
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS = ROOT / "artifacts/openwrt-apps-ram1"
@@ -48,7 +50,8 @@ def write_inspection(directory):
 
 
 def allocation_fixture(directory):
-    if "CONFIG_TY1208Z_ROUTER_RAM768=y\n" not in (ARTIFACTS / "linux.config").read_text():
+    config = (ARTIFACTS / "linux.config").read_text()
+    if not any(f"CONFIG_{name}=y\n" in config for name in ("TY1208Z_ROUTER_RAM768", "TY1208Z_ROUTER_SD_RO")):
         return None
     path = directory / "restart.json"
     boot_fixture(path)
@@ -76,7 +79,8 @@ class ApplicationProfileTests(unittest.TestCase):
         self.assertGreater(INITRD_ADDRESS, plan["header_address"] + plan["image_bytes"] + 0x100000)
 
     def test_native_higher_memory_requires_fresh_allocation_evidence(self):
-        if "CONFIG_TY1208Z_ROUTER_RAM768=y\n" not in self.config:
+        selected = [name for name in ("TY1208Z_ROUTER_RAM768", "TY1208Z_ROUTER_SD_RO") if f"CONFIG_{name}=y\n" in self.config]
+        if not selected:
             self.skipTest("The ordinary application retains its original memory bound")
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory)
@@ -97,7 +101,31 @@ class ApplicationProfileTests(unittest.TestCase):
             with self.subTest(option=option), self.assertRaises(ValueError):
                 applications_ram_profile(self.tree, self.config + f"CONFIG_{option}=y\n", ARTIFACTS)
         with self.assertRaises(ValueError):
-            applications_ram_profile(self.tree, self.config.replace("CONFIG_TY1208Z_ROUTER_RAM768=y\n", ""), ARTIFACTS)
+            applications_ram_profile(self.tree, self.config.replace(f"CONFIG_{selected[0]}=y\n", ""), ARTIFACTS)
+
+    def test_native_sd_read_only_resources_and_configuration(self):
+        if "CONFIG_TY1208Z_ROUTER_SD_RO=y\n" not in self.config:
+            with self.assertRaises(ValueError):
+                applications_ram_profile(self.tree, self.config + "CONFIG_TY1208Z_ROUTER_SD_RO=y\n", ARTIFACTS)
+            return
+        for option in SD_REQUIRED:
+            for replacement in ("", f"CONFIG_{option}=m\n"):
+                with self.subTest(option=option, replacement=replacement), self.assertRaises(ValueError):
+                    applications_ram_profile(self.tree, self.config.replace(f"CONFIG_{option}=y\n", replacement), ARTIFACTS)
+        for key, expected in SD_PROPERTIES.items():
+            tree = copy.deepcopy(self.tree)
+            node = next(node for node in tree["nodes"] if node["path"] == SD_NODE)
+            if expected:
+                kind = next(iter(expected))
+                node["properties"][key][kind] = ["changed"] if kind == "strings" else [0xdeadbeef]
+            else:
+                del node["properties"][key]
+            with self.subTest(property=key), self.assertRaises(ValueError):
+                applications_ram_profile(tree, self.config, ARTIFACTS)
+        for option in ("MMC_TEST", "MMC_DW_HI3798MV100_IDENT", "BLK_DEV_WRITE_MOUNTED", "BLK_DEV_THROTTLING",
+                       "TY1208Z_ROUTER_RAM768", "EXT2_FS"):
+            with self.subTest(option=option), self.assertRaises(ValueError):
+                applications_ram_profile(self.tree, self.config + f"CONFIG_{option}=y\n", ARTIFACTS)
 
     def test_initrd_and_resource_mutations_are_rejected(self):
         for path, property_name in (("/chosen", "linux,initrd-start"), ("/chosen", "linux,initrd-end"),
@@ -109,6 +137,8 @@ class ApplicationProfileTests(unittest.TestCase):
                 applications_ram_profile(tree, self.config, ARTIFACTS)
         router = any(node["path"] == "/soc/ethernet@f9840000" for node in self.tree["nodes"])
         options = {"BLOCK", "MMC", "USB_SUPPORT", "SMP", "INITRAMFS_FORCE"}
+        if "CONFIG_TY1208Z_ROUTER_SD_RO=y\n" in self.config:
+            options -= {"BLOCK", "MMC"}
         if not router:
             options.add("HISI_FEMAC")
         for option in options:

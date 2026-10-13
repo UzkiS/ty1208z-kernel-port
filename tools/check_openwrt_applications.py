@@ -13,9 +13,9 @@ from prepare_openwrt_applications import application_variant
 
 def check(source, built=False):
     variant = application_variant(source)
-    ethernet = variant in ("ethernet", "ethernet-ram768")
+    ethernet = variant in ("ethernet", "ethernet-ram768", "ethernet-sdro")
     config = (source / ".config").read_text()
-    if variant == "ethernet-ram768" and "CONFIG_KERNEL_PROC_PAGE_MONITOR=y\n" not in config:
+    if variant in ("ethernet-ram768", "ethernet-sdro") and "CONFIG_KERNEL_PROC_PAGE_MONITOR=y\n" not in config:
         raise ValueError("Higher-memory native configuration lacks the OpenWrt pagemap selection")
     for option in (
             "TARGET_hi3798mv100_apps", "TARGET_hi3798mv100_apps_DEVICE_ty1208z_apps",
@@ -79,8 +79,13 @@ def check(source, built=False):
         if len(kernels) != 1:
             raise ValueError("Expected one built application kernel configuration")
         kernel_config = kernels[0].read_text()
+        if variant == "ethernet-sdro":
+            from native_sd_profile import native_sd_configuration
+            native_sd_configuration(kernel_config)
         for option in ("BLOCK", "MMC", "MTD", "USB_SUPPORT", "SMP",
                        "HI3798MV100_EMMC_AUDIT", "MMC_DW_HI3798MV100_IDENT"):
+            if variant == "ethernet-sdro" and option in ("BLOCK", "MMC"):
+                continue
             if re.search(rf"^CONFIG_{option}=[ym]$", kernel_config, re.MULTILINE):
                 raise ValueError(f"Unreviewed hardware subsystem in application kernel: {option}")
         if ethernet:
@@ -88,7 +93,8 @@ def check(source, built=False):
                            "FESTA_TY1208Z_PHY", "PHYLIB", "NET_NS"):
                 if f"CONFIG_{option}=y\n" not in kernel_config:
                     raise ValueError(f"Missing built-in integrated Ethernet option: {option}")
-            release = "-ty1208z-openwrt-router768" if variant == "ethernet-ram768" else "-ty1208z-openwrt-router"
+            release = ("-ty1208z-openwrt-sdro" if variant == "ethernet-sdro" else
+                       "-ty1208z-openwrt-router768" if variant == "ethernet-ram768" else "-ty1208z-openwrt-router")
             if f'CONFIG_LOCALVERSION="{release}"\n' not in kernel_config:
                 raise ValueError("Integrated application kernel release differs")
             for option in ("WIRELESS", "WLAN", "DEBUG_FS"):
@@ -99,7 +105,9 @@ def check(source, built=False):
         extended = variant == "ethernet-ram768"
         if ("CONFIG_TY1208Z_ROUTER_RAM768=y\n" in kernel_config) != extended:
             raise ValueError("Higher-memory kernel selection differs from its native variant")
-        if extended and ("CONFIG_PROC_PAGE_MONITOR=y\n" not in kernel_config or
+        if ("CONFIG_TY1208Z_ROUTER_SD_RO=y\n" in kernel_config) != (variant == "ethernet-sdro"):
+            raise ValueError("Native SD kernel selection differs from its native variant")
+        if (extended or variant == "ethernet-sdro") and ("CONFIG_PROC_PAGE_MONITOR=y\n" not in kernel_config or
                          re.search(r"^CONFIG_(HIGHMEM|WATCHDOG)=[ym]$", kernel_config, re.MULTILINE)):
             raise ValueError("Native higher-memory reservation/PFN prerequisites differ")
         images = list((source / "bin/targets/hi3798mv100/apps").glob("*uImage*"))

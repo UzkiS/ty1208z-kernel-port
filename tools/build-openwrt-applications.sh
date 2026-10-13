@@ -15,13 +15,14 @@ if [ "$(id -u)" -eq 0 ]; then
     echo 'Run the application build as a regular user.' >&2
     exit 1
 fi
-case "$stage" in config|build|ram|network-config|network|network-ram768) ;; *) echo 'Unknown application stage' >&2; exit 1 ;; esac
+case "$stage" in config|build|ram|network-config|network|network-ram768|network-sdro) ;; *) echo 'Unknown application stage' >&2; exit 1 ;; esac
 export SOURCE_DATE_EPOCH=1791676800
 export TZ=UTC
 export LC_ALL=C
 prepare_args=(--taskbase "$taskbase")
 if [[ "$stage" == network* ]]; then prepare_args+=(--ethernet); fi
 if [ "$stage" = network-ram768 ]; then prepare_args+=(--ram768); fi
+if [ "$stage" = network-sdro ]; then prepare_args+=(--sd-read-only); fi
 source_tree=$("$python_cmd" "$project/tools/prepare_openwrt_applications.py" "${prepare_args[@]}")
 make_args=(-C "$source_tree" "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" COMMITCOUNT=1)
 (
@@ -60,6 +61,7 @@ if [ "$stage" = ram ] || [[ "$stage" == network* ]]; then
     if [[ "$stage" == network* ]]; then
         ram_artifacts="$project/artifacts/openwrt-router1"
         if [ "$stage" = network-ram768 ]; then ram_artifacts="$project/artifacts/openwrt-router768"; fi
+        if [ "$stage" = network-sdro ]; then ram_artifacts="$project/artifacts/openwrt-router-sdro"; fi
         "$python_cmd" "$project/tools/test_openwrt_apps_ram.py" --artifacts "$ram_artifacts"
         "$python_cmd" "$project/tools/test_ethernet_net.py"
     else

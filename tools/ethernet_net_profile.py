@@ -1,6 +1,9 @@
 """Narrow RAM-placement permission for one measured Ethernet experiment."""
 import re
 
+from native_sd_profile import COMPATIBLE as SD_COMPATIBLE, RELEASE as SD_RELEASE, native_sd_profile
+from sd_ident_profile import NODE as SD_NODE
+
 NETWORK_NODES = {
     "/soc/clock-controller@f8a220cc",
     "/soc/mdio@f9841100",
@@ -26,6 +29,8 @@ def openwrt_ethernet_profile(tree, config):
 
 
 def openwrt_router_ethernet_profile(tree, config):
+    if "CONFIG_TY1208Z_ROUTER_SD_RO=y\n" in config:
+        return openwrt_router_sdro_ethernet_profile(tree, config)
     if "CONFIG_TY1208Z_ROUTER_RAM768=y\n" in config:
         return openwrt_router768_ethernet_profile(tree, config)
     return _ethernet_profile(tree, config, "tianyi,ty1208z-ca-openwrt-router-ram",
@@ -48,7 +53,15 @@ def openwrt_router768_ethernet_profile(tree, config):
     return _ethernet_profile(tree, config, board, "-ty1208z-openwrt-router768", applications=True)
 
 
-def _ethernet_profile(tree, config, board, release, applications=False):
+def openwrt_router_sdro_ethernet_profile(tree, config):
+    if not native_sd_profile(tree, config):
+        return False
+    if "CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" not in config:
+        raise ValueError("Native SD lacks its explicit built-in Ethernet selection")
+    return _ethernet_profile(tree, config, SD_COMPATIBLE, SD_RELEASE, applications=True, sdro=True)
+
+
+def _ethernet_profile(tree, config, board, release, applications=False, sdro=False):
     props = {node["path"]: node["properties"] for node in tree["nodes"]}
     enabled = "CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" in config
     nodes = props.keys() & NETWORK_NODES
@@ -103,6 +116,8 @@ def _ethernet_profile(tree, config, board, release, applications=False):
     active = dict(re.findall(r"^CONFIG_(\w+)=([ym])$", config, re.MULTILINE))
     if "TY1208Z_ROUTER_RAM768" in active and board != "tianyi,ty1208z-ca-openwrt-router768-ram":
         raise ValueError("Higher-memory configuration outside its native router identity")
+    if "TY1208Z_ROUTER_SD_RO" in active and board != SD_COMPATIBLE:
+        raise ValueError("Native SD configuration outside its dedicated router identity")
     required = {"NET", "INET", "PACKET", "NETDEVICES", "HISI_FEMAC",
                 "MDIO_HISI_FEMAC", "PHYLIB", "FESTA_TY1208Z_PHY"}
     if any(active.get(name) != "y" for name in required):
@@ -117,6 +132,10 @@ def _ethernet_profile(tree, config, board, release, applications=False):
         # This exception belongs only to the distinct matched application
         # kernel/rootfs profile; ordinary Ethernet diagnostics remain closed.
         prohibited -= {"MODULES", "NETFILTER", "IPV6"}
+    if sdro:
+        if not applications or not native_sd_profile(tree, config):
+            raise ValueError("SD hardware exception lacks its exact native profile")
+        prohibited -= {"BLOCK", "MMC"}
     if active.keys() & prohibited:
         raise ValueError("Prohibited subsystem in Ethernet network profile: " +
                          ", ".join(sorted(active.keys() & prohibited)))
@@ -124,6 +143,6 @@ def _ethernet_profile(tree, config, board, release, applications=False):
     base_nodes = {"/", "/aliases", "/chosen", "/memory@0", "/cpus", "/cpus/cpu@0",
                   "/clock-24m", "/clock-83m3", "/interrupt-controller@f8a01000", "/soc",
                   "/soc/timer@f8a29000", "/soc/serial@f8b00000"}
-    if props.keys() != base_nodes | NETWORK_NODES:
+    if props.keys() != base_nodes | NETWORK_NODES | ({SD_NODE} if sdro else set()):
         raise ValueError("Unreviewed node in Ethernet network profile")
     return True

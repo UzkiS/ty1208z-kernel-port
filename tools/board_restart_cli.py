@@ -34,8 +34,9 @@ def run(args, serial_module):
               "status": "starting", "kernel_verified": False, "restart_sent": False,
               "persistent_writes": False}
     profile = getattr(args, "profile", "diagnostic")
-    native = profile in ("router", "router768")
+    native = profile in ("router", "router768", "router-sdro")
     sd_ident = profile in ("sd-ident1", "sd-ro1")
+    sd_shutdown = sd_ident or profile == "router-sdro"
     memory = profile == "ram768"
     result["profile"] = profile
     command = native_command if native else shell_command
@@ -52,7 +53,8 @@ def run(args, serial_module):
                     raise TransferError("Not the SP805 RAM experiment; no restart sent")
                 if native:
                     system = command(exchange, b"cat /etc/openwrt_release")
-                    board = (b"tianyi,ty1208z-ca-openwrt-router768-ram" if profile == "router768" else
+                    board = (b"tianyi,ty1208z-ca-openwrt-sdro-ram" if profile == "router-sdro" else
+                             b"tianyi,ty1208z-ca-openwrt-router768-ram" if profile == "router768" else
                              b"tianyi,ty1208z-ca-openwrt-router-ram")
                     if (b"DISTRIB_TARGET='hi3798mv100/apps'" not in system or
                             b"DISTRIB_REVISION='" + SOURCE_REVISION + b"'" not in system or
@@ -63,6 +65,13 @@ def run(args, serial_module):
                                       b"readlink /sys/bus/platform/devices/ty1208z-sp805-restart/driver")
                     if b"../../../bus/platform/drivers/ty1208z-sp805-restart" not in binding:
                         raise TransferError("Actual RAM restart module binding missing")
+                    if profile == "router-sdro":
+                        state = command(exchange, SD_RO_RESTART_GUARD)
+                        if not re.search(rb"(?:^|[\r\n])SD_RO_RESTART_GUARD[\r\n]", state):
+                            raise TransferError("Native SD read-only guard or unmounted state missing; no restart sent")
+                        state = command(exchange, RAM768_RESTART_GUARD)
+                        if not re.search(rb"(?:^|[\r\n])RAM768_RESTART_GUARD[\r\n]", state):
+                            raise TransferError("Native SD memory test cleanup missing; no restart sent")
                 if sd_ident:
                     board = b"sd-ro" if profile == "sd-ro1" else b"sd-ident"
                     if not re.search(rb"(?:^|[\r\n])tianyi,ty1208z-ca-" + board + rb"-ram\x00hi3798mv100-series\x00",
@@ -108,7 +117,7 @@ def run(args, serial_module):
                         continue
                     print(console_text(data.decode("utf-8", "backslashreplace")), end="", flush=True)
                     failure_tail = (failure_tail + data)[-4096:]
-                    if sd_ident and b"SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
+                    if sd_shutdown and b"SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
                         result["sd_shutdown_verified"] = True
                     if any(marker in failure_tail for marker in (
                             b"TY1208Z_RESTART_REFUSED", b"TY1208Z_RESTART_TIMEOUT", b"Reboot failed",
@@ -116,7 +125,7 @@ def run(args, serial_module):
                         raise TransferError("Kernel restart failed; no retry")
                     for outgoing in probe.feed(data):
                         exchange.write(outgoing)
-                if sd_ident and not result.get("sd_shutdown_verified"):
+                if sd_shutdown and not result.get("sd_shutdown_verified"):
                     raise TransferError("SD shutdown completion missing from actual restart stream")
                 result["status"] = "restart-bootloader-verified"
             except (TransferError, ProbeError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:
@@ -137,7 +146,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--profile", choices=("diagnostic", "router", "router768", "sd-ident1", "sd-ro1", "ram768"), default="diagnostic")
+    parser.add_argument("--profile", choices=("diagnostic", "router", "router768", "router-sdro", "sd-ident1", "sd-ro1", "ram768"), default="diagnostic")
     parser.add_argument("--timeout", type=int, default=60)
     args = parser.parse_args()
     if not 5 <= args.timeout <= 120:

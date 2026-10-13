@@ -23,6 +23,7 @@ on:
       - 'tools/ntp-qemu-fixture.c'
       - 'tools/test_xray_browser_clock.py'
       - 'tools/test_ethernet_probe_guards.py'
+      - 'tools/test_native_sd_kconfig.py'
       - 'tools/femac_patch.py'
       - 'tools/test_femac*.py'
       - 'Makefile'
@@ -48,6 +49,7 @@ on:
       - 'tools/ntp-qemu-fixture.c'
       - 'tools/test_xray_browser_clock.py'
       - 'tools/test_ethernet_probe_guards.py'
+      - 'tools/test_native_sd_kconfig.py'
       - 'tools/femac_patch.py'
       - 'tools/test_femac*.py'
       - 'Makefile'
@@ -78,6 +80,9 @@ jobs:
           - target: openwrt-router768
             source_dir: router768
             ram_dir: openwrt-router768
+          - target: openwrt-router-sdro
+            source_dir: router-sd
+            ram_dir: openwrt-router-sdro
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
@@ -144,6 +149,23 @@ jobs:
           path: |
             artifacts/native-router768-restart/
             logs/native-router768-restart.log
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Compile the exact native read-only SD router restart module
+        if: matrix.source_dir == 'router-sd'
+        run: |
+          python3 tools/test_restart_module.py
+          source_tree=$(find .work/router-sd/build -maxdepth 1 -type d -name 'openwrt-ram-*')
+          test -n "$source_tree"
+          python3 tools/build_openwrt_restart_module.py --taskbase .work --source "$source_tree" --router-artifacts artifacts/openwrt-router-sdro > logs/native-router-sdro-restart.log 2>&1 || { tail -n 100 logs/native-router-sdro-restart.log; exit 1; }
+      - name: Upload the exact native SD HARDWARE-UNTESTED restart module
+        if: always() && matrix.source_dir == 'router-sd'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ty1208z-router-sdro-RAM-MODULE-HARDWARE-UNTESTED-${{ github.sha }}
+          path: |
+            artifacts/native-router-sdro-restart/
+            logs/native-router-sdro-restart.log
           retention-days: 14
           if-no-files-found: warn
       - name: Upload QEMU-only artifacts and checks

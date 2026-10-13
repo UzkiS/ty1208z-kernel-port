@@ -30,9 +30,10 @@ typedef uint32_t u32;
 #define MMC_CAP_NEEDS_POLL 1
 #define MMC_CAP2_NO_MMC 2
 #define MMC_CAP2_NO_SDIO 4
-static bool ro_mode;
-#define CONFIG_HI3798MV100_SD_READ_ONLY 1
-#define IS_ENABLED(config) ro_mode
+static bool ro_mode, native_mode, native_identity;
+#define CONFIG_HI3798MV100_SD_READ_ONLY ro_mode
+#define CONFIG_TY1208Z_ROUTER_SD_RO native_mode
+#define IS_ENABLED(config) (config)
 struct device { void *of_node; };
 struct platform_device { struct device dev; };
 struct resource { uint64_t start, end; };
@@ -52,7 +53,14 @@ static const char *property;
 static unsigned maps, reads, registered, removed;
 static unsigned completion, errors;
 static bool of_machine_is_compatible(const char *name)
-{ assert(!strcmp(name, ro_mode ? "tianyi,ty1208z-ca-sd-ro-ram" : "tianyi,ty1208z-ca-sd-ident-ram")); return board; }
+{
+    assert(!strcmp(name, "tianyi,ty1208z-ca-sd-ro-ram") ||
+           !strcmp(name, "tianyi,ty1208z-ca-sd-ident-ram") ||
+           !strcmp(name, "tianyi,ty1208z-ca-openwrt-sdro-ram"));
+    const char *identity = native_identity ? "tianyi,ty1208z-ca-openwrt-sdro-ram" :
+                           ro_mode ? "tianyi,ty1208z-ca-sd-ro-ram" : "tianyi,ty1208z-ca-sd-ident-ram";
+    return board && !strcmp(name, identity);
+}
 static struct resource *platform_get_resource(struct platform_device *p, int type, unsigned i)
 { assert(p && type == IORESOURCE_MEM && i < 4); return (int)i == missing || (i == 3 && !extra) ? NULL : &resources[i]; }
 static uint64_t resource_size(struct resource *r) { return r->end - r->start + 1; }
@@ -91,8 +99,10 @@ static void initialize(void)
 }
 '''
 MAIN = r'''
-int main(void)
+static void exercise_profile(bool read_only, bool native)
 {
+    ro_mode = read_only; native_mode = native_identity = native;
+    completion = errors = 0;
     struct platform_device p = {.dev.of_node = &p};
     initialize(); board = false;
     assert(mv100_sd_ident_probe(&p) == -ENODEV && !maps && !registered);
@@ -129,7 +139,7 @@ int main(void)
     struct dw_mci_slot slot = {.mmc = &mmc};
     assert(!mv100_sd_ident_slot(&slot));
     assert(mmc.caps == MMC_CAP_NEEDS_POLL && mmc.caps2 == (MMC_CAP2_NO_MMC | MMC_CAP2_NO_SDIO));
-    assert(!mmc.pm_caps && mmc.f_max == 25000000 && mmc.max_blk_size == 512 && mmc.max_blk_count == 1 && mmc.max_req_size == 512 && mmc.max_seg_size == 512 && !mmc.dsr_req);
+    assert(!mmc.pm_caps && mmc.f_max == 25000000 && mmc.max_blk_size == 512 && mmc.max_blk_count == (ro_mode ? 8U : 1U) && mmc.max_req_size == 512 * mmc.max_blk_count && mmc.max_seg_size == mmc.max_req_size && !mmc.dsr_req);
     ro_mode = true;
     initialize();
     assert(!mv100_sd_ident_probe(&p));
@@ -145,6 +155,20 @@ int main(void)
         host.regs[offsets[i] / 4] = 0;
     }
     puts("SD_IDENT_PROBE_PASS: actual identity/resource/IRQ/provider/map gates, slot restrictions and DW shutdown dispatch");
+}
+int main(void)
+{
+    exercise_profile(false, false);
+    exercise_profile(true, false);
+    exercise_profile(true, true);
+    struct platform_device p = {.dev.of_node = &p};
+    ro_mode = true; native_identity = true; native_mode = false;
+    initialize();
+    assert(mv100_sd_ident_probe(&p) == -ENODEV && !maps && !reads && !registered);
+    native_mode = true; ro_mode = false;
+    initialize();
+    assert(mv100_sd_ident_probe(&p) == -ENODEV && !maps && !reads && !registered);
+    puts("SD_NATIVE_OPT_IN_PROBE_PASS: dedicated board requires both native and read-only selections before MMIO");
 }
 '''
 

@@ -15,6 +15,9 @@ HARNESS = r'''
 #ifndef CONFIG_TY1208Z_ROUTER_RAM768
 #define CONFIG_TY1208Z_ROUTER_RAM768 0
 #endif
+#ifndef CONFIG_TY1208Z_ROUTER_SD_RO
+#define CONFIG_TY1208Z_ROUTER_SD_RO 0
+#endif
 #define IS_ENABLED(x) (x)
 #define __exit
 #define ENODEV 19
@@ -64,6 +67,15 @@ int main(void)
     assert(ty1208z_ram_restart_init() == -ENODEV && !events);
 #endif
     events = 0;
+    board = "tianyi,ty1208z-ca-openwrt-sdro-ram";
+#if CONFIG_TY1208Z_ROUTER_SD_RO
+    mode = events = 0;
+    assert(ty1208z_ram_restart_init() == 0 && events == 2);
+    ty1208z_ram_restart_exit();
+#else
+    assert(ty1208z_ram_restart_init() == -ENODEV && !events);
+#endif
+    events = 0;
     board = "tianyi,ty1208z-ca-openwrt-router-ram";
     for (mode = 1; mode <= 3; mode++) {
         events = 0;
@@ -91,14 +103,15 @@ def test():
         program = path / "test.c"
         program.write_text(HARNESS + source[start:end] + source[exit_start:exit_end] + MAIN)
         binary = path / "test"
-        subprocess.run(["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
-                        "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
-                        str(program), "-o", str(binary)], check=True)
-        subprocess.run([binary], check=True)
-        subprocess.run(["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
-                        "-fsanitize=address,undefined", "-fno-pie", "-no-pie",
-                        "-DCONFIG_TY1208Z_ROUTER_RAM768=1", str(program), "-o", str(binary)], check=True)
-        subprocess.run([binary], check=True)
+        for selected in range(4):
+            arguments = ["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
+                         "-fsanitize=address,undefined", "-fno-pie", "-no-pie"]
+            if selected & 1:
+                arguments.append("-DCONFIG_TY1208Z_ROUTER_RAM768=1")
+            if selected & 2:
+                arguments.append("-DCONFIG_TY1208Z_ROUTER_SD_RO=1")
+            subprocess.run(arguments + [str(program), "-o", str(binary)], check=True)
+            subprocess.run([binary], check=True)
 
 
 if __name__ == "__main__":

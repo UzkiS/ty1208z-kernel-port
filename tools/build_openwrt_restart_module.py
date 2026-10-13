@@ -10,7 +10,9 @@ NAMES = ("ty1208z-sp805-restart.c", "ty1208z-sp805-restart.h", "ty1208z-mv100-re
 
 def build(source, taskbase, artifacts):
     return build_module(source, taskbase, artifacts,
-                        directory=("native-router768-restart" if
+                        directory=("native-router-sdro-restart" if
+                                   "CONFIG_TY1208Z_ROUTER_SD_RO=y\n" in (artifacts / "linux.config").read_text()
+                                   else "native-router768-restart" if
                                    "CONFIG_TY1208Z_ROUTER_RAM768=y\n" in (artifacts / "linux.config").read_text()
                                    else "native-ram-restart"),
                         names=tuple("drivers/power/reset/" + name for name in NAMES),
