@@ -27,7 +27,9 @@ reset and enables the shared controller clocks. It selects tuning by
 `(get_chipid(0) & 0xf0) == 0x10`. Inspection of the pinned MV100 implementation
 shows this low-byte branch comes directly from SYSID0; the SOC_FUSE high-part
 read is unnecessary for that decision. The new audit reads SYSID0 only, not
-the fuse block. Its actual value and USB control state remain unmeasured.
+the fuse block. The [physical read-only audit](../verification/usb-audit-board-20261013.md)
+measured SYSID0 `0x37980100` and inherited controller/PHY resets; capability
+reads were correctly skipped because the required readiness state was absent.
 
 Host1 has different registers/resources and stays outside the first audit.
 EHCI/OHCI host0 share PHY/clock ownership; later support must coordinate their
@@ -61,7 +63,8 @@ The built candidate and completed local checks are recorded in the
 
 ## Remaining milestones
 
-Measure inherited controls/revision/capabilities, then enable the separately
+Inherited controls and SYSID0 are measured; a separate bounded clock/PHY
+experiment must still establish capabilities. Then review the separately
 prepared host0 profile for RAM validation and test EHCI/OHCI enumeration.
 Check exact RDA revision, firmware source/license/hash, bounded control and
 bulk transfers, firmware startup, scan/association and AP support separately.
