@@ -41,6 +41,8 @@ def check(source, built=False):
     for package in PACKAGES:
         if f"CONFIG_PACKAGE_{package}=m\n" not in config:
             raise ValueError(f"Container package must remain compile-only: {package}")
+    if "CONFIG_PACKAGE_kmod-nft-nat=m\n" not in config:
+        raise ValueError("Container dependency kernel lacks selected nft NAT modules")
     manifest = json.loads((source / ".ty1208z-overlay.json").read_text())
     for relative, expected in manifest.items():
         if sha256(source / relative) != expected:
@@ -78,6 +80,9 @@ def check(source, built=False):
     for option in ("BLOCK", "CGROUPS", "MEMCG", "NAMESPACES", "NET_NS", "SECCOMP", "SECCOMP_FILTER"):
         if f"CONFIG_{option}=y\n" not in kernel_config:
             raise ValueError(f"Container dependency kernel missing: {option}")
+    for option in ("NFT_NAT", "NFT_MASQ", "NF_NAT", "NFT_COMPAT"):
+        if not re.search(rf"^CONFIG_{option}=[ym]$", kernel_config, re.MULTILINE):
+            raise ValueError(f"Container dependency kernel lacks nft NAT support: {option}")
     if list((source / "bin/targets").rglob("*uImage*")) or list((source / "bin/targets").rglob("*rootfs*")):
         raise ValueError("Compile-only container entry emitted a boot image/rootfs")
     output = PROJECT / "artifacts/openwrt-container-packages"

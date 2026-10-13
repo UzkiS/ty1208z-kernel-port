@@ -40,6 +40,7 @@ help:
 	@echo 'make usb-host-compile - compile optional host0 clock/PHY plus generic EHCI/OHCI, no boot image'
 	@echo 'make usb-host - build isolated host0 enumeration RAM candidate after physical capability acceptance'
 	@echo 'make openwrt-container-packages - compile/check separate native Docker APKs; no boot/runtime acceptance'
+	@echo 'make openwrt-container-qemu - test actual ARMv7 Docker in isolated QEMU; no board acceptance'
 
 lint:
 	python3 tools/check_repository.py
@@ -50,6 +51,7 @@ lint:
 	shellcheck initramfs/sd-ro-diag
 	shellcheck initramfs/emmc-ro-diag
 	shellcheck initramfs/ram768-diag
+	shellcheck initramfs/container-qemu-init initramfs/container-qemu-guest
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
 	python3 tools/test_pinned_archives.py
@@ -200,6 +202,10 @@ openwrt-container-config:
 
 openwrt-container-packages:
 	bash tools/build-openwrt-containers.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" build
+
+.PHONY: openwrt-container-qemu
+openwrt-container-qemu:
+	python3 tools/test_openwrt_container_runtime.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"
 
 .PHONY: openwrt-router768
 openwrt-router768:

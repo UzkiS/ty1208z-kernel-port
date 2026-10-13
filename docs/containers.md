@@ -39,11 +39,34 @@ Clean remote compilation on `3e89e05` also passed; all 13 downloaded artifact
 files, five package/source records, checker identities and actual version-check
 marker were independently verified, [CI report](../verification/container-packages-ci-20261013.md).
 
-First acceptance should run one small `linux/arm/v7` container, exercise DNS
-and outbound/forwarded networking with fw4/Passwall, verify memory/CPU limits
-and clean shutdown/restart. Confirm image architecture before download;
+The separate `make openwrt-container-qemu TASKBASE=/absolute/linux/build-root`
+entry now tests those actual native packages in a Cortex-A7/ARMv7 QEMU guest
+with 768 MiB, no NIC, disks or host mounts. Run `make build` and
+`make openwrt-container-packages` first. Its BusyBox helper, deterministic local
+Docker archive, complete APK dependency closure and exact kernel/config/input
+hashes are recorded under `artifacts/openwrt-container-qemu/`.
+
+Actual containers pass overlay2, PID/hostname isolation, default seccomp,
+CPU throttling, memory-cgroup OOM enforcement, writable-layer persistence,
+stop/start/restart and cleanup. User-defined bridge DNS/HTTP, default and
+user-defined bridge masquerading, and published-port DNAT pass through another
+guest-only network namespace. The daemon/containerd also shut down normally.
+The clock reaches 2040 only inside the guest. The native package profile now
+selects `kmod-nft-nat`: its absence previously prevented Docker's iptables-nft
+backend from creating NAT chains; the compiled-config checker also rejects
+that regression. [Runtime report](../verification/container-qemu-runtime-20261014.md).
+
+These are QEMU-only outputs, separate from every board RAM candidate. They
+exceed the existing physical router initrd transfer budget. The isolated
+dependency closure provides legacy `firewall`; this experiment does not run
+OpenWrt fw4 or Passwall, perform physical storage I/O or establish a final
+router installation. Fresh remote runtime CI remains pending.
+
+Physical/final-router acceptance still needs a small `linux/arm/v7` container,
+DNS and outbound/forwarded networking with fw4/Passwall, measured memory/CPU
+limits and clean shutdown/restart. Confirm image architecture before download;
 ARM64-only images cannot run natively on this CPU.
 
 One GiB permits modest workloads; the current single-core experiment, storage
 I/O, proxy load and actual free memory must determine the eventual service
-budget. Docker and full-memory/storage acceptance remain pending.
+budget. Physical Docker and full storage/final-router acceptance remain pending.

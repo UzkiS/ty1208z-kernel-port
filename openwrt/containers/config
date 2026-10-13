@@ -9,6 +9,8 @@ CONFIG_PACKAGE_dockerd=m
 CONFIG_PACKAGE_containerd=m
 CONFIG_PACKAGE_runc=m
 CONFIG_PACKAGE_tini=m
+# Docker's iptables-nft provider also needs the nft NAT chain/expression modules.
+CONFIG_PACKAGE_kmod-nft-nat=m
 CONFIG_KERNEL_SECCOMP=y
 CONFIG_KERNEL_SECCOMP_FILTER=y
 CONFIG_KERNEL_NAMESPACES=y

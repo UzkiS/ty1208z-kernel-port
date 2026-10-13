@@ -8,6 +8,7 @@ import subprocess
 
 root = Path(__file__).resolve().parents[1]
 skip = {".git", ".work", "artifacts", "evidence", "__pycache__", ".ruff_cache"}
+container_scripts = {"container-qemu-init", "container-qemu-guest"}
 lock = json.loads((root / "config/sources.lock.json").read_text(encoding="utf-8"))
 for kind in ("linux", "busybox"):
     assert lock[kind]["url"].startswith("https://")
@@ -16,7 +17,7 @@ for path in root.rglob("*"):
     rel = path.relative_to(root)
     if not path.is_file() or skip.intersection(rel.parts) or rel.parts[:2] == ("reference", "sdk"):
         continue
-    if path.suffix not in {".py", ".sh", ".ps1", ".c", ".h", ".dts", ".json", ".yaml", ".yml", ".md", ".toml"} and path.name not in {"Makefile", "init", "diag", "ethernet-diag", "ethernet-dhcp", "usb-diag", "sd-diag", "sd-ro-diag", "emmc-ro-diag", "ram768-diag"}:
+    if path.suffix not in {".py", ".sh", ".ps1", ".c", ".h", ".dts", ".json", ".yaml", ".yml", ".md", ".toml"} and path.name not in {"Makefile", "init", "diag", "ethernet-diag", "ethernet-dhcp", "usb-diag", "sd-diag", "sd-ro-diag", "emmc-ro-diag", "ram768-diag", *container_scripts}:
         continue
     blob = path.read_bytes()
     text = blob.decode("utf-8")
@@ -25,7 +26,7 @@ for path in root.rglob("*"):
     assert all(line == line.rstrip() for line in text.splitlines()), f"Trailing whitespace: {rel}"
     if path.suffix == ".py":
         ast.parse(text, filename=str(rel))
-    if path.suffix == ".sh" or path.name in {"init", "diag", "ethernet-diag", "ethernet-dhcp", "usb-diag", "sd-diag", "sd-ro-diag", "emmc-ro-diag", "ram768-diag"}:
+    if path.suffix == ".sh" or path.name in {"init", "diag", "ethernet-diag", "ethernet-dhcp", "usb-diag", "sd-diag", "sd-ro-diag", "emmc-ro-diag", "ram768-diag", *container_scripts}:
         subprocess.run(["bash", "-n", str(path)], check=True)
     if path.suffix == ".json":
         json.loads(text)

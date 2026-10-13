@@ -82,6 +82,13 @@ SSH recovery loaded only the exact matched module and all runtime tests passed.
 Repeated host receivers receive zero even when an SSH-triggered UART marker
 advances the board TX counter. A Windows PnP reset returned general failure.
 The serial adapter reconnect/3.3-V check is pending; no blind reboot is sent.
+The receive-only COM9 monitor ran its full 45-minute window and ended at
+2026-10-14 07:20:25 Asia/Shanghai with no actual UART marker received. It
+attempted no restart/return and released COM9. A subsequent SSH health check
+again verified the 14 restored configuration hashes, Chinese authenticated
+Passwall page, empty root password, exact restart binding and IRQ Err0.
+The second trial's final return remains pending; the first trial's accepted
+return is separate evidence.
 
 In the independently verified first return, the native `router-sdro` guard
 verifies its DT/source and matched restart binding. One graceful command

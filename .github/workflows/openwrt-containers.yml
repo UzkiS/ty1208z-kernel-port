@@ -1,4 +1,4 @@
-name: Native OpenWrt container package compilation
+name: Native OpenWrt container packages and isolated ARMv7 runtime
 
 on:
   workflow_dispatch:
@@ -12,6 +12,10 @@ on:
       - 'tools/prepare_openwrt*.py'
       - 'tools/build-openwrt-containers.sh'
       - 'tools/check_openwrt_containers.py'
+      - 'tools/test_openwrt_container_runtime.py'
+      - 'tools/container-resource-probe.c'
+      - 'config/busybox*'
+      - 'initramfs/container-qemu-*'
       - '.github/workflows/openwrt-containers.yml'
   pull_request:
     paths:
@@ -23,6 +27,10 @@ on:
       - 'tools/prepare_openwrt*.py'
       - 'tools/build-openwrt-containers.sh'
       - 'tools/check_openwrt_containers.py'
+      - 'tools/test_openwrt_container_runtime.py'
+      - 'tools/container-resource-probe.c'
+      - 'config/busybox*'
+      - 'initramfs/container-qemu-*'
       - '.github/workflows/openwrt-containers.yml'
 
 permissions:
@@ -51,7 +59,13 @@ jobs:
           sudo apt-get install -y build-essential clang g++ gcc-multilib \
             g++-multilib bc bison flex gawk gettext git libncurses-dev \
             libssl-dev python3 python3-setuptools rsync swig unzip zlib1g-dev \
-            file wget curl zstd time qemu-user binutils
+            file wget curl zstd time qemu-user qemu-system-arm binutils \
+            gcc-arm-linux-gnueabihf binutils-arm-linux-gnueabihf libc6-dev-armhf-cross \
+            libelf-dev device-tree-compiler u-boot-tools cpio xz-utils pkg-config
+      - name: Build the pinned static diagnostic helpers
+        run: |
+          mkdir -p logs
+          make build > logs/container-helper-build.log 2>&1 || { tail -n 100 logs/container-helper-build.log; exit 1; }
       - name: Build fixed native GCC and musl
         run: |
           mkdir -p logs
@@ -60,6 +74,10 @@ jobs:
         run: |
           make openwrt-container-packages > logs/openwrt-containers.log 2>&1 || { tail -n 100 logs/openwrt-containers.log; exit 1; }
           tail -n 30 logs/openwrt-containers.log
+      - name: Test actual ARMv7 Docker with no NIC, disks or host mounts
+        run: |
+          make openwrt-container-qemu > logs/container-qemu.log 2>&1 || { tail -n 100 logs/container-qemu.log; tail -n 100 artifacts/openwrt-container-qemu/qemu.log; exit 1; }
+          tail -n 30 logs/container-qemu.log
       - name: Upload COMPILE-ONLY packages and provenance
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -69,5 +87,16 @@ jobs:
             artifacts/openwrt-container-packages/
             logs/container-toolchain.log
             logs/openwrt-containers.log
+            logs/container-helper-build.log
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Upload QEMU-only runtime evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: ty1208z-containers-QEMU-ONLY-${{ github.sha }}
+          path: |
+            artifacts/openwrt-container-qemu/
+            logs/container-qemu.log
           retention-days: 14
           if-no-files-found: warn

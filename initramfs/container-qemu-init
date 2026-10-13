@@ -1,0 +1,20 @@
+#!/bin/sh
+set -eu
+export PATH=/bin:/sbin
+/bin/busybox --install -s /bin
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+grep -q 'linux,dummy-virt' /sys/firmware/devicetree/base/compatible
+grep -qw 'ty1208z.qemu_container=1' /proc/cmdline
+mkdir /newroot
+mount -t tmpfs -o mode=0755 tmpfs /newroot
+cp -a /bin /sbin /usr /lib /etc /opt /newroot/
+mkdir -p /newroot/dev/pts /newroot/proc /newroot/sys /newroot/tmp /newroot/run
+cp /container-init /newroot/init
+chmod 755 /newroot/init
+mknod -m 600 /newroot/dev/console c 5 1
+mknod -m 666 /newroot/dev/null c 1 3
+umount /sys
+umount /proc
+echo CONTAINER_QEMU_TMPFS_ROOT_SWITCH
+exec /bin/busybox switch_root /newroot /init
