@@ -8,7 +8,10 @@ attach ownership, association IE reporting, AP GTK state and USB TX padding.
 Official LuCI now exposes the supported RDA settings; the real form builder and
 installed package payload pass. A pinned netifd EOF loop that interrupted wired
 management is fixed. Chinese Dockerman and the offline APK transaction are also
-integrated. The specifically authorized p9 last-sector write/readback/restore
+integrated. An isolated headless browser now verifies the Chinese Docker overview
+with live engine data and the wireless editor/WPA2 input, without saving wireless
+changes; see the [UI report](verification/luci-ui-board-20261014.md).
+The specifically authorized p9 last-sector write/readback/restore
 now passes; the original readonly RAM system/configuration has been restored.
 Full installation and disk-root persistence remain unfinished.
 See the [current progress report](verification/progress-20261014.md) and
