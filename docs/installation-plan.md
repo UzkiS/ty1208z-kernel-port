@@ -6,6 +6,9 @@
 仍未验收，不能将正在执行的操作写成完成。
 功能状态见[阶段报告](../verification/progress-20261014.md)。
 
+后续可选的临时 OpenWrt 网页安装、紧凑镜像和 HiTool 路径已有
+[只读研究方案](ram-web-install.md)，尚未实现或刷写验收；不替换本次正在写入的镜像。
+
 拟沿用现有布局，在 eMMC p6 放内核，在 p9 放完整 OpenWrt rootfs、用户配置和
 `/opt/docker`。p6 为 14 MiB 起、20 MiB 长；p9 为 610 MiB 起、6846 MiB 长。
 该方案会替换现有 Hinas/Ubuntu 的内核与根文件系统。保留 p1–p5、p7/p8、已知成功的
