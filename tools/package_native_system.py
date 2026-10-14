@@ -3,7 +3,7 @@
 from prepare_native_userspace import native_archive, record
 from native_system_patch import TRANSFORMATIONS, ensure
 from prepare_openwrt import toolchain_from_native
-from prepare_native_userspace import prepare
+from prepare_native_package_supplement import input_provenance, prepare as prepare_packages
 import argparse
 import gzip
 import hashlib
@@ -22,9 +22,13 @@ parser.add_argument('--taskbase', type=Path, required=True)
 parser.add_argument('--kernel-build', type=Path)
 parser.add_argument('--base-artifacts', type=Path)
 parser.add_argument('--combined-artifacts', type=Path)
+parser.add_argument('--combined-source', type=Path,
+                    help='Configured native application build containing Dockerman and its dependencies')
 parser.add_argument('--work', type=Path)
 parser.add_argument('--output', type=Path)
 parser.add_argument('--resume', action='store_true')
+parser.add_argument('--rda-firmware', type=Path,
+                    help='Private backup-reference directory with manifest.json and extracted firmware files')
 args = parser.parse_args()
 project = Path(__file__).resolve().parents[1]
 base = args.taskbase.resolve()
@@ -36,6 +40,7 @@ state = json.loads((build / 'kernel-build.json').read_bytes())
 source = Path(state['native_source'])
 base_artifacts = args.base_artifacts or project / 'artifacts/openwrt-router-emmcro'
 combined = args.combined_artifacts or project / 'artifacts/openwrt-container-applications-qemu'
+combined_source = args.combined_source or base / 'container-applications/build' / source.name
 if output.exists() or work.exists():
     assert args.resume and not (output / 'manifest.json').exists(), 'Inspect an existing completed package rather than overwrite'
 work.mkdir(parents=True, exist_ok=True)
@@ -76,6 +81,11 @@ with (work / 'modules-install.log').open('wb') as log:
                     'INSTALL_MOD_STRIP=1', 'DEPMOD=true', 'modules_install'], check=True,
                    stdout=log, stderr=subprocess.STDOUT)
 modules = root / 'lib/modules/6.12.112'
+module = Path(state['rda_module']['path'])
+assert hashlib.sha256(module.read_bytes()).hexdigest() == state['rda_module']['sha256']
+shutil.copyfile(module, modules / 'rdawfmac.ko')
+subprocess.run([str(compiler).removesuffix('gcc') + 'strip', '--strip-debug',
+                modules / 'rdawfmac.ko'], check=True)
 for name in ('build', 'source'):
     (modules / name).unlink(missing_ok=True)
 # OpenWrt's /sbin/modprobe is ubox kmodloader, whose module scan is not
@@ -111,6 +121,19 @@ defaults.parent.mkdir(parents=True, exist_ok=True)
 shutil.copyfile(project / 'openwrt/system/docker-network', defaults)
 defaults.chmod(0o755)
 
+private_firmware = {}
+if args.rda_firmware:
+    reference = json.loads((args.rda_firmware / 'manifest.json').read_bytes())
+    for suffix in ('code_p2p', 'code1_p2p', 'data_p2p', 'code_ap', 'data_ap'):
+        name = 'rda5995_usb_' + suffix + '.bin'
+        relative = 'vendor/firmware/' + name
+        payload = (args.rda_firmware / name).read_bytes()
+        assert record(payload) == reference['files'][relative], 'Private firmware changed: ' + name
+        destination = root / 'lib/firmware' / name
+        destination.parent.mkdir(parents=True, exist_ok=True)
+        destination.write_bytes(payload)
+        private_firmware[name] = record(payload)
+
 # Preserve native accounts/configuration/language; mark this reduced bootstrap.
 (root / 'etc/ty1208z-system-bootstrap').write_text('Native RAM bootstrap; load the verified userspace supplement before using Passwall or Docker.\n')
 (root / 'etc/init.d/dockerd').unlink(missing_ok=True)
@@ -138,23 +161,29 @@ subprocess.run(['mkimage', '-A', 'arm', '-O', 'linux', '-T', 'kernel', '-C', 'no
                 '-d', work / 'zImage-dtb', output / 'uImage-UNTESTED.bin'], check=True,
                env=dict(os.environ, SOURCE_DATE_EPOCH='1791676800'))
 
-# Extend the already-prepared supplement with the omitted Xray and exact modules.
-supplement_dir = work / 'native-userspace-supplement'
+# Install actual APKs offline, using module packages from this exact board build.
+supplement_dir = work / 'native-package-supplement'
 if not supplement_dir.exists():
-    prepare(base_artifacts, combined, supplement_dir)
-supplement = supplement_dir / 'userspace-supplement.RAM-ONLY.tar.gz'
+    prepare_packages(base_artifacts, combined_source, source, root, kernel, supplement_dir)
+supplement = supplement_dir / 'userspace-packages.RAM-ONLY.tar.gz'
 supplement_manifest = json.loads((supplement_dir / 'manifest.json').read_bytes())
+assert supplement_manifest.get('input_provenance') == input_provenance(
+    base_artifacts, combined_source, source, root, kernel), 'Cached APK inputs changed; rebuild the transaction'
 assert record(supplement.read_bytes()) == supplement_manifest['files'][supplement.name]
+assert supplement_manifest['kernel_identity'] == hashlib.sha256(
+    (kernel / '.config').read_bytes() + (kernel / 'arch/arm/boot/zImage').read_bytes()).hexdigest()
+assert (supplement_dir / 'root/lib/modules/6.12.112/rdawfmac.ko').read_bytes() == (modules / 'rdawfmac.ko').read_bytes()
 data = io.BytesIO()
 delivered = {}
 with tarfile.open(supplement, 'r:gz') as existing, tarfile.open(fileobj=data, mode='w', format=tarfile.PAX_FORMAT) as archive:
     for member in existing:
         payload = existing.extractfile(member) if member.isfile() else None
         archive.addfile(member, payload)
-        delivered[member.name] = {'symlink': member.linkname} if member.issym() else {'bytes': member.size}
-    additions = {'usr/bin/xray': entries['usr/bin/xray'][2]}
+        delivered[member.name] = supplement_manifest['supplement_files'][member.name]
+    assert delivered.get('usr/bin/xray'), 'Reduced bootstrap requires Xray in the supplement'
+    additions = {}
     for p in sorted(modules.rglob('*')):
-        if p.is_file() and not p.is_symlink():
+        if p.is_file() and not p.is_symlink() and p.relative_to(root).as_posix() not in delivered:
             additions[p.relative_to(root).as_posix()] = p.read_bytes()
     for name, payload in additions.items():
         assert name not in delivered, name
@@ -175,8 +204,12 @@ receipt = {'schema': 1, 'status': 'integrated native RAM candidate; not booted o
            'bootstrap_omits': ['usr/bin/xray'], 'supplement': network_payload.name,
            'modules': len(new_modules), 'supplement_files': delivered,
            'module_layout': 'flat-openwrt-kmodloader',
+           'rda_module': state['rda_module'],
+           'private_rda_firmware': private_firmware,
+           'redistribution': 'PRIVATE user-supplied firmware; do not publish' if private_firmware else 'No RDA firmware included',
            'storage': 'eMMC and SD request-level read-only; no automount',
-           'package_database': 'bootstrap retained; supplement not registered; final native package integration pending',
+           'package_database': supplement_manifest['package_database'],
+           'installed_required_packages': supplement_manifest['installed_required_packages'],
            'prior_userspace_evidence': 'Unchanged cores/runtime and installed Passwall files; actual new-kernel runtime pending',
            'external_initrd': {'address': 0x4000000, 'bytes': compressed, 'uncompressed_bytes': cpio.stat().st_size},
            'persistent_writes': False, 'files': files}

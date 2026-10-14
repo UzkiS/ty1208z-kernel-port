@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check actual RDA cfg80211 startup rollback and expose missing named transport."""
+"""Check actual RDA cfg80211 startup rollback without named-iovar setup."""
 import argparse
 from pathlib import Path
 import re
@@ -66,7 +66,6 @@ static struct wland_if interface = {&vif};
 static struct wland_cfg80211_info config;
 static struct net_device netdev = {&wireless, &interface, &config};
 static int lock_depth, locks, unlocks, stage, calls[3], replies[3];
-static bool actual_roam;
 static void *netdev_priv(struct net_device *ndev) { return ndev->priv; }
 static struct wland_cfg80211_info *ndev_to_cfg(struct net_device *ndev) { return ndev->config; }
 static void mutex_lock(int *mutex) { assert(mutex == &config.usr_sync && !lock_depth); lock_depth++; locks++; }
@@ -75,68 +74,51 @@ static void set_bit(unsigned bit, unsigned long *state) { *state |= 1ul << bit; 
 static void clear_bit(unsigned bit, unsigned long *state) { *state &= ~(1ul << bit); }
 /* REAL NAMED TRANSPORT */
 /* REAL LEGACY ROAM */
-static int wland_dongle_roam(struct wland_if *ifp, u32 roamvar, u32 timeout) {
-    assert(lock_depth == 1 && stage == 0 && (vif.sme_state & (1ul << VIF_STATUS_READY)));
-    stage++; calls[0]++;
-    if (actual_roam) return legacy_dongle_roam(ifp, roamvar, timeout);
-    return replies[0];
-}
 static int wland_cfg80211_change_virtual_iface(struct wiphy *wiphy, struct net_device *ndev,
                                                int type, void *params) {
-    assert(lock_depth == 1 && stage == 1 && wiphy == &phy && ndev == &netdev
+    assert(lock_depth == 1 && stage == 0 && wiphy == &phy && ndev == &netdev
            && type == wireless.iftype && !params);
     assert(vif.sme_state & (1ul << VIF_STATUS_READY));
-    stage++; calls[1]++; return replies[1];
+    stage++; calls[0]++; return replies[0];
 }
 static int wland_update_wiphybands(struct wland_cfg80211_info *cfg, bool notify) {
-    assert(lock_depth == 1 && stage == 2 && cfg == &config && notify);
-    stage++; calls[2]++; return replies[2];
+    assert(lock_depth == 1 && stage == 1 && cfg == &config && notify);
+    stage++; calls[1]++; return replies[1];
 }
 /* REAL STARTUP */
 static unsigned long reset(bool initially_ready) {
     memset(&config, 0, sizeof(config)); memset(calls, 0, sizeof(calls)); memset(replies, 0, sizeof(replies));
     vif.sme_state = (1ul << VIF_STATUS_CONNECTING) | (1ul << VIF_STATUS_AP_CREATED);
     if (initially_ready) vif.sme_state |= 1ul << VIF_STATUS_READY;
-    lock_depth = locks = unlocks = stage = 0; actual_roam = false;
+    lock_depth = locks = unlocks = stage = 0;
     return vif.sme_state & ~(1ul << VIF_STATUS_READY);
 }
 static void balanced(void) { assert(!lock_depth && locks == 1 && unlocks == 1); }
 int main(void) {
     const int errors[] = {-EIO, -EOPNOTSUPP, -ETIMEDOUT, -EPROTO};
-    for (int prior = 0; prior < 2; prior++) for (int failed = 0; failed < 3; failed++)
+    for (int prior = 0; prior < 2; prior++) for (int failed = 0; failed < 2; failed++)
         for (unsigned e = 0; e < sizeof(errors)/sizeof(errors[0]); e++) {
             unsigned long untouched = reset(prior); replies[failed] = errors[e];
             assert(wland_cfg80211_up(&netdev) == errors[e]); balanced();
             assert(!config.dongle_up && vif.sme_state == untouched);
-            for (int i = 0; i < 3; i++) assert(calls[i] == (i <= failed));
+            for (int i = 0; i < 2; i++) assert(calls[i] == (i <= failed));
             /* A subsequent fully acknowledged fixture run may succeed. */
             memset(calls, 0, sizeof(calls)); memset(replies, 0, sizeof(replies));
             stage = locks = unlocks = 0;
             assert(!wland_cfg80211_up(&netdev)); balanced();
             assert(config.dongle_up && vif.sme_state == (untouched | (1ul << VIF_STATUS_READY)));
-            assert(calls[0] == 1 && calls[1] == 1 && calls[2] == 1);
+            assert(calls[0] == 1 && calls[1] == 1);
         }
     for (int prior = 0; prior < 2; prior++) {
         unsigned long untouched = reset(prior); config.dongle_up = true;
         assert(!wland_cfg80211_up(&netdev)); balanced();
         assert(config.dongle_up && vif.sme_state == (untouched | (1ul << VIF_STATUS_READY)));
-        assert(!calls[0] && !calls[1] && !calls[2]);
+        assert(!calls[0] && !calls[1]);
     }
-    /* This is the current real cold-start blocker, not a passing radio test. */
-    for (int prior = 0; prior < 2; prior++) for (int roam = 0; roam < 2; roam++) {
-        unsigned long untouched = reset(prior); actual_roam = true; config.roam_on = roam;
-        assert(wland_cfg80211_up(&netdev) == -EOPNOTSUPP); balanced();
-        assert(!config.dongle_up && vif.sme_state == untouched);
-        assert(calls[0] == 1 && !calls[1] && !calls[2]);
-    }
-    puts("RDA_STARTUP_ROLLBACK_PASS: actual up callback, stage failures/retry/fast path, mutex balance and real unsupported-roaming blocker");
+    puts("RDA_STARTUP_ROLLBACK_PASS: actual up callback, interface/band failures, retry, fast path and balanced locking");
 }
 '''
 code = code.replace("/* CONSTANTS */", constants)
-code = code.replace("/* REAL NAMED TRANSPORT */", definition("wland_cmds.c", "wland_fil_iovar_data_set"))
-code = code.replace("/* REAL LEGACY ROAM */",
-                    definition("wland_cfg80211.c", "wland_dongle_roam").replace(
-                        "wland_dongle_roam(", "legacy_dongle_roam(", 1))
 code = code.replace("/* REAL STARTUP */", definition("wland_cfg80211.c", "wland_cfg80211_up"))
 with tempfile.TemporaryDirectory() as directory:
     temp = Path(directory)
@@ -145,4 +127,4 @@ with tempfile.TemporaryDirectory() as directory:
                     "-Wall", "-Wextra", "-Werror", "-Wno-unused-parameter", "-Wno-unused-but-set-variable",
                     str(temp / "startup.c"), "-o", str(temp / "startup")], check=True)
     subprocess.run([str(temp / "startup")], check=True)
-print("Startup failure rollback passed; current named-roaming/capability transport still prevents real interface startup")
+print("Startup failure rollback passed; no named-iovar request remains in interface startup")

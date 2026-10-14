@@ -4,7 +4,7 @@ TRANSFORMATIONS = {'arch/arm/mach-hisi/Kconfig': [('config TY1208Z_ROUTER_EMMC_R
                                  '\tbool "TY1208Z native OpenWrt system with measured memory and '
                                  'read-only storage"\n'
                                  '\tdepends on ARCH_HI3798MV100 && NET && BLOCK && MMC\n'
-                                 '\tdepends on !HIGHMEM && !SMP && !USB_SUPPORT && !MTD\n'
+                                 '\tdepends on !HIGHMEM && !SMP && !MTD\n'
                                  '\tdepends on !DEBUG_FS && !WATCHDOG && !PM\n'
                                  '\thelp\n'
                                  '\t  Integrate the measured 768-MiB memory, Ethernet, SD and eMMC '
@@ -107,6 +107,17 @@ TRANSFORMATIONS = {'arch/arm/mach-hisi/Kconfig': [('config TY1208Z_ROUTER_EMMC_R
                                     'TY1208Z_ROUTER_EMMC_RO\n',
                                     '\tdepends on (!BLOCK && !MMC) || TY1208Z_ROUTER_SD_RO || '
                                     'TY1208Z_ROUTER_EMMC_RO || TY1208Z_OPENWRT_SYSTEM\n')]}
+
+TRANSFORMATIONS['drivers/clk/hisilicon/Kconfig'].append((
+    '\tdepends on USB_OHCI_HCD_PLATFORM=y && !BLOCK && !MMC && !MTD\n'
+    '\tdepends on !NET && !MODULES && !PM && !SMP && !DEBUG_FS\n',
+    '\tdepends on USB_OHCI_HCD_PLATFORM=y && !MTD && !PM && !SMP && !DEBUG_FS\n'
+    '\tdepends on (!BLOCK && !MMC && !NET && !MODULES) || TY1208Z_OPENWRT_SYSTEM\n'))
+TRANSFORMATIONS['drivers/mmc/host/Kconfig'].append((
+    '\tdepends on !SMP && !USB_SUPPORT && !MTD\n',
+    '\tdepends on !SMP && !MTD\n'
+    '\tdepends on !USB_SUPPORT || TY1208Z_OPENWRT_SYSTEM\n'))
+
 
 
 def apply(text, name):

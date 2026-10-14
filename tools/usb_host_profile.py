@@ -17,21 +17,8 @@ USB_OPTIONS = {
 }
 
 
-def usb_host_profile(tree, config):
-    props = {node["path"]: node["properties"] for node in tree["nodes"]}
-    enabled = "CONFIG_TY1208Z_USB_HOST0_EXPERIMENT=y\n" in config
-    nodes = props.keys() & HOST_NODES
-    if not enabled:
-        if nodes:
-            raise ValueError("USB host resources outside the explicit host0 profile")
-        return False
-    if (set(props) != BASE_NODES | HOST_NODES or
-            'CONFIG_LOCALVERSION="-ty1208z-usb-host1"\n' not in config or
-            props["/"].get("compatible", {}).get("strings") != [
-                "tianyi,ty1208z-ca-usb-host-experiment", "hi3798mv100-series"]):
-        raise ValueError("USB host0 identity, nodes or kernel release differs")
-    if props["/memory@0"].get("reg", {}).get("cells") != [0, 0x10000000]:
-        raise ValueError("USB host0 experiment exceeds bounded low RAM")
+def validate_usb_resources(props):
+    """Check the measured shared-clock connection in either explicit profile."""
     clock = props["/soc/clock-controller@f8a220b8"]
     if (set(clock) != {"compatible", "reg", "#clock-cells", "phandle"} or
             clock["compatible"].get("strings") != ["tianyi,ty1208z-usb-host0-clock"] or
@@ -51,6 +38,24 @@ def usb_host_profile(tree, config):
                 host["interrupts"].get("cells") != [0, irq, 4] or
                 host["clocks"].get("cells") != phandle):
             raise ValueError("USB host0 HCD resource/IRQ/shared-clock connection differs")
+
+
+def usb_host_profile(tree, config):
+    props = {node["path"]: node["properties"] for node in tree["nodes"]}
+    enabled = "CONFIG_TY1208Z_USB_HOST0_EXPERIMENT=y\n" in config
+    nodes = props.keys() & HOST_NODES
+    if not enabled:
+        if nodes:
+            raise ValueError("USB host resources outside the explicit host0 profile")
+        return False
+    if (set(props) != BASE_NODES | HOST_NODES or
+            'CONFIG_LOCALVERSION="-ty1208z-usb-host1"\n' not in config or
+            props["/"].get("compatible", {}).get("strings") != [
+                "tianyi,ty1208z-ca-usb-host-experiment", "hi3798mv100-series"]):
+        raise ValueError("USB host0 identity, nodes or kernel release differs")
+    if props["/memory@0"].get("reg", {}).get("cells") != [0, 0x10000000]:
+        raise ValueError("USB host0 experiment exceeds bounded low RAM")
+    validate_usb_resources(props)
     values = dict(re.findall(r"^CONFIG_(\w+)=([ym])$", config, re.MULTILINE))
     active = set(values)
     if any(values.get(name) != "y" for name in USB_OPTIONS):

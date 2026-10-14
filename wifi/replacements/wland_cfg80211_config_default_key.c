@@ -11,6 +11,13 @@ static s32 wland_cfg80211_config_default_key(struct wiphy *wiphy,
 	if (!wland_check_vif_up(ifp->vif))
 		return -EIO;
 
-	/* No implemented default-key selector in the locked named-iovar path. */
+	/* ADD_TX_GTK already installs and selects this AP transmit group key.
+	 * Acknowledge only that exact completed operation; arbitrary selection
+	 * and WEP/unicast selectors still have no implemented firmware command.
+	 */
+	if (!unicast && multicast &&
+	    ifp->vif->wdev.iftype == NL80211_IFTYPE_AP &&
+	    ifp->vif->tx_gtk_valid && ifp->vif->tx_gtk_index == key_idx)
+		return 0;
 	return -EOPNOTSUPP;
 }

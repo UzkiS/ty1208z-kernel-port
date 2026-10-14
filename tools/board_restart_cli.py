@@ -159,6 +159,8 @@ def run(args, serial_module):
                         result["sd_shutdown_verified"] = True
                     if (emmc_ro or system_native) and b"EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
                         result["emmc_shutdown_verified"] = True
+                    if system_native and b"TY1208Z_SYSTEM_USB_SHUTDOWN_PASS ehci-and-ohci" in failure_tail:
+                        result["usb_shutdown_verified"] = True
                     if any(marker in failure_tail for marker in (
                             b"TY1208Z_RESTART_REFUSED", b"TY1208Z_RESTART_TIMEOUT", b"Reboot failed",
                             b"SD_IDENT_SHUTDOWN_FAILED", b"EMMC_RO_SHUTDOWN_FAILED", b"EMMC_RO_RESTART_REFUSED",
@@ -170,6 +172,8 @@ def run(args, serial_module):
                     raise TransferError("SD shutdown completion missing from actual restart stream")
                 if (emmc_ro or system_native) and not result.get("emmc_shutdown_verified"):
                     raise TransferError("eMMC shutdown completion missing from actual restart stream")
+                if system_native and not result.get("usb_shutdown_verified"):
+                    raise TransferError("USB shutdown completion missing from actual restart stream")
                 result["status"] = "restart-bootloader-verified"
             except (TransferError, ProbeError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:
                 result.update(status="error", error=str(exc) or "Host interrupted")

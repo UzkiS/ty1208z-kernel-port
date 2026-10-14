@@ -60,6 +60,7 @@ typedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32; typedef int32_t 
 typedef uint16_t __le16;
 #define WLAND_DBG(...) ((void)0)
 #define WLAND_ERR(...) ((void)0)
+#define pr_info(...) ((void)0)
 /* CONSTANTS */
 /* STRUCTURES */
 enum { WLAND_BUS_DATA = 2 };

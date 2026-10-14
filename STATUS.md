@@ -1,6 +1,16 @@
 # TY1208Z kernel port status
 
 Updated: 2026-10-14. Existing Hinas booted; a read-only SSH baseline was collected.
+Latest milestone: RDA5995 WPA2 STA, phone AP handshake/DHCP/page access and
+netifd AP/STA switching pass on the integrated RAM system. The final module fixes
+attach ownership, association IE reporting, AP GTK state and USB TX padding.
+Official LuCI now exposes the supported RDA settings; the real form builder and
+installed package payload pass. A pinned netifd EOF loop that interrupted wired
+management is fixed. Chinese Dockerman and the offline APK transaction are also
+integrated. Storage writes and installable delivery remain unfinished.
+See the [current progress report](verification/progress-20261014.md) and
+[wireless report](verification/rda-wireless-board-20261014.md);
+historical boundaries below describe earlier artifacts.
 No flashing, persistent boot changes or OTP writes were performed by this project. Offline
 implementation and repository push are authorized.
 
@@ -16,14 +26,17 @@ Docker/uplink firewall zones fix the initial integration failures. Both hosts
 shut down before command restart, and the original Chinese router/configuration
 was restored automatically. The normal source/build/package entry is
 `make openwrt-system`; [physical report](verification/openwrt-system-board-20261014.md).
-The rebuilt delivery is not another exact-artifact board pass. APK database
-integration, writable persistent storage, Wi-Fi STA/AP and installation remain
-unfinished. Historical profiles and their earlier boundaries below are retained.
+The final repackaged delivery is not a fresh whole-artifact boot trial: unchanged
+kernel/application evidence is reused, and changed module, wireless management,
+APK and UI boundaries were checked separately. APK integration and STA/AP now
+pass; writable persistent storage and installation remain unfinished. Historical
+profiles and their earlier boundaries below are retained.
 
 User preferences: future LuCI builds default to Simplified Chinese, onboard
 Wi-Fi acceptance includes AP, and required [Docker support](docs/containers.md)
 follows verified higher-memory and storage support. The board has 1 GiB
-physical DDR; the current RAM profile deliberately exposes only low 256 MiB.
+physical DDR; the integrated system exposes measured low 768 MiB (about 744 MiB
+usable). The ordinary recovery router still exposes only low 256 MiB.
 User requested an empty default root password on 2026-10-13; the built plain
 and router rootfs already use it. RAM setup must stop adding random passwords;
 only explicitly user-configured passwords are preserved on later restoration.

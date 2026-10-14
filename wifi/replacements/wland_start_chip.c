@@ -43,6 +43,7 @@ int wland_start_chip(struct net_device *ndev)
 	    strcmp(rdawlan_firmware_path, "p2p"))
 		return -EPERM;
 
+	pr_info("RDA_STARTUP bus-active\n");
 	err = wland_bus_active(drvr->bus_if);
 	if (err < 0)
 		goto fail;
@@ -58,6 +59,7 @@ int wland_start_chip(struct net_device *ndev)
 		rda_mmc_set_sdio_irq(1, true);
 #endif
 #endif
+		pr_info("RDA_STARTUP firmware-state-query\n");
 		err = wland_fil_get_cmd_data(ifp, WID_MEMORY_ADDRESS,
 					     &memory_address, sizeof(memory_address));
 		if (err < 0)
@@ -68,12 +70,15 @@ int wland_start_chip(struct net_device *ndev)
 			goto fail;
 		}
 		if (memory_address != 0xffffffff) {
+			pr_info("RDA_STARTUP firmware-code\n");
 			err = wland_download_codefile(ifp);
 			if (err < 0)
 				goto fail;
+			pr_info("RDA_STARTUP firmware-data\n");
 			err = wland_download_datafile(ifp);
 			if (err < 0)
 				goto fail;
+			pr_info("RDA_STARTUP firmware-run\n");
 			err = wland_run_firmware(ifp, RDA5991H_CODE_ADDR);
 			if (err < 0)
 				goto fail;

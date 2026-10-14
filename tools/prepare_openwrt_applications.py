@@ -11,6 +11,7 @@ import tempfile
 import urllib.request
 
 from prepare_openwrt import extract, prepare, sha256, toolchain_from_native
+from luci_rda_wireless import apply as apply_luci_rda
 
 
 def pinned_feeds(project, taskbase):
@@ -73,6 +74,7 @@ def pinned_feeds(project, taskbase):
             raise ValueError(f"Existing source patch differs: {item['path']}")
         output.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(patch, output)
+    apply_luci_rda(destinations["luci"])
     return "".join(lines), lock
 
 

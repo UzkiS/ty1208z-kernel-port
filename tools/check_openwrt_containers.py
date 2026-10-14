@@ -48,6 +48,11 @@ def check(source, built=False, application_runtime=False):
     for package in PACKAGES:
         if f"CONFIG_PACKAGE_{package}={'y' if application_runtime else 'm'}\n" not in config:
             raise ValueError(f"Container package selection differs from this profile: {package}")
+    if application_runtime:
+        for package in ("luci-app-dockerman", "luci-i18n-dockerman-zh-cn",
+                        "docker-compose", "ttyd", "ucode-mod-socket"):
+            if f"CONFIG_PACKAGE_{package}=y\n" not in config:
+                raise ValueError(f"Missing Docker LuCI dependency: {package}")
     if f"CONFIG_PACKAGE_kmod-nft-nat={'y' if application_runtime else 'm'}\n" not in config:
         raise ValueError("Container dependency kernel lacks selected nft NAT modules")
     manifest = json.loads((source / ".ty1208z-overlay.json").read_text())

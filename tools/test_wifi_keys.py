@@ -70,7 +70,7 @@ typedef uint8_t u8; typedef uint32_t u32; typedef int32_t s32;
 struct key_params { const u8 *key; const u8 *seq; int key_len; int seq_len; u32 cipher; };
 struct wiphy { int unused; };
 struct wireless_dev { enum nl80211_iftype iftype; };
-struct wland_cfg80211_vif { struct wireless_dev wdev; };
+struct wland_cfg80211_vif { struct wireless_dev wdev; bool tx_gtk_valid; u8 tx_gtk_index; };
 struct wland_cfg80211_profile { u8 bssid[ETH_ALEN]; };
 struct wland_if;
 struct net_device {
@@ -114,6 +114,7 @@ static const u8 peer[6] = {2, 3, 4, 5, 6, 7};
 static void reset(enum nl80211_iftype type) {
     netdev.priv = &interface; netdev.ieee80211_ptr = &vif.wdev;
     vif.wdev.iftype = type; memcpy(profile.bssid, peer, sizeof(peer));
+    vif.tx_gtk_valid = false; vif.tx_gtk_index = 0;
     ready = true; calls = waits = debug_calls = secret_dumps = 0; reply_status = 0;
     ap_gtk_len = 0x55; command_wid = 0; command_size = 0;
     memset(command_data, 0xa5, sizeof(command_data));
@@ -165,9 +166,12 @@ int main(void) {
                 if (length != lengths[c]) {
                     assert(result == -EINVAL && !calls && !waits && !debug_calls);
                     assert(ap_gtk_len == 0x55);
+                    assert(!vif.tx_gtk_valid);
                 } else {
                     assert(!result); check_payload(roles[r], pairwise, pairwise ? 0 : 3, key, length, sequence, 8);
                     assert(ap_gtk_len == ((!pairwise && roles[r] == NL80211_IFTYPE_AP) ? length+2 : 0x55));
+                    assert(vif.tx_gtk_valid == (!pairwise && roles[r] == NL80211_IFTYPE_AP));
+                    if (vif.tx_gtk_valid) assert(vif.tx_gtk_index == 3);
                 }
                 for (int i = 0; i < length; i++) assert(key[i] == (u8)(0x10+i));
                 assert(!secret_dumps);
@@ -182,6 +186,7 @@ int main(void) {
             reset(roles[r]); reply_status = statuses[i];
             assert(install(pairwise, 0, peer, &params) == (reply_status < 0 ? reply_status : 0));
             assert(calls == 1); assert(ap_gtk_len == ((!pairwise && roles[r] == NL80211_IFTYPE_AP && reply_status >= 0) ? 18 : 0x55));
+            assert(vif.tx_gtk_valid == (!pairwise && roles[r] == NL80211_IFTYPE_AP && reply_status >= 0));
         }
     }
     for (int len = -1; len <= 40; len++) {

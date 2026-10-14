@@ -12,6 +12,7 @@ from native_emmc_profile import BOOTARGS, NODE as EMMC_NODE, PROPERTIES as EMMC_
 from sd_ident_profile import NODE as SD_NODE, PROPERTIES as SD_PROPERTIES
 from ram768_profile import memory_boot_evidence
 from ethernet_net_profile import NETWORK_NODES
+from usb_host_profile import HOST_NODES, USB_OPTIONS, validate_usb_resources
 
 COMPATIBLE = 'tianyi,ty1208z-ca-openwrt-system-ram'
 RESTART = '/soc/system-restart@f8a2c000'
@@ -31,8 +32,9 @@ def native_system_profile(tree, config):
                 'POWER_RESET_TY1208Z_MV100_SYSTEM', 'PROC_PAGE_MONITOR', 'MEMCG', 'CGROUPS',
                 'CFS_BANDWIDTH', 'SECCOMP', 'SECCOMP_FILTER', 'NAMESPACES', 'NET_NS', 'PID_NS',
                 'OVERLAY_FS', 'TMPFS_XATTR', 'BLOCK', 'EXT4_FS', 'VFAT_FS', 'EXFAT_FS',
-                'ARM_APPENDED_DTB', 'BLK_DEV_INITRD', 'RD_GZIP', 'MODULES'}
-    forbidden = {'USB_SUPPORT', 'SMP', 'HIGHMEM', 'WATCHDOG', 'DEBUG_FS', 'PM', 'MTD', 'MMC_TEST',
+                'ARM_APPENDED_DTB', 'BLK_DEV_INITRD', 'RD_GZIP', 'MODULES',
+                'TY1208Z_USB_HOST0_EXPERIMENT', 'CFG80211', 'FW_LOADER', 'CRYPTO_MD5'} | USB_OPTIONS
+    forbidden = {'USB_STORAGE', 'USB_UAS', 'SMP', 'HIGHMEM', 'WATCHDOG', 'DEBUG_FS', 'PM', 'MTD', 'MMC_TEST',
                  'OF_PARTITION', 'BLK_DEV_WRITE_MOUNTED', 'TY1208Z_ROUTER_RAM768',
                  'TY1208Z_ROUTER_SD_RO', 'TY1208Z_ROUTER_EMMC_RO', 'POWER_RESET_TY1208Z_MV100_EMMC_RO',
                  'POWER_RESET_TY1208Z_MV100_SD', 'POWER_RESET_TY1208Z_SP805',
@@ -42,10 +44,11 @@ def native_system_profile(tree, config):
         raise ValueError('Integrated native configuration differs from the measured composition')
     if ('CONFIG_LOCALVERSION="-ty1208z-openwrt-system"\n' not in config or
             'CONFIG_INITRAMFS_SOURCE=""\n' not in config or
-            set(props) != BASE | NETWORK_NODES | {EMMC_NODE, SD_NODE, RESTART} or
+            set(props) != BASE | NETWORK_NODES | HOST_NODES | {EMMC_NODE, SD_NODE, RESTART} or
             props['/memory@0']['reg'].get('cells') != [0, 0x30000000] or
             props['/chosen']['bootargs'].get('strings') != [BOOTARGS]):
         raise ValueError('Integrated identity/memory/peripherals/partitions differ')
+    validate_usb_resources(props)
     for node, expected in ((EMMC_NODE, EMMC_PROPERTIES), (SD_NODE, SD_PROPERTIES)):
         if set(props[node]) != set(expected) or any(props[node][name].get(kind) != value
                 for name, kinds in expected.items() for kind, value in kinds.items()):
@@ -54,8 +57,10 @@ def native_system_profile(tree, config):
     if (set(reset) != {'compatible', 'reg'} or
             reset['compatible'].get('strings') != ['tianyi,ty1208z-mv100-system-restart'] or
             reset['reg'].get('cells') != [0xf8a2c000, 0x1000, 0xf8000ee0, 4,
-                                         0xf9830000, 0x1000, 0xf9820000, 0x1000]):
-        raise ValueError('Integrated two-host reset resources differ')
+                                         0xf9830000, 0x1000, 0xf9820000, 0x1000,
+                                         0xf9890000, 0x10000, 0xf9880000, 0x10000,
+                                         0xf8a220b8, 4, 0xf8a220bc, 4]):
+        raise ValueError('Integrated storage/USB reset resources differ')
     aliases = props['/aliases']
     if aliases.get('mmc0', {}).get('strings') != [EMMC_NODE] or aliases.get('mmc1', {}).get('strings') != [SD_NODE]:
         raise ValueError('Stable read-only disk host aliases differ')

@@ -1,0 +1,21 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+uci -q get wireless.radio0 >/dev/null && exit 0
+touch /etc/config/wireless || exit 1
+uci -q batch <<'EOF'
+set wireless.radio0=wifi-device
+set wireless.radio0.type='rda'
+set wireless.radio0.path='platform/soc/f9890000.usb/usb1/1-2'
+set wireless.radio0.band='2g'
+set wireless.radio0.channel='6'
+set wireless.radio0.htmode='HT20'
+set wireless.radio0.disabled='1'
+set wireless.default_radio0=wifi-iface
+set wireless.default_radio0.device='radio0'
+set wireless.default_radio0.mode='ap'
+set wireless.default_radio0.network='lan'
+set wireless.default_radio0.ssid='OpenWrt'
+set wireless.default_radio0.encryption='none'
+commit wireless
+EOF
+exit $?

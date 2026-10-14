@@ -19,7 +19,7 @@ def replace(text, old, new, count=1):
 def function_spans(text, name):
     """Locate locked C definitions, counting braces outside strings/comments."""
     pattern = re.compile(r"^(?:static\s+)?(?:__maybe_unused\s+)?(?:inline\s+)?"
-                         r"(?:int|s32|u8|u16|u64|void|bool|struct\s+file\s*\*)\s*"
+                         r"(?:int|s32|u8|u16|u64|void|bool|struct\s+\w+\s*\*)\s*"
                          + re.escape(name) + r"\s*\([^;]*?\)\s*\{", re.M)
     spans = []
     for match in pattern.finditer(text):
@@ -133,10 +133,34 @@ def scan_result_handler(text):
 
 def transform(files):
     result = dict(files)
+    result["rdawlan/wland_defs.h"] = replace(
+        files["rdawlan/wland_defs.h"],
+        "#ifdef WLAND_USB_SUPPORT\n\n#define WLAND_P2P_SUPPORT",
+        "#ifdef WLAND_USB_SUPPORT\n\n"
+        "/* USB STA/AP use WIDs; P2P requires an unavailable named-iovar transport. */")
+    result["rdawlan/wland_cfg80211.h"] = replace(
+        files["rdawlan/wland_cfg80211.h"],
+        "struct wland_cfg80211_connect_info {",
+        "struct wland_cfg80211_connect_info {\n"
+        "\t/* Work/timer/list lifetime, including partial attach rollback. */\n"
+        "\tbool initialized;")
+    result["rdawlan/wland_cfg80211.h"] = replace(
+        result["rdawlan/wland_cfg80211.h"], "struct wland_cfg80211_vif {",
+        "struct wland_cfg80211_vif {\n"
+        "\t/* WID_ADD_TX_GTK selects its supplied AP group-key index. */\n"
+        "\tbool tx_gtk_valid;\n\tu8 tx_gtk_index;")
+    result["rdawlan/wland_fweh.h"] = replace(files["rdawlan/wland_fweh.h"],
+                                            "\tu8 data[0];", "\tu8 data[];")
     result["rdawlan/wland_bus.c"] = replace(files["rdawlan/wland_bus.c"],
                                            "#include <asm/unaligned.h>", "#include <linux/unaligned.h>")
     result["rdawlan/wland_bus.c"] = replace(result["rdawlan/wland_bus.c"],
                                            "random_ether_addr(", "eth_random_addr(", 4)
+    for call, step in (("ret = wland_fws_init(drvr);", "fws-init"),
+                       ("drvr->config = wland_cfg80211_attach(drvr, bus_if->dev);", "cfg80211-attach"),
+                       ("ret = wland_netdev_attach(ifp);", "netdev-register")):
+        result["rdawlan/wland_bus.c"] = replace(
+            result["rdawlan/wland_bus.c"], "\t" + call,
+            '\tdev_info(dev, "RDA_STARTUP ' + step + '\\n");\n\t' + call)
     result["rdawlan/wland_utils.h"] = replace(files["rdawlan/wland_utils.h"],
                                               "prandom_u32", "get_random_u32")
     result["rdawlan/wland_fwsmgr.c"] = replace(files["rdawlan/wland_fwsmgr.c"], "strlcpy(", "strscpy(")
@@ -190,6 +214,24 @@ def transform(files):
     result["rdawlan/wland_rx.c"] = text
     # Applied after the USB-only API patch; these anchors are unaffected by it.
     text = files["rdawlan/wland_usb.c"]
+    text = replace(text, '#include "wland_bus.h"',
+                   '#include "wland_bus.h"\n#include "wland_port_usb.h"')
+    start, _, end = function_spans(text, "wland_usb_bus_txdata")[0]
+    operation = text[start:end]
+    begin = operation.index('\tbuf = skb->data;\n\tbuf_len = skb->len & CDC_DCMD_LEN_MASK;',
+                            operation.index('#endif\n\tbuf = skb->data;'))
+    finish = operation.index('\n\treq->skb = skb;', begin)
+    operation = operation[:begin] + '''\tret = wland_port_usb_tx_length(skb);
+\tif (ret < 0) {
+\t\twland_txcomplete(dev, skb, false);
+\t\twland_usb_enq(devinfo, &devinfo->tx_freeq, req,
+\t\t\t&devinfo->tx_freecount, &devinfo->tx_freeq_lock);
+\t\tgoto flow_ctrl;
+\t}
+\tbuf_len = ret;
+\tbuf = skb->data;
+''' + operation[finish:]
+    text = text[:start] + operation + text[end:]
     text = replace(text, '''\t\tmemcpy(buf, rx_info->rxctl, min(len, rxlen));''', '''\t\tif (rxlen > len || rxlen > rx_info->rxblen || !rx_info->rxctl)
 \t\t\terr = -EMSGSIZE;
 \t\telse {
@@ -197,6 +239,14 @@ def transform(files):
 \t\t\terr = rxlen;
 \t\t}''')
     text = replace(text, "\terr = rxlen>0 ? (int)rxlen : -ETIMEDOUT;", "\tif (!rxlen)\n\t\terr = -ETIMEDOUT;")
+    for call, step in (("ret = wland_bus_attach(0, dev);", "bus-attach"),
+                       ("ret = wland_bus_start(dev);", "bus-start")):
+        text = replace(text, "\t\t" + call,
+                       '\t\tdev_info(&intf->dev, "RDA_STARTUP ' + step + '\\n");\n\t\t' + call)
+    text = replace(text, '\tWLAND_DBG(USB, ERROR, "Enter\\n");',
+                   '\tdev_info(&intf->dev, "RDA_STARTUP usb-probe\\n");')
+    text = replace(text, "\treturn 0;\nfail1:",
+                   '\tdev_info(&intf->dev, "RDA_STARTUP usb-probe-complete\\n");\n\treturn 0;\nfail1:')
     result["rdawlan/wland_usb.c"] = text
     text = files["rdawlan/wland_nvram.c"]
     text = body(text, "wland_nvram_read", '''\tstruct file *file;
@@ -264,6 +314,14 @@ def transform(files):
 ''')
     result["rdawlan/wland_cmds.c"] = text
     text = files["rdawlan/wland_trap.c"]
+    text = replace(text, '#ifdef WLAND_FIRMWARE_PATH\n',
+                   '#if defined(WLAND_FIRMWARE_PATH) && !defined(WLAND_USB_SUPPORT)\n')
+    text = replace(text, '\tsdesc->flags = 0x0;\n', '')
+    text = replace(text, 'int wland_hash(char *name, const u8 *str, size_t len, u8 *hash)',
+                   'static int wland_hash(char *name, const u8 *str, size_t len, u8 *hash)')
+    text = replace(text, '\tcrypto_shash_update(sdesc, str, len);',
+                   '\terr = crypto_shash_update(sdesc, str, len);\n'
+                   '\tif (err)\n\t\tgoto hash_err;')
     text = replace(text, '''\trdlen = kernel_read(fp, fp->f_pos, buf, len);
 \tif (rdlen > 0)
 \t\tfp->f_pos += rdlen;''', '\trdlen = kernel_read(fp, buf, len, &fp->f_pos);')
@@ -287,6 +345,9 @@ def transform(files):
 \t\t\tfilename = RDA5991H_USB_{component}_RF;
 #endif'''
         text = replace(text, branch, '')
+    text = replace(text, '\t\tret = wland_download_image(ifp, filename, RDA5991H_CODE_ADDR);',
+                   '\t\tret = wland_download_image(ifp, filename, RDA5991H_CODE_ADDR);\n'
+                   '\tif (ret < 0)\n\t\treturn ret;')
     result["rdawlan/wland_trap.c"] = text
 
     text = files["rdawlan/wland_linux.c"]
@@ -300,6 +361,18 @@ def transform(files):
     text = body(text, "wland_check_test_mode", "\treturn 0;\n")
     text = body(text, "wland_set_test_mode", "\t/* Manufacturing/test firmware is unavailable in this port. */\n")
     text = replace(text, "static u8 wifi_in_test_mode = 0;", "/* Test mode deliberately has no mutable state. */")
+    start, _, end = function_spans(text, "wland_del_if")[0]
+    operation = text[start:end]
+    operation = replace(operation, '\t\tunregister_netdev(ifp->ndev);',
+                        '\t\t/* Keep netdev/ifp alive until cfg80211 works, timers and\n'
+                        '\t\t * vif pointers are drained after netdev unregister.\n'
+                        '\t\t */\n'
+                        '\t\tifp->ndev->priv_destructor = NULL;\n'
+                        '\t\tunregister_netdev(ifp->ndev);')
+    operation = replace(operation, '\t\tdrvr->iflist[bssidx] = NULL;\n\n\t} else {',
+                        '\t\tdrvr->iflist[bssidx] = NULL;\n'
+                        '\t\tfree_netdev(ifp->ndev);\n\n\t} else {')
+    text = text[:start] + operation + text[end:]
     result["rdawlan/wland_linux.c"] = text
     result["rdawlan/wland_wid.c"] = replace_definition(
         files["rdawlan/wland_wid.c"], "wland_start_chip")
@@ -317,6 +390,7 @@ def transform(files):
     result["rdawlan/wland_rf.c"] = text
 
     text = files["rdawlan/wland_cfg80211.c"]
+    text = replace_definition(text, "wland_cfg80211_change_virtual_iface")
     text = replace_definition(text, "wland_get_assoc_ies_from_frame")
     text = replace(text, '#include "wland_android.h"',
                    '#include <linux/math64.h>\n#include "wland_port_key.h"\n'
@@ -428,6 +502,10 @@ def transform(files):
 \tif (ifp->vif->wdev.iftype == NL80211_IFTYPE_AP)
 \t\tap_gtk_len = params->key_len + 2;
 #endif
+\tif (ifp->vif->wdev.iftype == NL80211_IFTYPE_AP) {
+\t\tifp->vif->tx_gtk_index = key_idx;
+\t\tifp->vif->tx_gtk_valid = true;
+\t}
 \tWLAND_DBG(CFG80211, TRACE, "Done.\\n");''')
     text = text[:start] + operation + text[end:]
     for name in ("wland_cfg80211_del_key", "wland_cfg80211_get_key",
@@ -455,6 +533,12 @@ def transform(files):
     text = text[:start] + operation + text[end:]
     start, _, end = function_spans(text, "wland_cfg80211_up")[0]
     operation = text[start:end]
+    operation = replace(operation, '''\terr = wland_dongle_roam(ifp, (cfg->roam_on ? 0 : 1),
+\t\tWLAND_BEACON_TIMEOUT);
+\tif (err < 0)
+\t\tgoto up_exit;''', '''\t/* RDA has no named-iovar roaming transport. Host supplicant owns
+\t * roaming; link-loss handling is configured by preinit's real WIDs.
+\t */''')
     operation = replace(operation, '''up_exit:
 \tmutex_unlock(&cfg->usr_sync);''', '''up_exit:
 \t/* A failed initialization must not leave cfg80211 callbacks enabled. */
@@ -462,6 +546,12 @@ def transform(files):
 \t\tclear_bit(VIF_STATUS_READY, &ifp->vif->sme_state);
 \tmutex_unlock(&cfg->usr_sync);''')
     text = text[:start] + operation + text[end:]
+    text = replace(text, '\tcfg->roam_on = true;\t/* roam on & off switch. we enable roam per default */',
+                   '\tcfg->roam_on = false;\t/* Firmware roaming is not advertised. */')
+    for name in ("wland_dongle_roam", "wland_construct_reginfo"):
+        start, _, end = function_spans(text, name)[0]
+        text = text[:start] + text[end:]
+    text = replace_definition(text, "wland_update_wiphybands")
     start, _, end = function_spans(text, "wland_wait_for_scancmp_event")[0]
     operation = text[start:end]
     operation = replace(operation, 'cfg->scanid_wait, !(*lockvar),',
@@ -542,6 +632,20 @@ scan_failed:
                    '\t\t\tmin_t(int, ssids->ssid_len, sizeof(ssids->ssid)), ssids->ssid);')
     text = replace(text, '\t\t\tcfg->ctrl_scan_wait = false;',
                    '\t\t\tWRITE_ONCE(cfg->ctrl_scan_wait, false);')
+    for name in ("wland_init_connect_info", "wland_deinit_connect_info",
+                 "wland_cfg80211_attach", "wland_free_vif", "wland_get_assoc_ies"):
+        text = replace_definition(text, name)
+    text = replace(text, "\t\tif (completed) {\n\t\t\t//wland_get_assoc_ies(cfg, ifp);",
+                   "\t\tif (completed && wland_get_assoc_ies(cfg, ifp) < 0) {\n"
+                   "\t\t\tWLAND_ERR(\"Firmware association IE query failed\\n\");\n"
+                   "\t\t\tcompleted = false;\n"
+                   "\t\t}\n"
+                   "\t\tif (completed) {")
+    text = replace(text, "\t\t\tWARN_ON(profile->rsn_cap);", "")
+    for name in ("wland_cfg80211_start_ap", "wland_cfg80211_down"):
+        _, start, end = function_spans(text, name)[0]
+        insertion = text.index('\tWLAND_DBG(', start, end)
+        text = text[:insertion] + '\tifp->vif->tx_gtk_valid = false;\n\n' + text[insertion:]
     text = replace(text, '#include "wland_wid.h"',
                    '#include "wland_wid.h"\n#include "wland_port_scan.h"')
     text = replace_definition(text, "wland_parse_network_info")

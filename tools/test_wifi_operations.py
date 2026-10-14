@@ -52,6 +52,8 @@ status = re.search(r"^enum wland_vif_status \{[\s\S]*?^\};",
                    files["wland_cfg80211.h"], re.M)
 assert status
 constants += status[0] + "\n"
+constants += re.search(r"^enum wland_mode \{[\s\S]*?^\};",
+                       files["wland_cfg80211.h"], re.M)[0] + "\n"
 stop = re.search(r"^\s*WID_STOP_AP_MAC1\s*=\s*([^,\n]+),", files["wland_wid.h"], re.M)
 assert stop
 constants += "enum { WID_STOP_AP_MAC1 = " + stop[1] + " };\n"
@@ -82,7 +84,9 @@ typedef uint8_t u8; typedef uint16_t u16; typedef uint32_t u32; typedef int32_t 
 struct wiphy { int unused; };
 struct key_params { const u8 *key; const u8 *seq; int key_len; int seq_len; u32 cipher; };
 struct wireless_dev { enum nl80211_iftype iftype; };
-struct wland_cfg80211_vif { struct wireless_dev wdev; unsigned long sme_state; };
+struct wland_cfg80211_vif { struct wireless_dev wdev; unsigned long sme_state; bool tx_gtk_valid; u8 tx_gtk_index; enum wland_mode mode; };
+struct vif_params { int unused; };
+static char rdawlan_firmware_path[5];
 struct wland_if;
 struct net_device { struct wireless_dev *ieee80211_ptr; struct wland_if *priv; };
 struct wland_if { struct wland_cfg80211_vif *vif; int bssidx; u8 mac_addr[ETH_ALEN]; };
@@ -125,6 +129,7 @@ static struct wland_cfg80211_conf settings;
 static void reset(enum nl80211_iftype role) {
     ready = true; firmware_calls = callbacks = 0; reply_status = 0;
     interface.bssidx = P2PAPI_BSSCFG_DEVICE; vif.wdev.iftype = role;
+    vif.tx_gtk_valid = false; vif.tx_gtk_index = 0;
     netdev.ieee80211_ptr = &vif.wdev;
     config.conf = &settings; config.ndev = &netdev; settings.tx_power = 0x1234;
     const u8 address[] = {2,3,4,5,6,7}; memcpy(interface.mac_addr, address, ETH_ALEN);
@@ -148,6 +153,13 @@ static void unsupported_keys(void) {
     assert(wland_cfg80211_get_key(&phy, &netdev, -1, 0, false, NULL, NULL, key_callback) == -EIO);
     assert(wland_cfg80211_config_default_key(&phy, &netdev, -1, 0, true, true) == -EIO);
     ready = true;
+    reset(NL80211_IFTYPE_AP); vif.tx_gtk_valid = true; vif.tx_gtk_index = 2;
+    assert(wland_cfg80211_config_default_key(&phy, &netdev, -1, 2, false, true) == 0);
+    assert(wland_cfg80211_config_default_key(&phy, &netdev, -1, 1, false, true) == -EOPNOTSUPP);
+    assert(wland_cfg80211_config_default_key(&phy, &netdev, -1, 2, true, true) == -EOPNOTSUPP);
+    vif.tx_gtk_valid = false;
+    assert(wland_cfg80211_config_default_key(&phy, &netdev, -1, 2, false, true) == -EOPNOTSUPP);
+    reset(NL80211_IFTYPE_STATION);
     assert(wland_cfg80211_get_key(&phy, &netdev, -1, 0, false, NULL, NULL, NULL) == -EINVAL);
     assert(wland_cfg80211_del_key(&phy, &netdev, 1, 0, false, NULL) == -EOPNOTSUPP);
     assert(wland_cfg80211_get_key(&phy, &netdev, 1, 0, false, NULL, NULL, key_callback) == -EOPNOTSUPP);
@@ -221,8 +233,27 @@ static void tx_power(void) {
     assert(wland_cfg80211_set_tx_power(&phy, &vif.wdev, NL80211_TX_POWER_FIXED, 2000) == -EIO);
     assert(settings.tx_power == 0x1234 && !firmware_calls);
 }
+static void change_iface(void) {
+    const char *firmware[] = {"sta", "ap", "p2p"};
+    for (unsigned f = 0; f < 3; f++) {
+        for (int type = 0; type < NUM_NL80211_IFTYPES; type++) {
+            reset(NL80211_IFTYPE_STATION); interface.bssidx = 0;
+            vif.mode = WL_MODE_BSS;
+            strcpy(rdawlan_firmware_path, firmware[f]);
+            bool supported = (f == 0 && type == NL80211_IFTYPE_STATION) ||
+                             (f == 1 && type == NL80211_IFTYPE_AP);
+            int result = wland_cfg80211_change_virtual_iface(&phy, &netdev, type, NULL);
+            assert(result == (supported ? 0 : -EOPNOTSUPP));
+            assert((int)vif.wdev.iftype == (supported ? type : NL80211_IFTYPE_STATION));
+            assert(vif.mode == (supported && f == 1 ? WL_MODE_AP : WL_MODE_BSS));
+            assert(!firmware_calls);
+        }
+    }
+    interface.bssidx = 1; strcpy(rdawlan_firmware_path, "sta");
+    assert(wland_cfg80211_change_virtual_iface(&phy, &netdev, NL80211_IFTYPE_STATION, NULL) == -EOPNOTSUPP);
+}
 int main(void) {
-    unsupported_keys(); named_iovars(); stop_ap(); tx_power();
+    unsupported_keys(); named_iovars(); stop_ap(); tx_power(); change_iface();
     assert(sizeof(__wl_cipher_suites)/sizeof(__wl_cipher_suites[0]) == 4);
     puts("RDA_OPERATIONS_PASS: actual unsupported callbacks/iovars, output preservation, AP-stop payload/reply ordering and cipher declarations");
 }
@@ -232,7 +263,8 @@ functions = [definition("wland_cmds.c", name) for name in (
     "wland_fil_iovar_data_set", "wland_fil_iovar_data_get")]
 functions += [definition("wland_cfg80211.c", name) for name in (
     "wland_cfg80211_del_key", "wland_cfg80211_get_key", "wland_cfg80211_config_default_key",
-    "wland_cfg80211_stop_ap", "wland_cfg80211_set_tx_power", "wland_cfg80211_get_tx_power")]
+    "wland_cfg80211_stop_ap", "wland_cfg80211_set_tx_power", "wland_cfg80211_get_tx_power",
+    "wland_cfg80211_change_virtual_iface")]
 code = code.replace("/* FUNCTIONS */", "\n".join(functions))
 code = code.replace("/* ADVERTISED */", advertised)
 with tempfile.TemporaryDirectory() as directory:

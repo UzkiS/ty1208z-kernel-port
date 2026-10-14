@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Optional host0 clock/PHY experiment; hardware USB audit remains pending. */
+/* Measured host0 clock/PHY sequence shared by the RAM system and USB profile. */
 #include <linux/clk-provider.h>
 #include <linux/module.h>
 #include <linux/of.h>
@@ -61,7 +61,9 @@ static int ty1208z_usb_clock_probe(struct platform_device *pdev)
 	unsigned int i;
 	int ret;
 
-	if (!of_machine_is_compatible("tianyi,ty1208z-ca-usb-host-experiment"))
+	if (!of_machine_is_compatible("tianyi,ty1208z-ca-usb-host-experiment") &&
+	    !(IS_ENABLED(CONFIG_TY1208Z_OPENWRT_SYSTEM) &&
+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-system-ram")))
 		return -ENODEV;
 	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
 		resource = platform_get_resource(pdev, IORESOURCE_MEM, i);

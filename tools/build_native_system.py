@@ -54,9 +54,11 @@ for name in TRANSFORMATIONS:
     expected = ensure((original / name).read_text(), name)
     if path.read_text() != expected:
         path.write_text(expected)
-reset = Path('drivers/power/reset/ty1208z-mv100-system-restart.c')
-if not (kernel / reset).exists() or (project / 'overlay' / reset).read_bytes() != (kernel / reset).read_bytes():
-    shutil.copyfile(project / 'overlay' / reset, kernel / reset)
+for name in ('drivers/power/reset/ty1208z-mv100-system-restart.c',
+             'drivers/clk/hisilicon/clk-ty1208z-usb.c'):
+    overlay = project / 'overlay' / name
+    if not (kernel / name).exists() or overlay.read_bytes() != (kernel / name).read_bytes():
+        shutil.copyfile(overlay, kernel / name)
 
 state['native_config_sha256'] = digest(original / '.config')
 
@@ -98,7 +100,9 @@ with log.open('wb') as handle:
     resolved = (kernel / '.config').read_text()
     expected = options((project / 'openwrt/system/kernel.config').read_text())
     actual = options(resolved)
-    assert all(actual.get(name) == value for name, value in expected.items()), 'System kernel fragment did not resolve'
+    different = {name: (value, actual.get(name)) for name, value in expected.items()
+                 if actual.get(name, '# CONFIG_' + name + ' is not set') != value}
+    assert not different, 'System kernel fragment did not resolve: ' + repr(different)
     state['config_sha256'] = digest(kernel / '.config')
     save('building-integrated-native-kernel-and-modules')
     result = subprocess.run(make + ['-j4', 'zImage', 'modules'], stdout=handle, stderr=subprocess.STDOUT, env=environment)
@@ -113,5 +117,27 @@ assert layout['physical_bss_end'] < 0x1000000, 'Integrated kernel exceeds the me
 state['layout'] = layout
 state['zimage_sha256'] = digest(kernel / 'arch/arm/boot/zImage')
 state['modules'] = len(list(kernel.rglob('*.ko')))
+save('building-matching-rda-module')
+pristine = base / 'rda-usb/source'
+subprocess.run([sys.executable, project / 'tools/fetch_wifi.py', '--output', pristine], check=True)
+port = work / 'rda-port'
+if port.exists():
+    assert not port.is_symlink() and port.resolve().is_relative_to(work.resolve())
+    shutil.rmtree(port)
+shutil.copytree(pristine, port)
+with (work / 'rda-module-build.log').open('wb') as handle:
+    for name in ('0003-rda-usb-api-audit.patch', '0004-rda-linux-6.12-port.patch'):
+        with (project / 'patches' / name).open('rb') as patch:
+            subprocess.run(['patch', '--forward', '--batch', '-d', str(port), '-p1'],
+                           stdin=patch, stdout=handle, stderr=subprocess.STDOUT, check=True)
+    shutil.copyfile(project / 'wifi/Kbuild', port / 'rdawlan/Kbuild')
+    subprocess.run(make + ['M=' + str(port / 'rdawlan'), '-j4', 'modules'],
+                   stdout=handle, stderr=subprocess.STDOUT, env=environment, check=True)
+module = port / 'rdawlan/rdawfmac.ko'
+symbols = subprocess.check_output([cross + 'nm', module], text=True)
+assert not re.search(r'wland_(efuse_set_|write_efuse_|write_txpower_to_efuse|rf_test_cmd)', symbols)
+state['rda_module'] = {'path': str(module), 'bytes': module.stat().st_size,
+                       'sha256': digest(module), 'hardware_accepted': False,
+                       'port_patch_sha256': digest(project / 'patches/0004-rda-linux-6.12-port.patch')}
 state['runtime_accepted'] = False
 save('integrated-native-kernel-built-not-booted')

@@ -146,6 +146,9 @@ def prepare(project, taskbase):
     # codeload archives have no Git revision. OpenWrt's 'unknown' fallback is
     # invalid in the APK package version; preserve the actual fixed commit.
     (destination / "version").write_text("source-" + item["commit"] + "\n")
+    from netifd_wireless_eof import apply as fix_netifd_eof
+    netifd_file = fix_netifd_eof(destination)
+    manifest[str(netifd_file.relative_to(destination))] = sha256(netifd_file)
     (destination / ".ty1208z-overlay.json").write_text(json.dumps(manifest, indent=2) + "\n")
     config = project / "openwrt/config/ram.config"
     if not (destination / ".config").exists():
