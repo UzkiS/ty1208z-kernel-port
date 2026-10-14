@@ -1,5 +1,5 @@
 #!/qemu-helper/busybox sh
-# QEMU-only entry gate; the unmodified native /init switches to tmpfs.
+# QEMU-only entry gate and bounded-memory handoff to native procd.
 set -eu
 helper=/qemu-helper/busybox
 "$helper" mount -t proc proc /proc
@@ -8,4 +8,43 @@ helper=/qemu-helper/busybox
 "$helper" grep -qw 'ty1208z.qemu_container_apps=1' /proc/cmdline
 "$helper" umount /sys
 "$helper" umount /proc
-exec /init
+
+# Native /init copies the complete root before switch_root. Larger application
+# archives cannot hold two complete roots within this guest's fixed 768 MiB.
+# Move each file after its copy instead; retain native init/procd and payloads.
+# ramfs unpacking and this tmpfs limit avoid the default half-RAM quota;
+# the guest's fixed RAM allocation remains unchanged.
+new_root=/new_root
+"$helper" mkdir "$new_root"
+"$helper" mount -t tmpfs -o mode=0755,size=90% tmpfs "$new_root"
+"$helper" mkdir "$new_root/qemu-helper"
+"$helper" cp -p "$helper" "$new_root/qemu-helper/busybox"
+helper="$new_root/qemu-helper/busybox"
+# BusyBox switch_root checks the old initramfs still contains a regular /init.
+"$helper" cp -p /init "$new_root/init"
+
+transfer_tree() {
+	# The explicitly selected interpreter is BusyBox ash.
+	# shellcheck disable=SC3043
+	local source="$1" target="$2" item
+	if [ -d "$source" ] && [ ! -L "$source" ]; then
+		"$helper" mkdir -p "$target"
+		for item in "$source"/* "$source"/.[!.]* "$source"/..?*; do
+			[ -e "$item" ] || [ -L "$item" ] || continue
+			transfer_tree "$item" "$target/${item##*/}"
+		done
+		"$helper" chmod "$("$helper" stat -c %a "$source")" "$target"
+		"$helper" rm -rf "$source"
+	else
+		"$helper" cp -a "$source" "$target"
+		"$helper" rm -f "$source"
+	fi
+}
+
+for item in /* /.[!.]* /..?*; do
+	[ -e "$item" ] || [ -L "$item" ] || continue
+	case "$item" in /new_root|/qemu-helper|/init) continue ;; esac
+	transfer_tree "$item" "$new_root/${item##*/}"
+done
+export INITRAMFS=1
+exec "$helper" switch_root "$new_root" /sbin/init

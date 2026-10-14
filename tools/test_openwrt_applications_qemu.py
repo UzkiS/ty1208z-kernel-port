@@ -189,7 +189,7 @@ def test(source, memory_mib=512, taskbase=None):
         "-m", f"{memory_mib}M", "-smp", "1", "-nographic", "-monitor", "none", "-serial", "stdio",
         "-no-reboot", "-nic", "none", "-kernel", str(kernel), "-initrd", str(initrd),
         # The combined archive exceeds rootfs tmpfs's default half-RAM limit.
-        # Unpack into ramfs; native /init still pivots to its own tmpfs root.
+        # The gated wrapper moves files to tmpfs before starting native procd.
         "-append", (f"console=ttyAMA0 rootfstype=ramfs rdinit=/qemu-init ty1208z.qemu_container_apps=1 panic=0 mem={memory_limit_mib}M"
                     if combined else f"console=ttyAMA0 rdinit=/init panic=0 mem={memory_limit_mib}M"),
     ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
@@ -213,7 +213,8 @@ def test(source, memory_mib=512, taskbase=None):
                     transcript.extend(data)
                     log.write(data)
                     log.flush()
-                    if b"Initramfs unpacking failed:" in transcript or b"Kernel panic" in transcript:
+                    if (b"Initramfs unpacking failed:" in transcript or b"Kernel panic" in transcript
+                            or b"Out of memory: Killed process" in transcript):
                         raise ValueError(f"Application QEMU runtime failed; see {transcript_path.name}")
                     if activation_at is None and b"Please press Enter" in transcript:
                         activation_at = time.monotonic() + 1
