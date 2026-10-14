@@ -23,7 +23,7 @@ def main():
     binary = args.output / "emmc-p9-control.arm"
     subprocess.run([str(toolchain / "bin/arm-openwrt-linux-muslgnueabi-gcc"), "-static", "-Os",
                     "-Wall", "-Wextra", "-Werror", "-s", str(source), "-o", str(binary)], check=True)
-    receipt = {"status": "compiled RAM-only p9 ioctl helper; not physically run", "compiler": identity,
+    receipt = {"status": "compiled RAM-only fixed p6/p9 ioctl helper; not physically run", "compiler": identity,
                "source_sha256": hashlib.sha256(source.read_bytes()).hexdigest(),
                "file": binary.name, "bytes": binary.stat().st_size,
                "sha256": hashlib.sha256(binary.read_bytes()).hexdigest(), "hardware_actions": False}

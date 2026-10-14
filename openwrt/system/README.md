@@ -58,3 +58,13 @@ authorized installation mode may load it. The default invocation of
 `probe_native_emmc_write.py` prints a one-sector write/readback/restore plan;
 `--apply` is reserved for specific user storage-write authorization.
 See [installation preparation](../../docs/installation-plan.md).
+
+The specifically authorized last-sector probe now passes on the board, with
+the original content restored and an automatic return to the readonly RAM
+system/configuration; [physical report](../../verification/native-emmc-write-board-20261014.md).
+The candidate exposes a page-sized block queue while upstream MMC data preparation
+still trims every transfer to one sector. `install_native_emmc.py` defaults to
+a verified offline plan, writes only fixed p9 then p6 under separately authorized
+`--apply`, clears the block cache for SHA-256 readback and relocks each partition.
+Its `--mode restore` streams only the original backed-up p9 range and p6 payload.
+Full installation, recovery writes and disk-root boot remain unaccepted.

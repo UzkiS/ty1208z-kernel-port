@@ -42,6 +42,10 @@ def run(args, serial_module):
               "persistent_writes": False}
     profile = getattr(args, "profile", "diagnostic")
     system_native = profile == "system"
+    install_version = getattr(args, "install_kernel_version", None)
+    if install_version is not None and (not system_native or
+            not re.fullmatch(r"6\.12\.112~[0-9a-f]{32}-r1", install_version)):
+        raise ValueError("Installation restart needs its exact system kernel APK version")
     native = profile in ("router", "router768", "router-sdro", "router-emmcro", "system")
     sd_ident = profile in ("sd-ident1", "sd-ro1")
     sd_shutdown = sd_ident or profile in ("router-sdro", "system")
@@ -78,6 +82,11 @@ def run(args, serial_module):
                         if b"../../../bus/platform/drivers/ty1208z-sp805-restart" not in binding:
                             raise TransferError("Actual RAM restart module binding missing")
                     if system_native:
+                        if install_version is not None:
+                            installed = command(exchange, b"apk query --installed --format json kernel")
+                            if not re.search(rb'"version"\s*:\s*"' + re.escape(install_version.encode()) + rb'"', installed):
+                                raise TransferError("Exact installation kernel APK differs; no restart sent")
+                            result["installation_kernel_version"] = install_version
                         binding = command(exchange, b"readlink /sys/bus/platform/devices/f8a2c000.system-restart/driver")
                         if b"../../../bus/platform/drivers/ty1208z-mv100-system-restart" not in binding:
                             raise TransferError("Integrated two-host restart binding missing")
@@ -88,6 +97,18 @@ def run(args, serial_module):
                                  b'test "$(cat /sys/class/block/mmcblk0/ro)" = 1 && '
                                  b'test "$(cat /sys/class/block/mmcblk1/ro)" = 1 && '
                                  b"test ! -e /tmp/ram768-area/memory-test && echo SYSTEM_STORAGE_GUARD; fi")
+                        if install_version is not None:
+                            no_mounts = command(exchange,
+                                b"! grep -Eq '^[^ ]+ [^ ]+ 179:' /proc/self/mountinfo && ! grep -q mmcblk /proc/swaps && "
+                                b'test "$(cat /sys/bus/mmc/devices/mmc0:0001/name)" = 008G30 && '
+                                b'test "$(cat /sys/class/block/mmcblk1/ro)" = 1 && echo INSTALL_STORAGE_UNMOUNTED')
+                            if not re.search(rb"(?:^|[\r\n])INSTALL_STORAGE_UNMOUNTED[\r\n]", no_mounts):
+                                raise TransferError("Installation storage is active or card identity differs")
+                            guard = (b"if test -e /sys/class/block/mmcblk0; then "
+                                     b'test "$(cat /sys/class/block/mmcblk0/size)" = 15269888 && '
+                                     b'test "$(cat /sys/class/block/mmcblk0/ro)" = 0 && '
+                                     b'for p in /sys/class/block/mmcblk0p*/ro; do test "$(cat "$p")" = 1 || exit 1; done; '
+                                     b"else test ! -e /dev/mmcblk0; fi && echo SYSTEM_STORAGE_GUARD")
                         state = command(exchange, guard)
                         if not re.search(rb"(?:^|[\r\n])SYSTEM_STORAGE_GUARD[\r\n]", state):
                             raise TransferError("Integrated storage is mounted/swapped or readonly identity differs")
@@ -131,7 +152,8 @@ def run(args, serial_module):
                                      command(exchange, RAM768_RESTART_GUARD)):
                         raise TransferError("Memory test file/mount still active; no restart sent")
                 result["kernel_verified"] = True
-                report = command(exchange, b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE")
+                report = command(exchange, b"dmesg | grep -E 'TY1208Z_(SYSTEM_)?RESTART_READY|TY1208Z_MV100_RESTART_READY'; "
+                                 b"echo TY1208Z_RESTART_CHECK_COMPLETE")
                 if (not (system_native and b"TY1208Z_SYSTEM_RESTART_READY no-startup-writes" in report) and
                     not re.search(rb"(?:^|[\r\n])[^\r\n]*TY1208Z_RESTART_READY "
                                   rb"no-startup-writes explicit-restart-only[\r\n]", report) or
@@ -195,6 +217,7 @@ def main():
     parser.add_argument("--output", type=Path)
     parser.add_argument("--profile", choices=("diagnostic", "router", "router768", "router-sdro", "router-emmcro", "system", "sd-ident1", "sd-ro1", "emmc-ro1", "ram768"), default="diagnostic")
     parser.add_argument("--timeout", type=int, default=60)
+    parser.add_argument("--install-kernel-version", help="Exact opt-in kernel APK identity for a separately authorized RAM candidate")
     args = parser.parse_args()
     if not 5 <= args.timeout <= 120:
         parser.error("timeout must be 5..120 seconds")

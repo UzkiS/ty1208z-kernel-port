@@ -142,12 +142,13 @@ class RestartSerialTests(unittest.TestCase):
                         os.write(master, (b"RAM768_MOUNT_ACTIVE" if mode == "mounted" else b"RAM768_RESTART_GUARD") + b"\r\n" + prompt)
                         if mode == "mounted":
                             return
-                    self.assertEqual(read_command(), b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE\r")
+                    report_command = b"dmesg | grep -E 'TY1208Z_(SYSTEM_)?RESTART_READY|TY1208Z_MV100_RESTART_READY'; echo TY1208Z_RESTART_CHECK_COMPLETE"
+                    self.assertEqual(read_command(), report_command + b"\r")
                     registration = b"not registered" if mode == "missing" else (
                         b"[0.4] driver: TY1208Z_RESTART_READY no-startup-writes explicit-restart-only")
                     if (native or sd_ident or memory or emmc_ro) and mode != "missing-mv100":
                         registration += b"\r\n[0.5] driver: TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes"
-                    completion = (b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE" if mode == "echo-completion"
+                    completion = (report_command if mode == "echo-completion"
                                   else b"TY1208Z_RESTART_CHECK_COMPLETE")
                     os.write(master, registration + b"\r\n" + completion + b"\r\n" + prompt)
                     if mode in {"missing", "echo-completion", "missing-mv100"}:

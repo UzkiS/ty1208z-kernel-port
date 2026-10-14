@@ -1,26 +1,32 @@
 # TY1208Z kernel port status
 
-Updated: 2026-10-14. Existing Hinas booted; a read-only SSH baseline was collected.
+Updated: 2026-10-14. The board has returned to integrated readonly RAM OpenWrt
+after the authorized single-sector write/readback/restore.
 Latest milestone: RDA5995 WPA2 STA, phone AP handshake/DHCP/page access and
 netifd AP/STA switching pass on the integrated RAM system. The final module fixes
 attach ownership, association IE reporting, AP GTK state and USB TX padding.
 Official LuCI now exposes the supported RDA settings; the real form builder and
 installed package payload pass. A pinned netifd EOF loop that interrupted wired
 management is fixed. Chinese Dockerman and the offline APK transaction are also
-integrated. Storage writes and installable delivery remain unfinished.
+integrated. The specifically authorized p9 last-sector write/readback/restore
+now passes; the original readonly RAM system/configuration has been restored.
+Full installation and disk-root persistence remain unfinished.
 See the [current progress report](verification/progress-20261014.md) and
 [wireless report](verification/rda-wireless-board-20261014.md);
 historical boundaries below describe earlier artifacts.
-No flashing, persistent boot changes or OTP writes were performed by this project. Offline
-implementation and repository push are authorized.
+No full installation, persistent boot changes or OTP writes were performed.
+Only the authorized 512-byte probe and its restoration wrote eMMC data.
+Offline implementation and repository push are authorized.
 
 A separate private installation candidate now builds offline: p6/p9-only
 one-sector write policy, a full 6846-MiB ext4 p9 with real APK metadata, a
 disk-root kernel and original p6 recovery payload. Policy/ordinary-boot refusal
-and filesystem/content/ownership checks pass. It has not run on the board and
-no storage-write authorization exists. The next proposed action is a single
-p9-sector write/readback followed by immediate original-sector restoration;
-see the [specific preparation and hashes](docs/installation-plan.md).
+and filesystem/content/ownership checks pass. Its RAM kernel physically passes
+the limited write and command-restart return; see the [write report](verification/native-emmc-write-board-20261014.md).
+The queue now accepts a page while MMC transfers remain single-sector. Fixed
+p6/p9 installation and recovery tools and exact private disk images are prepared,
+but full writes and disk-root boot are not authorized or accepted; see the
+[specific preparation and hashes](docs/installation-plan.md).
 
 Target: modern Linux, official native OpenWrt, Passwall, board Wi-Fi and verified
 time64 behavior. The current milestone is single-core RAM-only native network/

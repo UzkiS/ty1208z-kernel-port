@@ -58,8 +58,16 @@ def main():
                  "-o", "StrictHostKeyChecking=accept-new", "-o", "UserKnownHostsFile=" + settings["known_hosts"],
                  "-o", "BatchMode=yes", "-o", "ConnectTimeout=8", "root@" + settings["host"]]
 
-    def ssh(command, data=None, timeout=30):
-        result = subprocess.run([*arguments, command], input=data, capture_output=True, timeout=timeout)
+    def ssh(command, data=None, timeout=30, *, log=None):
+        try:
+            result = subprocess.run([*arguments, command], input=data, capture_output=True, timeout=timeout)
+        except subprocess.TimeoutExpired as exc:
+            if log is not None:
+                log.write_bytes((exc.stdout or b"") + (exc.stderr or b"") +
+                                b"\nHOST_TIMEOUT: restoration/lock status unconfirmed; no further write/reboot\n")
+            raise
+        if log is not None:
+            log.write_bytes(result.stdout + result.stderr)
         if result.returncode:
             raise RuntimeError("Remote step failed; no further write/reboot: " + result.stderr.decode(errors="replace"))
         return result.stdout
@@ -82,6 +90,9 @@ apk query --installed --format json kernel
     assert len(installed) == 1 and installed[0]["version"] == version, "Exact opt-in kernel APK identity differs"
     preimage = ssh(f"dd if=/dev/mmcblk0 bs=512 skip={SECTOR} count=1 2>/dev/null")
     assert len(preimage) == 512
+    with args.backup.open("rb") as handle:
+        handle.seek(SECTOR * 512)
+        assert handle.read(512) == preimage, "Live sector differs from the retained whole-user-area backup; no write"
     args.output.mkdir(parents=True)
     preimage_path = args.output / "sector-before.PRIVATE.bin"
     with preimage_path.open("xb") as handle:
@@ -126,8 +137,7 @@ echo NATIVE_EMMC_WRITE_READBACK_RESTORE_PASS
                "status": "write-starting-not-yet-accepted", "private_preimage": preimage_path.name}
     receipt_path = args.output / "receipt.json"
     receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")
-    output = ssh("sh -s", script.encode(), timeout=45)
-    (args.output / "result.PRIVATE.log").write_bytes(output)
+    output = ssh("sh -s", script.encode(), timeout=45, log=args.output / "result.PRIVATE.log")
     assert b"NATIVE_EMMC_WRITE_READBACK_RESTORE_PASS\n" in output
     receipt.update(status="one-sector-write-readback-restored", ended_utc=datetime.now(timezone.utc).isoformat())
     receipt_path.write_text(json.dumps(receipt, indent=2) + "\n")

@@ -14,13 +14,33 @@ HARNESS = r'''
 #include <stdio.h>
 #include "hi3798mv100-emmc-install-policy.h"
 #define IS_ENABLED(option) (option)
-struct mmc_card { bool mmc, ro; struct { unsigned cmdclass; } csd; };
+struct mmc_host { unsigned max_blk_count, max_req_size; };
+struct mmc_card { bool mmc, ro; struct { unsigned cmdclass; } csd; struct mmc_host *host; };
 #define mmc_card_mmc(card) ((card)->mmc)
 #define mmc_card_readonly(card) ((card)->ro)
 /* READONLY */
 /* SWITCH_PREP */
+#define PAGE_SIZE 4096U
+#define min(a,b) ((a) < (b) ? (a) : (b))
+#define max(a,b) ((a) > (b) ? (a) : (b))
+static unsigned queue_limit(struct mmc_card *card) {
+    struct mmc_host *host = card->host;
+    struct { unsigned max_hw_sectors; } lim;
+    /* QUEUE_LIMIT */
+    return lim.max_hw_sectors;
+}
+static unsigned transfer_blocks(struct mmc_card *card, unsigned requested) {
+    struct { struct { unsigned blocks; } data; } request = {.data.blocks = requested}, *brq = &request;
+    /* TRANSFER_LIMIT */
+    return brq->data.blocks;
+}
 int main(void) {
-    struct mmc_card card = {.mmc = true, .csd.cmdclass = CCC_BLOCK_WRITE};
+    struct mmc_host host = {.max_blk_count = 1, .max_req_size = PAGE_SIZE};
+    struct mmc_card card = {.mmc = true, .csd.cmdclass = CCC_BLOCK_WRITE, .host = &host};
+    assert(queue_limit(&card) == (CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE ? 8U : 1U));
+    assert(transfer_blocks(&card, 8) == 1);
+    card.mmc = false; assert(queue_limit(&card) == 1); card.mmc = true;
+    host.max_blk_count = 8; assert(queue_limit(&card) == 8); host.max_blk_count = 1;
     assert(!!mmc_blk_readonly(&card) == !CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE);
     card.ro = true; assert(mmc_blk_readonly(&card)); card.ro = false;
     card.mmc = false; assert(mmc_blk_readonly(&card));
@@ -101,6 +121,11 @@ def main():
             raise AssertionError("Read-only boot mode accepted a write-capable kernel")
         assert native_system_profile(tree, candidate, allow_install_candidate=True)
     block = ensure((source / "drivers/mmc/core/block.c").read_text(), "drivers/mmc/core/block.c")
+    queue = ensure((source / "drivers/mmc/core/queue.c").read_text(), "drivers/mmc/core/queue.c")
+    start = queue.index("\tlim.max_hw_sectors = min(")
+    queue_limit = queue[start:queue.index("\n\n", start)]
+    start = block.index("\tif (brq->data.blocks > card->host->max_blk_count)")
+    transfer_limit = block[start:block.index("\n\n", start)]
     start = block.index("static inline int mmc_blk_readonly(")
     readonly = block[start:block.index("\n}\n", start) + 3]
     with tempfile.TemporaryDirectory(prefix="emmc-install-") as directory:
@@ -118,7 +143,8 @@ def main():
                                           'typedef uint64_t u64; typedef int32_t s32;\n#define BIT(n) (1U << (n))\n')
         (temp / "linux/completion.h").write_text('struct completion { int unused; };\n')
         harness = temp / "test.c"
-        harness.write_text(HARNESS.replace("/* READONLY */", readonly).replace("/* SWITCH_PREP */", switch_prep))
+        harness.write_text(HARNESS.replace("/* READONLY */", readonly).replace("/* SWITCH_PREP */", switch_prep)
+                           .replace("/* QUEUE_LIMIT */", queue_limit).replace("/* TRANSFER_LIMIT */", transfer_limit))
         for enabled in (0, 1):
             binary = temp / f"test-{enabled}"
             subprocess.run(["cc", "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror",
