@@ -52,6 +52,15 @@ def build_resize(source, work, env):
     if not tree.exists():
         with tarfile.open(archive) as packed:
             packed.extractall(work, filter="data")
+    main = tree / "resize/main.c"
+    original = "\tif (print_min_size)\n\t\topen_flags = O_RDONLY;"
+    patched = "\tif (print_min_size || (mount_flags & EXT2_MF_MOUNTED))\n\t\topen_flags = O_RDONLY;"
+    text = main.read_text()
+    assert text.count(original) == 1 or text.count(patched) == 1, "resize2fs mounted-open anchor differs"
+    main.write_text(text.replace(original, patched))
+    # Our kernel denies raw writes to mounted devices. Online resize uses an
+    # ioctl on the mountpoint; the initial block-device inspection needs only
+    # O_RDONLY. Preserve ordinary O_RDWR behavior for offline filesystems.
     # resize2fs uses only libe2p/libext2fs/libcom_err and libc. The configure
     # probes for unrelated UUID/blkid utilities are bypassed; none is linked.
     env = dict(env, ac_cv_lib_uuid_uuid_generate="yes", ac_cv_lib_blkid_blkid_get_cache="yes",

@@ -26,6 +26,14 @@ CHANGES = {
         '\t\t(!IS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE) ||\n'
         '\t\t !mmc_card_mmc(card))) ||\n')],
     "drivers/mmc/core/queue.c": [(
+        '\tif (mmc_can_erase(card))\n\t\tmmc_queue_setup_discard(card, &lim);',
+        '\t/* The opt-in host denies CMD35/36/38. Do not advertise hardware\n'
+        '\t * discard or WRITE_ZEROES: ext4 must use ordinary bounded writes.\n'
+        '\t */\n'
+        '\tif (mmc_can_erase(card) &&\n'
+        '\t    !(IS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE) &&\n'
+        '\t      mmc_card_mmc(card)))\n'
+        '\t\tmmc_queue_setup_discard(card, &lim);'), (
         '\tlim.max_hw_sectors = min(host->max_blk_count, host->max_req_size / 512);',
         '\tlim.max_hw_sectors = min(host->max_blk_count, host->max_req_size / 512);\n'
         '\t/* Block queues require a page; block.c trims each transfer to\n'

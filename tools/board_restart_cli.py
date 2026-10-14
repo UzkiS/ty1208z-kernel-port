@@ -179,7 +179,9 @@ def run(args, serial_module):
                     failure_tail = (failure_tail + data)[-4096:]
                     if sd_shutdown and b"SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
                         result["sd_shutdown_verified"] = True
-                    if (emmc_ro or system_native) and b"EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
+                    if (emmc_ro or system_native) and any(marker in failure_tail for marker in (
+                            b"EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes",
+                            b"EMMC_RO_SHUTDOWN_COMPLETE host-retained clock-disabled no-card-writes")):
                         result["emmc_shutdown_verified"] = True
                     if system_native and b"TY1208Z_SYSTEM_USB_SHUTDOWN_PASS ehci-and-ohci" in failure_tail:
                         result["usb_shutdown_verified"] = True

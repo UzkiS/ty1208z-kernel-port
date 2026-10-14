@@ -120,6 +120,12 @@ TRANSFORMATIONS['drivers/mmc/host/Kconfig'].append((
 
 
 
+def source_text(original, project, name):
+    """Keep new board files authoritative when rebuilding an older native tree."""
+    overlay = project / "overlay" / name
+    return (overlay if overlay.is_file() else original / name).read_text()
+
+
 def apply(text, name):
     for old, new in TRANSFORMATIONS.get(name, []):
         if text.count(old) != 1:

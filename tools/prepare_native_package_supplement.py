@@ -19,7 +19,7 @@ from prepare_native_userspace import native_archive, record
 REQUIRED = ("docker", "dockerd", "containerd", "runc", "tini", "luci-app-dockerman",
             "luci-i18n-dockerman-zh-cn", "docker-compose", "ttyd", "ucode-mod-socket",
             "iw-full", "wpad-mbedtls", "hostapd-common", "wireless-regdb", "wifi-scripts",
-            "ucode-mod-nl80211", "ucode-mod-rtnl")
+            "ucode-mod-nl80211", "ucode-mod-rtnl", "block-mount", "lsblk")
 ARCH = "arm_cortex-a7_neon-vfpv4"
 EPOCH = "1791676800"
 PROJECT = Path(__file__).resolve().parents[1]
@@ -106,6 +106,7 @@ def input_provenance(base, source, baseline_source, board_root, kernel_build):
     modules = board_root / "lib/modules/6.12.112"
     provenance = {
         "preparer_sha256": digest(Path(__file__)),
+        "docker_startup_preparer_sha256": digest(PROJECT / "tools/native_docker_startup.py"),
         "board_files": {name: digest(PROJECT / path) for name, path in board_files(kernel_build).items()},
         "base_rootfs_sha256": digest(base / "rootfs.cpio.gz"),
         "native_config_sha256": digest(source / ".config"),
@@ -213,6 +214,8 @@ def prepare(base, source, baseline_source, board_root, kernel_build, output):
     previous = os.environ.get("SOURCE_DATE_EPOCH")
     os.environ["SOURCE_DATE_EPOCH"] = EPOCH
     try:
+        from native_docker_startup import make_package as make_docker_package
+        candidates["dockerd"] = make_docker_package(apk, candidates["dockerd"], work / "dockerd-startup")
         kernel_packages, omitted, kernel_identity = make_kernel_packages(
             apk, candidates, board_root, kernel_build, repository, work)
         if "CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE=y\n" in (kernel_build / ".config").read_text():

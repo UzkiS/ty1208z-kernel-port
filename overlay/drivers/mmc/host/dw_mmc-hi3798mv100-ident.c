@@ -11,6 +11,7 @@
 
 #include "dw_mmc.h"
 #include "dw_mmc-pltfm.h"
+#include "../core/core.h"
 #include "hi3798mv100-ident-policy.h"
 #include "hi3798mv100-emmc-ro-policy.h"
 
@@ -175,17 +176,41 @@ static void mv100_ident_shutdown(struct platform_device *pdev)
 	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))
 		return;
 	host = platform_get_drvdata(pdev);
-	/* Stop rescans/requests and mask IRQs before an explicit system reset.
-	 * The inherited CRG/pinmux are retained; policy still denies card writes.
-	 */
-	dw_mci_pltfm_remove(pdev);
+	if (IS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE)) {
+		/* A disk-root reboot must not unregister its still-mounted gendisk.
+		 * del_gendisk marks ext4 dead and can wait on the root mount forever.
+		 * Userspace has synced/remounted it read-only before device_shutdown.
+		 * Claim the host through reset, then quiesce the already PIO-only
+		 * controller without removing the card or issuing card commands.
+		 */
+		if (!host->slot)
+			return;
+		mmc_claim_host(host->slot->mmc);
+		if (host->state != STATE_IDLE || host->mrq || host->cmd || host->data) {
+			dev_err(&pdev->dev, "EMMC_RO_SHUTDOWN_FAILED request-active\n");
+			return;
+		}
+		mci_writel(host, INTMASK, 0);
+		mci_writel(host, IDINTEN, 0);
+		mci_writel(host, CTRL, mci_readl(host, CTRL) &
+			   ~(SDMMC_CTRL_INT_ENABLE | SDMMC_CTRL_DMA_ENABLE |
+			     SDMMC_CTRL_USE_IDMAC));
+		mci_writel(host, RINTSTS, 0xffffffff);
+		mci_writel(host, CLKENA, 0);
+		mci_writel(host, CLKSRC, 0);
+	} else {
+		/* Read-only RAM profiles can unregister their unused disk. */
+		dw_mci_pltfm_remove(pdev);
+	}
 	if (mci_readl(host, INTMASK) || mci_readl(host, CLKENA) ||
 	    mci_readl(host, IDINTEN) ||
 	    (mci_readl(host, CTRL) & (SDMMC_CTRL_DMA_ENABLE | SDMMC_CTRL_USE_IDMAC))) {
 		dev_err(&pdev->dev, "EMMC_RO_SHUTDOWN_FAILED controller-not-quiesced\n");
 		return;
 	}
-	dev_info(&pdev->dev, "EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\n");
+	dev_info(&pdev->dev, "EMMC_RO_SHUTDOWN_COMPLETE %s clock-disabled no-card-writes\n",
+		 IS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE) ?
+		 "host-retained" : "host-removed");
 }
 
 static const struct of_device_id mv100_ident_match[] = {

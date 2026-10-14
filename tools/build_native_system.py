@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build a copy of the exact native OpenWrt kernel; leave accepted trees intact."""
-from native_system_patch import TRANSFORMATIONS, ensure
+from native_system_patch import TRANSFORMATIONS, ensure, source_text
 from prepare_openwrt import toolchain_from_native
 from datetime import datetime, timezone
 import argparse
@@ -55,7 +55,7 @@ else:
     shutil.copytree(original, kernel, symlinks=True)
 for name in TRANSFORMATIONS:
     path = kernel / name
-    expected = ensure((original / name).read_text(), name)
+    expected = ensure(source_text(original, project, name), name)
     if path.read_text() != expected:
         path.write_text(expected)
 for name in ('drivers/power/reset/ty1208z-mv100-system-restart.c',
@@ -84,6 +84,7 @@ def options(text):
 config = options((original / '.config').read_text())
 config.update(options((project / 'openwrt/system/kernel.config').read_text()))
 if args.persistent_candidate:
+    config.update(options((project / 'openwrt/system/persistent/storage.config').read_text()))
     config['TY1208Z_EMMC_INSTALL_CANDIDATE'] = 'CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE=y'
 config['LOCALVERSION'] = 'CONFIG_LOCALVERSION="-ty1208z-openwrt-system"'
 config['INITRAMFS_SOURCE'] = 'CONFIG_INITRAMFS_SOURCE=""'
@@ -110,6 +111,8 @@ with log.open('wb') as handle:
         raise SystemExit(result.returncode)
     resolved = (kernel / '.config').read_text()
     expected = options((project / 'openwrt/system/kernel.config').read_text())
+    if args.persistent_candidate:
+        expected.update(options((project / 'openwrt/system/persistent/storage.config').read_text()))
     actual = options(resolved)
     different = {name: (value, actual.get(name)) for name, value in expected.items()
                  if actual.get(name, '# CONFIG_' + name + ' is not set') != value}

@@ -45,6 +45,9 @@ def native_system_profile(tree, config, *, allow_install_candidate=False):
         if active.get('TY1208Z_EMMC_INSTALL_CANDIDATE') != 'y':
             raise ValueError('Explicit installation mode requires its exact opt-in kernel')
         forbidden.remove('TY1208Z_EMMC_INSTALL_CANDIDATE')
+        forbidden.remove('USB_STORAGE')
+        if 'USB_STORAGE' in active:
+            required.update({'SCSI', 'BLK_DEV_SD', 'USB_STORAGE'})
     if not all(active.get(n) == 'y' for n in required) or active.keys() & forbidden:
         raise ValueError('Integrated native configuration differs from the measured composition')
     if ('CONFIG_LOCALVERSION="-ty1208z-openwrt-system"\n' not in config or

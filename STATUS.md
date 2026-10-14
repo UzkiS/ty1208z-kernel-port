@@ -1,54 +1,32 @@
 # TY1208Z kernel port status
 
-Updated: 2026-10-14. The user requested interruption of the full p9 write to
-switch to a compact RAM/web first installer. The writer and automatic continuation
-have stopped. p9 is partially written, flushed and locked read-only; p6 has not
-been written. The accepted RAM system remains online. Do not boot the partial
-eMMC installation. The corrected compact installer has now passed the real
-Chinese LuCI upload, official sysupgrade validation and RAM pivot, and is writing
-its 1-GiB p9 root. Full installation and disk-root persistence remain unaccepted.
-SD remains read-only; CA fastboot and persistent boot settings are unchanged.
-Latest milestone: RDA5995 WPA2 STA, phone AP handshake/DHCP/page access and
-netifd AP/STA switching pass on the integrated RAM system. The final module fixes
-attach ownership, association IE reporting, AP GTK state and USB TX padding.
-Official LuCI now exposes the supported RDA settings; the real form builder and
-installed package payload pass. A pinned netifd EOF loop that interrupted wired
-management is fixed. Chinese Dockerman and the offline APK transaction are also
-integrated. An isolated headless browser now verifies the Chinese Docker overview
-with live engine data and the wireless editor/WPA2 input, without saving wireless
-changes; see the [UI report](verification/luci-ui-board-20261014.md).
-The specifically authorized p9 last-sector write/readback/restore
-now passes; the original readonly RAM system/configuration was restored before
-the separately authorized full installation started.
-Full installation and disk-root persistence remain unfinished.
-See the [current progress report](verification/progress-20261014.md) and
-[wireless report](verification/rda-wireless-board-20261014.md);
-historical boundaries below describe earlier artifacts.
-The previous full-p9 operation was interrupted after approximately 5.15 GB of
-writes, before any p6 write. Private receipts distinguish partial writing from a
-verified installation. A separate 1-GiB compact first-install candidate now builds
-with a 126-MiB upload, exact p9/p6 checks and a first-boot growth APK. Actual
-first-install writing is in progress; readback, online growth and persistent boot
-remain pending. See the [first-install checkpoint](verification/compact-first-install-board-20261014.md).
-Offline implementation and repository push are authorized.
+Updated: 2026-10-15. Compact official Chinese LuCI first installation is
+physically complete: full 1-GiB p9 and p6 readback, real eMMC ext4 rw root boot,
+and online growth to all 6846 MiB pass. Cold boot preserves configuration and
+Docker container content; Docker 29.6.1 starts automatically and Chinese
+Dockerman displays the live engine. Its disk-root snapshotter is overlayfs.
 
-Official web upgrade support is now implemented as a board APK and
-`/lib/upgrade/platform.sh`, using the standard LuCI Backup / Flash Firmware
-page and official sysupgrade/stage2. The private file-level image preserves
-Docker/user data and stages/verifies a new root before p6 activation. Actual
-ARM/ASan parser and official ARM sysupgrade validation checks pass offline;
-physical web upgrade/pivot/reboot/data preservation remain pending until the
-current installation completes. See the [offline report](verification/native-web-upgrade-offline-20261014.md).
+The latest 131287242-byte native sysupgrade image adds block-mount/lsblk, built-in
+USB mass storage and a fix for disk-root shutdown hanging in del_gendisk.
+The exact image physically passes official Chinese LuCI upload/hash/keep-config
+confirmation, stage2 RAM pivot, default eMMC reboot, unchanged configuration,
+Docker data/autostart and the Chinese mount page. One ordinary disk-root reboot
+passes the repaired host-retained MMC shutdown, fresh eleven-allocation table
+and default eMMC boot without UART input. See the
+[physical upgrade report](verification/native-web-upgrade-board-20261015.md).
 
-A separate private installation candidate now builds offline: p6/p9-only
-one-sector write policy, a full 6846-MiB ext4 p9 with real APK metadata, a
-disk-root kernel and original p6 recovery payload. Policy/ordinary-boot refusal
-and filesystem/content/ownership checks pass. Its RAM kernel physically passes
-the limited write and command-restart return; see the [write report](verification/native-emmc-write-board-20261014.md).
-The queue now accepts a page while MMC transfers remain single-sector. Fixed
-p6/p9 installation and recovery tools and exact private disk images are prepared,
-with full writes and disk-root boot now authorized but not yet accepted; see the
-[specific preparation and hashes](docs/installation-plan.md).
+SD remains request-level read-only. No external USB disk has been physically
+accepted. Wi-Fi STA and AP pass; Wi-Fi-uplink bypass-routing is not measured.
+The existing CA fastboot, persistent boot environment, other eMMC partitions and
+boot0/boot1/RPMB are preserved. Private firmware/backups/UART are not published.
+See [current progress](verification/progress-20261014.md),
+[first installation](verification/compact-first-install-board-20261014.md) and
+[installation/upgrade instructions](docs/installation-plan.md).
+
+## Historical development evidence
+
+The following records describe their dated independent profiles; pending
+statements in those historical entries are not the current integrated status.
 
 Target: modern Linux, official native OpenWrt, Passwall, board Wi-Fi and verified
 time64 behavior. The current milestone is single-core RAM-only native network/

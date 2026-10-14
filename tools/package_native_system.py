@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Package the built native system for bounded RAM boot and network supplementation."""
 from prepare_native_userspace import native_archive, record
-from native_system_patch import TRANSFORMATIONS, ensure
+from native_system_patch import TRANSFORMATIONS, ensure, source_text
 from prepare_openwrt import toolchain_from_native
 from prepare_native_package_supplement import input_provenance, prepare as prepare_packages
 import argparse
@@ -52,11 +52,11 @@ assert bool(state.get('persistent_candidate')) == args.persistent_candidate
 if args.persistent_candidate:
     from native_persistent_patch import CHANGES, ensure as ensure_persistent
     for name in set(TRANSFORMATIONS) | set(CHANGES):
-        expected = ensure_persistent(ensure((original_kernel / name).read_text(), name), name)
+        expected = ensure_persistent(ensure(source_text(original_kernel, project, name), name), name)
         assert (kernel / name).read_text() == expected, name
 else:
     for name in TRANSFORMATIONS:
-        assert (kernel / name).read_text() == ensure((original_kernel / name).read_text(), name), name
+        assert (kernel / name).read_text() == ensure(source_text(original_kernel, project, name), name), name
 assert state['status'] == 'integrated-native-kernel-built-not-booted' and state['exit_code'] == 0
 
 root = work / 'root'
