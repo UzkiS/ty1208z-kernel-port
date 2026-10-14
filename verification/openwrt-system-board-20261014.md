@@ -1,76 +1,68 @@
 # 完整 RAM 系统与物理 Docker 实测（2026-10-14）
 
-> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
+> 历史阶段记录：本页只描述此RAM镜像的实测。后续持久安装状态见 [STATUS](../STATUS.md)。
 
-The single RAM system physically runs the native ARMv7 Docker 29.6.1 daemon
-and a small container through OpenWrt procd, overlay2, cgroup v2 and default
-seccomp. Container DNS through the LAN gateway and a TCP/HTTP request through
-the physical Ethernet interface pass. SD/eMMC remain request-level read-only;
-no card, flash or persistent boot writes occurred.
+单一RAM系统通过OpenWrt procd运行原生ARMv7 Docker29.6.1与小容器，
+使用overlay2、cgroup v2和默认seccomp。
+容器经LAN gateway解析DNS、通过物理网口执行TCP/HTTP请求均通过。
+SD/eMMC全程请求级只读，没有卡、flash或持久boot写入。
 
-## Measured delivery
+## 精确产物
 
-- Board: TY1208Z CA / Hi3798MV100, one online Cortex-A7 CPU.
-- Kernel: Linux 6.12.112, SHA-256
-  `b474bd8fc834cc8e9091159fe81855f46e63e4c70aef368cb3a324626d4b3ac4`.
-- Resolved config SHA-256:
-  `cce1bcb5838add7f35d31a3485c0b8f62aabe9bfbbb6ab81c4aa71db0f28a163`.
-- Bootstrap: 22561748 compressed / 61516800 expanded bytes, SHA-256
-  `3202c092c7e4305bb45e6e69bd992e3abdd6a19584763f85b3009ff102519b27`.
-- Usable RAM: 762296 KiB, approximately 744 MiB. The low 16 MiB remain reserved
-  and the upper 256 MiB excluded using fresh guarded-restart allocation evidence.
-- eMMC `008G30`: 7818182656 bytes, nine partitions, read-only.
-- SD `SU04G`: 3965190144 bytes, two partitions, read-only.
-- Both storage controllers and the built-in guarded restart handler bind.
-  Interrupt error count is zero.
+- TY1208Z CA / Hi3798MV100，一个在线Cortex-A7。
+- Linux6.12.112 SHA-256：
+  `b474bd8fc834cc8e9091159fe81855f46e63e4c70aef368cb3a324626d4b3ac4`。
+- 实际config SHA-256：
+  `cce1bcb5838add7f35d31a3485c0b8f62aabe9bfbbb6ab81c4aa71db0f28a163`。
+- Bootstrap压缩22561748 B、展开61516800 B，SHA-256：
+  `3202c092c7e4305bb45e6e69bd992e3abdd6a19584763f85b3009ff102519b27`。
+- MemTotal762296 KiB，约744 MiB；新受控重启allocation证据支持低768范围，
+  低16保留、上方256排除。
+- eMMC `008G30`：7818182656 B、九分区、只读；
+  SD `SU04G`：3965190144 B、两分区、只读。
+- 双存储controller与内置受控restart绑定，IRQ Err0。
 
-Chinese/empty-root settings and application/runtime file identities were
-checked during setup. The already accepted Xray/sing-box, unzip, time64,
-application networking and higher-memory tests were reused rather than repeated.
-The larger userspace supplement was streamed directly over SSH into RAM.
+设置时核对中文、root空密码及应用/runtime文件身份。
+已有双代理核心、unzip、time64、应用网络和较大内存证据复用，
+没有重新执行整套测试。大supplement通过SSH直接解入RAM。
 
-## Integration fixes and physical result
+## 集成修复与实测
 
-The initial system put modules in `lib/modules/6.12.112/kernel/...`.
-OpenWrt's ubox kmodloader only scans the release directory itself. Flattening
-the 107 matching modules fixes loading; no other target's modules were copied.
+最初模块位于 `lib/modules/6.12.112/kernel/...`，
+但ubox kmodloader只扫描release目录；平铺本次107个模块后加载正常，
+未复制其他target模块。
 
-The daemon then started and ran a container, but forwarded DNS was rejected:
-the DHCP interface `probe` was absent from the WAN zone and Docker had no
-Docker-to-WAN forwarding. Adding the actual uplink to WAN and that forwarding
-fixes the path while retaining the firewall. The target defaults in
-`openwrt/system/docker-network` contain those settings.
+随后daemon和容器已启动，但DNS转发失败：DHCP接口probe不在WAN，
+且没有Docker → WAN转发。
+把实际uplink加入WAN并增加转发后成功，保留防火墙；
+默认值维护于 `openwrt/system/docker-network`。
 
-The final physical check observed overlay2 on tmpfs, ARMv7, a 64-MiB memory
-limit, CPU quota readback of `50000 100000`, PID 1 inside the container and
-seccomp mode 2. It then resolved `openwrt.org` through the gateway and fetched
-a unique HTTP token from the host over physical Ethernet. The final private
-runtime stream SHA-256 is
-`204a15c7108cac6659895628cba0b8a6b9a045424b500d2d448ec625b69a1675`.
-The complete failed attempts were retained locally before cleanup.
+最终实测tmpfs上的overlay2、ARMv7、64 MiB memory limit、
+CPU quota读回 `50000 100000`、容器PID1和seccomp mode2。
+通过gateway解析 `openwrt.org`，并从主机经物理网口取得唯一HTTP token。
+私有runtime SHA-256：
+`204a15c7108cac6659895628cba0b8a6b9a045424b500d2d448ec625b69a1675`。
+失败尝试原始记录均在清理前保留本地。
 
-After removing the container and stopping Docker, the three original UCI
-files were restored. Both MMC hosts shut down, one command restart reached a
-fresh CA loader, and both original-router device CRCs passed. The current
-configuration, Chinese authenticated LuCI, empty root password, restart module
-and IRQ Err0 passed after return. Restart stream SHA-256:
-`2b3073766e7b7ecbc56d295311addc533f3c66e49a369ac4489b7437432eb193`.
-Restored-router health stream SHA-256:
-`30513a1cddf4eb8d0240e00279afa970d8a670e28640e8df4afe4d6586f02369`.
-COM9 is released; no manual power cycle was needed.
+删除容器、停止Docker后恢复原三份UCI。
+双MMC host实际关闭，命令重启到新CA引导，
+原router双设备CRC通过并恢复配置。
+中文认证LuCI、root空密码、restart模块及IRQ Err0均通过，无人工断电。
+私有restart SHA-256：
+`2b3073766e7b7ecbc56d295311addc533f3c66e49a369ac4489b7437432eb193`；
+恢复健康检查：
+`30513a1cddf4eb8d0240e00279afa970d8a670e28640e8df4afe4d6586f02369`。
 
-## Reproducible source entry and remaining work
+## 构建入口与当时边界
 
-`make openwrt-system` now compiles/composes the native integration from explicit
-existing pinned native build inputs. The normal build and packager completed;
-the resolved config is byte-identical to the physical run. The rebuilt kernel
-has a different build timestamp/version, SHA-256
-`67716ef7f13b6f2f089b3fdcafe34937418026a984ee76c714c4b823d52a44f8`;
-this rebuilt delivery and the installed first-boot defaults have not been
-booted as a new exact artifact. They are not described as another measured pass.
+`make openwrt-system` 从明确的固定原生构建输入组合系统。
+常规构建与打包完成，实际config与实测版本逐字节相同；
+重建kernel因timestamp/version不同，SHA-256为
+`67716ef7f13b6f2f089b3fdcafe34937418026a984ee76c714c4b823d52a44f8`。
+这个重建包及first-boot defaults没有作为新完整产物再次启动，
+不能记录为另一次完整实测。
 
-The supplement still lacks final APK database registration. Storage-backed
-Docker, installation/recovery images, RDA firmware startup and STA/AP operation
-remain unfinished. This check does not establish registry downloads, general
-Internet routing, IPv6 or performance. The ordinary restored router remains
-the low256 RAM profile; no installation image is claimed.
+本次检查点尚未包含最终APK数据库登记、持久Docker、安装/恢复镜像与RDA STA/AP；
+也不证明registry下载、一般Internet路由、IPv6或性能。
+当时返回的是原低256 RAM router。后续APK、无线和安装结果见状态页，
+这些后续结果不改变本次镜像的测量范围。
