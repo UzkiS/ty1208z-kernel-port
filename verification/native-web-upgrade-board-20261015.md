@@ -56,7 +56,8 @@ process and changed kernel/resize/application boundaries were reused. First inst
 wrote 1 GiB p9 in about 29 minutes and read back in about 11; single-sector PIO remains.
 
 The persistent kernel includes SCSI/BLK_DEV_SD/USB_STORAGE and existing ext4/VFAT/exFAT.
-No external USB disk was plugged in for physical acceptance. SD remains request-level
+No external USB disk was plugged in at this earlier checkpoint. Later VFAT/NTFS3
+physical acceptance and its newer image are recorded in the [USB report](usb-storage-board-20261015.md). SD remains request-level
 read-only; writable SD/formatting and wireless-uplink bypass-routing are not accepted.
 Wi-Fi stays disabled by default. CA fastboot, persistent boot settings, other eMMC
 partitions, SD, boot0/boot1/RPMB and security state are preserved.

@@ -6,7 +6,7 @@ and online growth to all 6846 MiB pass. Cold boot preserves configuration and
 Docker container content; Docker 29.6.1 starts automatically and Chinese
 Dockerman displays the live engine. Its disk-root snapshotter is overlayfs.
 
-The latest 131287242-byte native sysupgrade image adds block-mount/lsblk, built-in
+The earlier 131287242-byte native sysupgrade image adds block-mount/lsblk, built-in
 USB mass storage and a fix for disk-root shutdown hanging in del_gendisk.
 The exact image physically passes official Chinese LuCI upload/hash/keep-config
 confirmation, stage2 RAM pivot, default eMMC reboot, unchanged configuration,
@@ -15,8 +15,13 @@ passes the repaired host-retained MMC shutdown, fresh eleven-allocation table
 and default eMMC boot without UART input. See the
 [physical upgrade report](verification/native-web-upgrade-board-20261015.md).
 
-SD remains request-level read-only. No external USB disk has been physically
-accepted. Wi-Fi STA and AP pass; Wi-Fi-uplink bypass-routing is not measured.
+The latest 131399882-byte image adds built-in NTFS3 and passes another official
+keep-configuration LuCI upgrade/default boot. A 320a:827b USB2 disk (58.2 GiB)
+passes VFAT and NTFS3 read-only file reads/unmount; NTFS access leaves USB write
+counters unchanged. See the [USB report](verification/usb-storage-board-20261015.md).
+SD remains request-level read-only. Wi-Fi STA and AP pass; Wi-Fi-uplink
+bypass-routing is not measured. Fresh-build CI closure remains pending;
+see the [CI repair record](verification/ci-closure-20261015.md).
 The existing CA fastboot, persistent boot environment, other eMMC partitions and
 boot0/boot1/RPMB are preserved. Private firmware/backups/UART are not published.
 See [current progress](verification/progress-20261014.md),

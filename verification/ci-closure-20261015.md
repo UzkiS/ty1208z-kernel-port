@@ -10,6 +10,9 @@ fresh-source checks. Three failures on 40cd3f0 were traced to:
 - Independent application variants did not explicitly deselect the new system
   Kconfig symbol, causing noninteractive syncconfig to prompt. The shared
   application fragment now explicitly disables this separate opt-in profile.
+  Both existing SD/eMMC configurations resolve against current actual system
+  Kconfig with olddefconfig and closed-stdin syncconfig, without enabling system
+  mode or prompting. Full fresh variant builds are still checked remotely.
 - The larger combined QEMU archive exceeded the initial rootfs tmpfs quota.
   Selecting ramfs fixes extraction, but copying a complete second root then
   exceeds 768 MiB. A 386217472-byte synthetic archive reproduces guest-global
@@ -26,5 +29,10 @@ bootstrap only; it does not change installed firmware or establish a new board
 memory claim. Earlier combined runtime evidence used the older native /init
 handoff; the current full fresh-build run must pass independently.
 
-Remote results are pending. The first 5bba089 combined rerun stopped at a
-BusyBox HTTPS download timeout, before compilation/runtime; it was retried once.
+Full local make lint passes. Remote results are pending. The first 5bba089
+combined rerun stopped at a BusyBox HTTPS download timeout, before compilation/
+runtime. Its retry was superseded by 086df54's corrected memory handoff. Duplicate
+unchanged application/RAM checks were cancelled; the required application run
+from 5bba089 and corrected combined run from 086df54 continue separately. The
+diagnostic run uses cancel-in-progress and was superseded by later pushes, so
+its final current-source run still needs to finish.
