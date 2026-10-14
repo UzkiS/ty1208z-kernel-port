@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#include "hi3798mv100-ty1208z-ethernet-net.dts"
+
+/ {
+	model = "TY1208Z CA native OpenWrt system RAM candidate";
+	compatible = "tianyi,ty1208z-ca-openwrt-system-ram", "hi3798mv100-series";
+	chosen {
+		bootargs = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 rdinit=/init loglevel=7 panic=0 blkdevparts=mmcblk0:1M(boot)ro,1M(bootargs)ro,4M(baseparam)ro,4M(pqparam)ro,4M(logo)ro,20M(kernel)ro,64M(busybox)ro,512M(backup)ro,6846M(ubuntu)ro";
+		linux,initrd-start = <TY1208Z_INITRD_START>;
+		linux,initrd-end = <TY1208Z_INITRD_END>;
+	};
+};
+
+&{/soc} {
+	mmc@f9830000 {
+		compatible = "tianyi,ty1208z-emmc-identification";
+		reg = <0xf9830000 0x1000>, <0xf8a220a0 4>;
+		reg-names = "controller", "crg40";
+		interrupts = <0 35 4>;
+		clock-frequency = <100000000>;
+		fifo-depth = <256>;
+		bus-width = <1>;
+		max-frequency = <25000000>;
+		non-removable;
+		no-sd;
+		no-sdio;
+	};
+	system-restart@f8a2c000 {
+		compatible = "tianyi,ty1208z-mv100-system-restart";
+		reg = <0xf8a2c000 0x1000>, <0xf8000ee0 4>,
+		      <0xf9830000 0x1000>, <0xf9820000 0x1000>;
+	};
+};
+
+&{/memory@0} { reg = <0 0x30000000>; };
+&{/aliases} {
+	mmc0 = "/soc/mmc@f9830000";
+	mmc1 = "/soc/mmc@f9820000";
+};
+&{/soc} {
+	mmc@f9820000 {
+		compatible = "tianyi,ty1208z-sd-identification";
+		reg = <0xf9820000 0x1000>, <0xf8a2209c 4>, <0xf8a2011c 4>;
+		reg-names = "controller", "crg39", "ldo";
+		interrupts = <0 34 4>;
+		clock-frequency = <50000000>;
+		fifo-depth = <256>;
+		bus-width = <1>;
+		max-frequency = <25000000>;
+		no-mmc;
+		no-sdio;
+	};
+};
+

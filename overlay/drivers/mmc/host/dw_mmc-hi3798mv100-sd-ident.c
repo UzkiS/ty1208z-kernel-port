@@ -115,7 +115,9 @@ static int mv100_sd_ident_probe(struct platform_device *pdev)
 	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ?
 	    !(of_machine_is_compatible("tianyi,ty1208z-ca-sd-ro-ram") ||
 	      (IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) &&
-	       of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram"))) :
+	       of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")) ||
+	      (IS_ENABLED(CONFIG_TY1208Z_OPENWRT_SYSTEM) &&
+	       of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-system-ram"))) :
 	    !of_machine_is_compatible("tianyi,ty1208z-ca-sd-ident-ram"))
 		return -ENODEV;
 	controller = platform_get_resource(pdev, IORESOURCE_MEM, 0);

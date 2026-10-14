@@ -8,6 +8,18 @@ Target: modern Linux, official native OpenWrt, Passwall, board Wi-Fi and verifie
 time64 behavior. The current milestone is single-core RAM-only native network/
 application acceptance, with USB and Wi-Fi validated separately.
 
+The integrated native RAM system now physically runs Docker on the board with
+762296 KiB usable RAM and both read-only SD/eMMC hosts. A small ARMv7 container
+passes overlay2, memory/CPU quota readback, default seccomp, gateway DNS and
+TCP/HTTP through physical Ethernet. Flat OpenWrt module layout and correct
+Docker/uplink firewall zones fix the initial integration failures. Both hosts
+shut down before command restart, and the original Chinese router/configuration
+was restored automatically. The normal source/build/package entry is
+`make openwrt-system`; [physical report](verification/openwrt-system-board-20261014.md).
+The rebuilt delivery is not another exact-artifact board pass. APK database
+integration, writable persistent storage, Wi-Fi STA/AP and installation remain
+unfinished. Historical profiles and their earlier boundaries below are retained.
+
 User preferences: future LuCI builds default to Simplified Chinese, onboard
 Wi-Fi acceptance includes AP, and required [Docker support](docs/containers.md)
 follows verified higher-memory and storage support. The board has 1 GiB

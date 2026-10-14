@@ -2,6 +2,12 @@
 
 Docker is a required feature of the final official OpenWrt system, alongside
 Chinese LuCI, Passwall with Xray and sing-box, unzip and board Wi-Fi/AP support.
+The [integrated native RAM system](../openwrt/system/README.md) now physically
+runs a small ARMv7 container with overlay2, cgroup limits, default seccomp,
+gateway DNS and TCP/HTTP through Ethernet. The exact runtime and safe return
+are recorded in the [board report](../verification/openwrt-system-board-20261014.md).
+Persistent Docker storage, final package registration and installation remain
+unfinished. The earlier independent experiments below retain their original scope.
 The board has 1 GiB of physical DDR and a 32-bit Cortex-A7/ARMv7 CPU. The
 current RAM experiment intentionally exposes only the low 256 MiB, with the
 low 16 MiB reserved. It is not a Docker installation candidate.

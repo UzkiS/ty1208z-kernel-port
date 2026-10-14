@@ -70,6 +70,9 @@ def prepare(artifacts, inspection, allocation_evidence=None):
     tree = parse_fdt(dtb)
     properties = {node["path"]: node["properties"] for node in tree["nodes"]}
     config = (artifacts / "linux.config").read_text()
+    if properties["/"].get("compatible", {}).get("strings") == ["tianyi,ty1208z-ca-openwrt-system-ram", "hi3798mv100-series"]:
+        from native_system_profile import prepare_native_system
+        return prepare_native_system(artifacts, metadata, allocation_evidence)
     extended = (ram768_profile(tree, config) or openwrt_router768_ethernet_profile(tree, config) or
                 openwrt_router_sdro_ethernet_profile(tree, config))
     memory_evidence_sha256 = None

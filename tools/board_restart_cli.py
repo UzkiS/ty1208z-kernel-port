@@ -41,9 +41,10 @@ def run(args, serial_module):
               "status": "starting", "kernel_verified": False, "restart_sent": False,
               "persistent_writes": False}
     profile = getattr(args, "profile", "diagnostic")
-    native = profile in ("router", "router768", "router-sdro", "router-emmcro")
+    system_native = profile == "system"
+    native = profile in ("router", "router768", "router-sdro", "router-emmcro", "system")
     sd_ident = profile in ("sd-ident1", "sd-ro1")
-    sd_shutdown = sd_ident or profile == "router-sdro"
+    sd_shutdown = sd_ident or profile in ("router-sdro", "system")
     memory = profile == "ram768"
     emmc_ro = profile in ("emmc-ro1", "router-emmcro")
     result["profile"] = profile
@@ -61,7 +62,8 @@ def run(args, serial_module):
                     raise TransferError("Not the SP805 RAM experiment; no restart sent")
                 if native:
                     system = command(exchange, b"cat /etc/openwrt_release")
-                    board = (b"tianyi,ty1208z-ca-openwrt-emmcro-ram" if profile == "router-emmcro" else
+                    board = (b"tianyi,ty1208z-ca-openwrt-system-ram" if system_native else
+                             b"tianyi,ty1208z-ca-openwrt-emmcro-ram" if profile == "router-emmcro" else
                              b"tianyi,ty1208z-ca-openwrt-sdro-ram" if profile == "router-sdro" else
                              b"tianyi,ty1208z-ca-openwrt-router768-ram" if profile == "router768" else
                              b"tianyi,ty1208z-ca-openwrt-router-ram")
@@ -70,11 +72,25 @@ def run(args, serial_module):
                             not re.search(rb"(?:^|[\r\n])" + re.escape(board) + rb"[\r\n]",
                                           command(exchange, DT_IDENTITY))):
                         raise TransferError("Native router source/DT differs; no restart sent")
-                    if profile != "router-emmcro":
+                    if profile not in ("router-emmcro", "system"):
                         binding = command(exchange, b"test -e /sys/module/ty1208z_sp805_restart && "
                                           b"readlink /sys/bus/platform/devices/ty1208z-sp805-restart/driver")
                         if b"../../../bus/platform/drivers/ty1208z-sp805-restart" not in binding:
                             raise TransferError("Actual RAM restart module binding missing")
+                    if system_native:
+                        binding = command(exchange, b"readlink /sys/bus/platform/devices/f8a2c000.system-restart/driver")
+                        if b"../../../bus/platform/drivers/ty1208z-mv100-system-restart" not in binding:
+                            raise TransferError("Integrated two-host restart binding missing")
+                        guard = (b"if grep -Eq '^[^ ]+ [^ ]+ 179:' /proc/self/mountinfo || "
+                                 b"grep -q mmcblk /proc/swaps; then echo SYSTEM_STORAGE_ACTIVE; else "
+                                 b'test "$(cat /sys/class/block/mmcblk0/device/name)" = 008G30 && '
+                                 b'test "$(cat /sys/class/block/mmcblk0/size)" = 15269888 && '
+                                 b'test "$(cat /sys/class/block/mmcblk0/ro)" = 1 && '
+                                 b'test "$(cat /sys/class/block/mmcblk1/ro)" = 1 && '
+                                 b"test ! -e /tmp/ram768-area/memory-test && echo SYSTEM_STORAGE_GUARD; fi")
+                        state = command(exchange, guard)
+                        if not re.search(rb"(?:^|[\r\n])SYSTEM_STORAGE_GUARD[\r\n]", state):
+                            raise TransferError("Integrated storage is mounted/swapped or readonly identity differs")
                     if profile == "router-sdro":
                         state = command(exchange, SD_RO_RESTART_GUARD)
                         if not re.search(rb"(?:^|[\r\n])SD_RO_RESTART_GUARD[\r\n]", state):
@@ -116,11 +132,12 @@ def run(args, serial_module):
                         raise TransferError("Memory test file/mount still active; no restart sent")
                 result["kernel_verified"] = True
                 report = command(exchange, b"dmesg; echo TY1208Z_RESTART_CHECK_COMPLETE")
-                if (not re.search(rb"(?:^|[\r\n])[^\r\n]*TY1208Z_RESTART_READY "
+                if (not (system_native and b"TY1208Z_SYSTEM_RESTART_READY no-startup-writes" in report) and
+                    not re.search(rb"(?:^|[\r\n])[^\r\n]*TY1208Z_RESTART_READY "
                                   rb"no-startup-writes explicit-restart-only[\r\n]", report) or
                         not re.search(rb"(?:^|[\r\n])TY1208Z_RESTART_CHECK_COMPLETE[\r\n]", report)):
                     raise TransferError("Actual restart registration missing; no restart sent")
-                if (native or sd_ident or memory or emmc_ro) and b"TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes" not in report:
+                if (native or sd_ident or memory or emmc_ro) and not system_native and b"TY1208Z_MV100_RESTART_READY sysid=37980100 measured-inactive-watchdog no-startup-writes" not in report:
                     raise TransferError("Measured MV100 restart guard missing")
                 # PID 1 is the diagnostic shell, not an init service manager.
                 # This fixed -f command enters the kernel restart syscall.
@@ -140,17 +157,18 @@ def run(args, serial_module):
                     failure_tail = (failure_tail + data)[-4096:]
                     if sd_shutdown and b"SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
                         result["sd_shutdown_verified"] = True
-                    if emmc_ro and b"EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
+                    if (emmc_ro or system_native) and b"EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
                         result["emmc_shutdown_verified"] = True
                     if any(marker in failure_tail for marker in (
                             b"TY1208Z_RESTART_REFUSED", b"TY1208Z_RESTART_TIMEOUT", b"Reboot failed",
-                            b"SD_IDENT_SHUTDOWN_FAILED", b"EMMC_RO_SHUTDOWN_FAILED", b"EMMC_RO_RESTART_REFUSED")):
+                            b"SD_IDENT_SHUTDOWN_FAILED", b"EMMC_RO_SHUTDOWN_FAILED", b"EMMC_RO_RESTART_REFUSED",
+                            b"TY1208Z_SYSTEM_RESTART_REFUSED", b"TY1208Z_SYSTEM_RESTART_TIMEOUT")):
                         raise TransferError("Kernel restart failed; no retry")
                     for outgoing in probe.feed(data):
                         exchange.write(outgoing)
                 if sd_shutdown and not result.get("sd_shutdown_verified"):
                     raise TransferError("SD shutdown completion missing from actual restart stream")
-                if emmc_ro and not result.get("emmc_shutdown_verified"):
+                if (emmc_ro or system_native) and not result.get("emmc_shutdown_verified"):
                     raise TransferError("eMMC shutdown completion missing from actual restart stream")
                 result["status"] = "restart-bootloader-verified"
             except (TransferError, ProbeError, OSError, serial_module.SerialException, KeyboardInterrupt) as exc:
@@ -171,7 +189,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--profile", choices=("diagnostic", "router", "router768", "router-sdro", "router-emmcro", "sd-ident1", "sd-ro1", "emmc-ro1", "ram768"), default="diagnostic")
+    parser.add_argument("--profile", choices=("diagnostic", "router", "router768", "router-sdro", "router-emmcro", "system", "sd-ident1", "sd-ro1", "emmc-ro1", "ram768"), default="diagnostic")
     parser.add_argument("--timeout", type=int, default=60)
     args = parser.parse_args()
     if not 5 <= args.timeout <= 120:

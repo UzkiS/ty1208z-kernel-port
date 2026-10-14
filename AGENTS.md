@@ -53,6 +53,12 @@ board support. Keep assumptions separate from measured facts.
   It retains the same fresh-allocation/low-reservation gates and has a distinct
   opt-in kernel/board identity. The ordinary restored router remains low256;
   SD/eMMC, Docker and production integration are still separate.
+  The later `system` RAM composition now physically runs an ARMv7 Docker
+  container with overlay2/default seccomp, memory/CPU quota readback, gateway
+  DNS and physical Ethernet HTTP. Both read-only hosts shut down before its
+  command restart and exact router/config return. Reuse this acceptance;
+  remaining work includes final APK registration, storage writes/installation
+  and RDA STA/AP. See `verification/openwrt-system-board-20261014.md`.
 
 ## Authorization
 

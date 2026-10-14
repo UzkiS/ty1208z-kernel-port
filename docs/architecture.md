@@ -72,6 +72,12 @@ OpenWrt 通用补丁叠加、完整原生 GCC/musl 镜像构建及核心用户�
 
 ## 源码与产物
 
+`make openwrt-system` 现将已测的大内存、网口、只读 eMMC/SD 与原生应用和 Docker
+组合为单一 RAM 系统。实机小容器已通过资源限制读回、seccomp、DNS 和物理网口
+HTTP；双控制器停止后可命令重启并恢复原中文系统。构建入口和最终安装边界见
+[系统说明](../openwrt/system/README.md) 与 [实机记录](../verification/openwrt-system-board-20261014.md)。
+软件包数据库整合、存储写入、无线 STA/AP 与持久安装仍未完成。
+
 `make ethernet-net` 是独立的有线网口 RAM 实验入口：启用上游 FEMAC/MDIO、
 专用 MV100 初始化和保留状态的 FESTAv220 驱动，但关闭存储、USB、模块与 SMP。
 它有独立设备树、配置、BusyBox 网络工具、构建目录和 RAM 启动校验，不会改变

@@ -1,0 +1,34 @@
+#!/bin/sh
+# Configure the measured single-port DHCP uplink and Docker's bridge.
+# Invoked in the target rootfs; this file never changes persistent boot state.
+set -eu
+
+test "$(uci get network.probe.device)" = eth0
+uci set network.docker=interface
+uci set network.docker.device=docker0
+uci set network.docker.proto=none
+uci set network.docker.auto=0
+uci set network.ty1208z_docker_bridge=device
+uci set network.ty1208z_docker_bridge.type=bridge
+uci set network.ty1208z_docker_bridge.name=docker0
+
+uci set firewall.docker=zone
+uci set firewall.docker.name=docker
+uci set firewall.docker.network=docker
+uci set firewall.docker.input=ACCEPT
+uci set firewall.docker.output=ACCEPT
+uci set firewall.docker.forward=ACCEPT
+uci set firewall.ty1208z_docker_wan=forwarding
+uci set firewall.ty1208z_docker_wan.src=docker
+uci set firewall.ty1208z_docker_wan.dest=wan
+wan_found=0
+for zone in $(uci show firewall | grep '=zone$' | cut -d. -f2 | cut -d= -f1); do
+    if [ "$(uci get "firewall.$zone.name")" = wan ]; then
+        uci -q del_list "firewall.$zone.network=probe" || true
+        uci add_list "firewall.$zone.network=probe"
+        wan_found=1
+    fi
+done
+test "$wan_found" = 1
+uci commit network
+uci commit firewall

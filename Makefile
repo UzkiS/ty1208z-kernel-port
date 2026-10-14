@@ -43,6 +43,12 @@ help:
 	@echo 'make openwrt-container-packages - compile/check separate native Docker APKs; no boot/runtime acceptance'
 	@echo 'make openwrt-container-qemu - test actual ARMv7 Docker in isolated QEMU; no board acceptance'
 	@echo 'make openwrt-container-applications - build/test/export native Docker + fw4 + dual-core Passwall in QEMU'
+	@echo 'make openwrt-system - compose the measured board kernel and native userspace for RAM delivery'
+
+.PHONY: openwrt-system
+openwrt-system:
+	python3 tools/build_native_system.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" --resume
+	python3 tools/package_native_system.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" --resume
 
 lint:
 	python3 tools/check_repository.py

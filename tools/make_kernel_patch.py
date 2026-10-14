@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Generate the diagnostic patch from a verified, pristine Linux archive."""
+from native_system_patch import extend
 import argparse
 import difflib
 import hashlib
@@ -466,6 +467,8 @@ changes["arch/arm/boot/dts/hisilicon/Makefile"] = (
     changes["arch/arm/boot/dts/hisilicon/Makefile"][0],
     changes["arch/arm/boot/dts/hisilicon/Makefile"][1] +
     'dtb-$(CONFIG_TY1208Z_USB_HOST0_EXPERIMENT) += hi3798mv100-ty1208z-usb-host.dtb\n')
+
+extend(changes)
 
 diffs = []
 with tarfile.open(args.archive) as archive:
