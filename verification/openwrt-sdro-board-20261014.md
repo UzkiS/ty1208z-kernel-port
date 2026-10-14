@@ -4,7 +4,9 @@ The independent `openwrt-router-sdro` RAM candidate passes SD block/VFAT file
 reads, higher-memory/PFN stress, physical Ethernet transfers, both Passwall
 cores and autonomous command restart. The exact original low-256-MiB Chinese
 router and current user configuration were restored after the first trial.
-The completed second application trial remains running as the Chinese SD RAM router; its final return is waiting for recovery of the host serial receiver. SSH is healthy. No card-data,
+The completed second application trial also returned automatically after the
+user reconnected the TTL adapter and actual UART reception recovered. The
+original Chinese router is healthy. No card-data,
 persistent boot/flash or security-state writes were performed.
 
 ## Exact accepted candidate
@@ -81,14 +83,19 @@ Its UART module-upload fallback then encountered a host RX-zero condition;
 SSH recovery loaded only the exact matched module and all runtime tests passed.
 Repeated host receivers receive zero even when an SSH-triggered UART marker
 advances the board TX counter. A Windows PnP reset returned general failure.
-The serial adapter reconnect/3.3-V check is pending; no blind reboot is sent.
-The receive-only COM9 monitor ran its full 45-minute window and ended at
-2026-10-14 07:20:25 Asia/Shanghai with no actual UART marker received. It
-attempted no restart/return and released COM9. A subsequent SSH health check
-again verified the 14 restored configuration hashes, Chinese authenticated
-Passwall page, empty root password, exact restart binding and IRQ Err0.
-The second trial's final return remains pending; the first trial's accepted
-return is separate evidence.
+Receive-only COM9 monitors expired without a restart attempt; the latest ended
+at 2026-10-14 08:42:59 Asia/Shanghai. After the user reconnected TTL, a fresh
+SSH-triggered marker was received in full, with 33 received bytes and matching
+board TX progress. Independent SSH identity/IRQ checks preceded interactive
+console recovery. No additional manual box power cycle was needed.
+
+The second trial then completed one guarded command restart at 08:59.
+Immediately before restart, all 15 current configuration/account/key files
+were backed up and independently hash-checked. Actual controller shutdown,
+fresh original CA-loader inspection, the exact low256 router's two device
+CRCs, current configuration restoration, Chinese authenticated Passwall page,
+empty root login, restart binding and IRQ Err0 passed. COM9 was released.
+This return is separate from the first trial's accepted return.
 
 In the independently verified first return, the native `router-sdro` guard
 verifies its DT/source and matched restart binding. One graceful command

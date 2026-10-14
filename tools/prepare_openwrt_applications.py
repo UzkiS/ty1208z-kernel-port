@@ -82,7 +82,7 @@ def application_variant(source):
         return "qemu"
     record = json.loads(marker.read_text())
     if record not in tuple({"schema": 1, "variant": variant}
-                           for variant in ("qemu", "ethernet", "ethernet-ram768", "ethernet-sdro")):
+                           for variant in ("qemu", "ethernet", "ethernet-ram768", "ethernet-sdro", "container-qemu")):
         raise ValueError("Unrecognized application source variant")
     return record["variant"]
 
@@ -98,7 +98,10 @@ def merge_kernel_fragment(original, extra):
     return "\n".join(kept) + "\n" + extra
 
 
-def prepare_applications(project, taskbase, ethernet=False, container_packages=False, ram768=False, sdro=False):
+def prepare_applications(project, taskbase, ethernet=False, container_packages=False, ram768=False, sdro=False,
+                         container_applications=False):
+    if container_applications and (ethernet or container_packages or ram768 or sdro):
+        raise ValueError("Combined container applications require their independent QEMU-only source")
     if sdro and (not ethernet or container_packages or ram768):
         raise ValueError("Native read-only SD requires its independent Ethernet variant")
     if ram768 and (not ethernet or container_packages):
@@ -107,7 +110,7 @@ def prepare_applications(project, taskbase, ethernet=False, container_packages=F
         raise ValueError("Container package compilation must remain separate from router RAM builds")
     toolchain, identity = toolchain_from_native(project, taskbase)
     feeds_config, lock = pinned_feeds(project, taskbase)
-    appbase = taskbase / ("container-packages" if container_packages else
+    appbase = taskbase / ("container-applications" if container_applications else "container-packages" if container_packages else
                           "router-sd" if sdro else "router768" if ram768 else "router" if ethernet else "applications")
     appbase.mkdir(parents=True, exist_ok=True)
     downloads = appbase / "downloads"
@@ -151,6 +154,12 @@ def prepare_applications(project, taskbase, ethernet=False, container_packages=F
         path.write_text(merge_kernel_fragment(
             path.read_text(), (project / "openwrt/containers/kernel.config").read_text()))
         manifest[relative] = sha256(path)
+    if container_applications:
+        relative = "target/linux/hi3798mv100/apps/config-6.12"
+        path = source / relative
+        path.write_text(merge_kernel_fragment(
+            path.read_text(), (project / "openwrt/containers/applications-kernel.config").read_text()))
+        manifest[relative] = sha256(path)
 
     relative = Path("target/linux/hi3798mv100/Makefile")
     makefile = source / relative
@@ -177,10 +186,12 @@ def prepare_applications(project, taskbase, ethernet=False, container_packages=F
     (source / ".ty1208z-application-lock.json").write_text(json.dumps(lock, indent=2) + "\n")
     (source / ".ty1208z-toolchain.json").write_text(json.dumps(identity, indent=2) + "\n")
     (source / ".ty1208z-application-variant.json").write_text(json.dumps(
-        {"schema": 1, "variant": "ethernet-sdro" if sdro else "ethernet-ram768" if ram768 else "ethernet" if ethernet else "qemu"}, indent=2) + "\n")
+        {"schema": 1, "variant": "container-qemu" if container_applications else "ethernet-sdro" if sdro else "ethernet-ram768" if ram768 else "ethernet" if ethernet else "qemu"}, indent=2) + "\n")
     config = (project / "openwrt/config/ram.config").read_text()
     config += (project / ("openwrt/containers/config" if container_packages else
                          "openwrt/applications/config")).read_text()
+    if container_applications:
+        config = merge_kernel_fragment(config, (project / "openwrt/containers/applications.config").read_text())
     if ethernet:
         config += (project / "openwrt/router/config").read_text()
     if ram768:
@@ -201,6 +212,11 @@ def prepare_applications(project, taskbase, ethernet=False, container_packages=F
             "schema": 1, "scope": "native Docker packages only; no rootfs/boot/runtime acceptance",
             "config_sha256": sha256(project / "openwrt/containers/config"),
         }, indent=2) + "\n")
+    if container_applications:
+        (source / ".ty1208z-container-qemu-only.json").write_text(json.dumps({
+            "schema": 1, "scope": "combined native applications and Docker for isolated QEMU only; no board image",
+            "config_sha256": sha256(project / "openwrt/containers/applications.config"),
+        }, indent=2) + "\n")
     print(source)
     return source
 
@@ -210,11 +226,12 @@ def main():
     parser.add_argument("--taskbase", type=Path, required=True)
     parser.add_argument("--ethernet", action="store_true", help="Use separate router build with measured Ethernet support")
     parser.add_argument("--container-packages", action="store_true", help="Separate compile-only Docker packages")
+    parser.add_argument("--container-applications", action="store_true", help="Combined native applications/Docker; QEMU only")
     parser.add_argument("--ram768", action="store_true", help="Independent bounded higher-memory router")
     parser.add_argument("--sd-read-only", action="store_true", help="Independent native read-only SD router")
     args = parser.parse_args()
     prepare_applications(Path(__file__).resolve().parents[1], args.taskbase.resolve(),
-                         args.ethernet, args.container_packages, args.ram768, args.sd_read_only)
+                         args.ethernet, args.container_packages, args.ram768, args.sd_read_only, args.container_applications)
 
 
 if __name__ == "__main__":

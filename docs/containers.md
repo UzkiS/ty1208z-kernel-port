@@ -62,6 +62,37 @@ dependency closure provides legacy `firewall`; this experiment does not run
 OpenWrt fw4 or Passwall, perform physical storage I/O or establish a final
 router installation. Fresh remote runtime CI remains pending.
 
+The independent `make openwrt-container-applications TASKBASE=/absolute/linux/build-root`
+entry now builds the Chinese application rootfs, firewall4 and all five native
+container cores from one source/kernel profile, runs the combined ARMv7 suite
+at 768 MiB and exports verified QEMU-only delivery under
+`artifacts/openwrt-container-applications-qemu/`. Its actual native `/init`,
+BusyBox and procd are preserved. A separate gated fixture archive starts the
+real dockerd service with guest-RAM storage and the real native tini. The
+deterministic container includes that same rootfs's musl/libgcc libraries.
+
+The combined suite passes overlay2, default seccomp, actual CPU throttling and
+memory-cgroup OOM, PID-limit readback, embedded DNS, bridge masquerading and
+published DNAT through real netifd/fw4 configuration. Both installed Passwall
+cores also pass transparent TLS requests from an actual container network
+namespace; native curl runs in that namespace. Direct requests fail before
+and after each proxy. Docker networking survives the firewall and Passwall
+reloads, and containers/network namespaces and the procd daemon shut down
+cleanly. The original application checks still cover Chinese/empty-password
+LuCI, both SOCKS/TLS cores, unzip, DNS/TLS and NTP/time64 across 2036/2038/2040.
+All 26 required markers appear exactly once; input hashes are frozen before
+preparation/runtime and verified afterwards. The exporter independently checks
+native/core/kernel/fixture/console consistency and copied file hashes.
+See [combined report](../verification/container-applications-qemu-20261014.md).
+
+This profile has no CA/uImage, board DTB or installation path and is explicitly
+refused by the physical RAM packager. It enables block support for declared
+container dependencies while excluding MMC, MTD, USB, board Ethernet and SMP.
+It is separate from the physically accepted SD router. Its workflow builds
+from a fresh Linux checkout; a configured workflow is not successful CI
+evidence. Physical storage-backed Docker, external Internet/registry access,
+IPv6, performance and board integration remain pending.
+
 Physical/final-router acceptance still needs a small `linux/arm/v7` container,
 DNS and outbound/forwarded networking with fw4/Passwall, measured memory/CPU
 limits and clean shutdown/restart. Confirm image architecture before download;

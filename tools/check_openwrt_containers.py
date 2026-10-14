@@ -26,11 +26,18 @@ def unique(paths, label):
     return paths[0]
 
 
-def check(source, built=False):
-    marker = json.loads((source / ".ty1208z-container-compile-only.json").read_text())
-    if marker != {"schema": 1,
-                  "scope": "native Docker packages only; no rootfs/boot/runtime acceptance",
-                  "config_sha256": sha256(PROJECT / "openwrt/containers/config")}:
+def check(source, built=False, application_runtime=False):
+    output = PROJECT / ("artifacts/openwrt-container-application-packages" if application_runtime else
+                        "artifacts/openwrt-container-packages")
+    if built:
+        (output / "manifest.json").unlink(missing_ok=True)
+    marker_name = ".ty1208z-container-qemu-only.json" if application_runtime else ".ty1208z-container-compile-only.json"
+    config_name = "applications.config" if application_runtime else "config"
+    scope = ("combined native applications and Docker for isolated QEMU only; no board image" if application_runtime else
+             "native Docker packages only; no rootfs/boot/runtime acceptance")
+    marker = json.loads((source / marker_name).read_text())
+    if marker != {"schema": 1, "scope": scope,
+                  "config_sha256": sha256(PROJECT / "openwrt/containers" / config_name)}:
         raise ValueError("Container package compile-only profile differs")
     config = (source / ".config").read_text()
     for option in ("TARGET_hi3798mv100_apps", "TARGET_hi3798mv100_apps_DEVICE_ty1208z_apps",
@@ -39,9 +46,9 @@ def check(source, built=False):
         if f"CONFIG_{option}=y\n" not in config:
             raise ValueError(f"Missing container compile configuration: {option}")
     for package in PACKAGES:
-        if f"CONFIG_PACKAGE_{package}=m\n" not in config:
-            raise ValueError(f"Container package must remain compile-only: {package}")
-    if "CONFIG_PACKAGE_kmod-nft-nat=m\n" not in config:
+        if f"CONFIG_PACKAGE_{package}={'y' if application_runtime else 'm'}\n" not in config:
+            raise ValueError(f"Container package selection differs from this profile: {package}")
+    if f"CONFIG_PACKAGE_kmod-nft-nat={'y' if application_runtime else 'm'}\n" not in config:
         raise ValueError("Container dependency kernel lacks selected nft NAT modules")
     manifest = json.loads((source / ".ty1208z-overlay.json").read_text())
     for relative, expected in manifest.items():
@@ -69,7 +76,8 @@ def check(source, built=False):
         if recipes[name] != recipe_lock["packages"][name]:
             raise ValueError(f"Container recipe differs from reviewed identity: {name}")
     if not built:
-        print("OPENWRT_CONTAINER_CONFIG_PASS compile-only no-rootfs no-device-access")
+        print("OPENWRT_CONTAINER_APP_CONFIG_PASS QEMU-only no-board-image" if application_runtime else
+              "OPENWRT_CONTAINER_CONFIG_PASS compile-only no-rootfs no-device-access")
         return
     kernel = unique((source / "build_dir").glob(
         "target-*/linux-hi3798mv100_apps/linux-6.12.112/.config"), "container dependency kernel")
@@ -83,11 +91,10 @@ def check(source, built=False):
     for option in ("NFT_NAT", "NFT_MASQ", "NF_NAT", "NFT_COMPAT"):
         if not re.search(rf"^CONFIG_{option}=[ym]$", kernel_config, re.MULTILINE):
             raise ValueError(f"Container dependency kernel lacks nft NAT support: {option}")
-    if list((source / "bin/targets").rglob("*uImage*")) or list((source / "bin/targets").rglob("*rootfs*")):
+    if (list((source / "bin/targets").rglob("*uImage*")) or
+            (not application_runtime and list((source / "bin/targets").rglob("*rootfs*")))):
         raise ValueError("Compile-only container entry emitted a boot image/rootfs")
-    output = PROJECT / "artifacts/openwrt-container-packages"
     output.mkdir(parents=True, exist_ok=True)
-    (output / "manifest.json").unlink(missing_ok=True)
     apk = source / "staging_dir/host/bin/apk"
     go = source / "staging_dir/hostpkg/lib/go-1.26/bin/go"
     runtime_packages = {}
@@ -156,9 +163,11 @@ def check(source, built=False):
              for path in sorted(output.iterdir()) if path.is_file()}
     (output / "manifest.json").write_text(json.dumps({
         "status": "native Docker packages and ARM version checks only; daemon/container/hardware untested",
+        "scope": scope,
         "packages": records, "files": files,
         "check_sources": {name: sha256(PROJECT / "tools" / name)
                           for name in ("check_openwrt_containers.py", "prepare_openwrt_applications.py",
+                                       "build-openwrt-container-applications.sh" if application_runtime else
                                        "build-openwrt-containers.sh")},
     }, indent=2) + "\n")
     print("OPENWRT_CONTAINER_PACKAGES_PASS actual-native-APK ARM-EABI5 versions; daemon/container untested")
@@ -168,8 +177,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
     parser.add_argument("--built", action="store_true")
+    parser.add_argument("--application-runtime", action="store_true")
     args = parser.parse_args()
-    check(args.source.resolve(), args.built)
+    check(args.source.resolve(), args.built, args.application_runtime)
 
 
 if __name__ == "__main__":

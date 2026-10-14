@@ -391,8 +391,14 @@ nft add rule inet time64 prerouting tcp dport 19000 tproxy to :19001 meta mark s
 nft list table inet time64
 nft delete table inet time64
 echo NFT_EXPRESSIONS_AND_COUNTER_PASS
+if [ -f /opt/qemu-container-fixtures/guest.sh ]; then
+    sh /opt/qemu-container-fixtures/guest.sh setup
+fi
 if [ -f /tmp/router-runtime-test.sh ]; then
     sh /tmp/router-runtime-test.sh
+fi
+if [ -f /opt/qemu-container-fixtures/guest.sh ]; then
+    sh /opt/qemu-container-fixtures/guest.sh verify-cleanup
 fi
 logger -t time64 OPENWRT_APPLICATIONS_LOG_2040
 sleep 1

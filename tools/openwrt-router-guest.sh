@@ -118,6 +118,19 @@ if udp_transfer > router-udp-bypass.json 2> router-udp-bypass.log; then
     echo 'Unexpected direct UDP/control forwarding before transparent proxy'
     exit 1
 fi
+docker_client_request() {
+    docker_pid=$(docker inspect --format '{{.State.Pid}}' combined-proxy-client)
+    test "$docker_pid" -gt 1
+    /qemu-helper/busybox nsenter -t "$docker_pid" -n curl --noproxy '*' -fsS --max-time 5 \
+        --resolve time64.test:19443:198.19.0.2 --cacert /tmp/time64-test/ca.pem \
+        https://time64.test:19443/
+}
+if [ -f /opt/qemu-container-fixtures/guest.sh ]; then
+    if docker_client_request >router-docker-bypass.txt 2>router-docker-bypass.log; then
+        echo 'Unexpected direct Docker forwarding before transparent proxy'
+        exit 1
+    fi
+fi
 
 # Use the installed Passwall service, its generated Xray redir config, nft
 # rules and policy routing. The existing fixture's VLESS/TLS server is local.
@@ -165,6 +178,11 @@ grep -q 'lookup 999' router-policy-rules.txt
 ip route show table 999 | grep -q 'local default dev lo'
 cat router-policy-rules.txt
 grep 'tproxy ip to' router-passwall-rules.txt
+if [ -f /opt/qemu-container-fixtures/guest.sh ]; then
+    docker_client_request >router-docker-xray.txt 2>router-docker-xray.log
+    grep -qx TY1208Z_LOCAL_PAYLOAD_2040 router-docker-xray.txt
+    echo OPENWRT_DOCKER_PASSWALL_XRAY_TPROXY_PASS
+fi
 /etc/init.d/passwall stop > router-passwall-stop.log 2>&1
 if ip netns exec qemu_client curl --noproxy '*' -fsS --max-time 4 \
         --resolve time64.test:19443:198.19.0.2 --cacert ca.pem \
@@ -175,6 +193,30 @@ fi
 if udp_transfer > router-udp-after-stop.json 2> router-udp-after-stop.log; then
     echo 'Unexpected UDP/control forwarding after transparent proxy stopped'
     exit 1
+fi
+if [ -f /opt/qemu-container-fixtures/guest.sh ]; then
+    if docker_client_request >router-docker-after-stop.txt 2>router-docker-after-stop.log; then
+        echo 'Unexpected direct Docker forwarding after transparent proxy stopped'
+        exit 1
+    fi
+    uci set 'passwall.@global[0].node=qemu_singbox_vless_valid'
+    uci commit passwall
+    /etc/init.d/passwall start >router-passwall-singbox-start.log 2>&1
+    attempts=0
+    until docker_client_request >router-docker-singbox.txt 2>router-docker-singbox.log; do
+        attempts=$((attempts+1))
+        [ "$attempts" -lt 20 ] || exit 1
+        sleep 1
+    done
+    grep -qx TY1208Z_LOCAL_PAYLOAD_2040 router-docker-singbox.txt
+    nft list table inet passwall >router-passwall-singbox-rules.txt
+    grep -Eq 'counter packets [1-9][0-9]*.*tproxy ip to' router-passwall-singbox-rules.txt
+    /etc/init.d/passwall stop >router-passwall-singbox-stop.log 2>&1
+    if docker_client_request >router-docker-singbox-after-stop.txt 2>router-docker-singbox-after-stop.log; then
+        echo 'Unexpected direct Docker forwarding after sing-box stopped'
+        exit 1
+    fi
+    echo OPENWRT_DOCKER_PASSWALL_SINGBOX_TPROXY_PASS
 fi
 kill "$udp_origin_pid"
 test "$(date -u +%Y)" = 2040

@@ -22,28 +22,105 @@ def unique(paths, description):
     return paths[0]
 
 
-def test(source, memory_mib=512):
+def identity(path):
+    with path.open("rb") as stream:
+        return {"bytes": path.stat().st_size,
+                "sha256": hashlib.file_digest(stream, "sha256").hexdigest()}
+
+
+def required_markers(variant):
+    markers = (
+        b"XRAY_UNSYNCHRONIZED_CLOCK_PASS", b"NTP_ERA_TIME64_PASS",
+        b"CERTIFICATE_TIME64_PASS", b"DNS_TIME64_PASS", b"HTTPS_TIME64_PASS",
+        b"LUCI_CHINESE_DEFAULT_PASS", b"PASSWALL_LUCI_AUTH_TIME64_PASS",
+        b"LUCI_RPCD_TIME64_PASS", b"PASSWALL_XRAY_SOCKS_TIME64_PASS",
+        b"PASSWALL_XRAY_TLS_TIME64_PASS", b"PASSWALL_SINGBOX_SOCKS_TIME64_PASS",
+        b"PASSWALL_SINGBOX_TLS_TIME64_PASS", b"UNZIP_ARCHIVE_TIME64_PASS",
+        b"LUCI_EMPTY_ROOT_LOGIN_PASS", b"NFT_EXPRESSIONS_AND_COUNTER_PASS",
+        b"OPENWRT_APPLICATIONS_QEMU_PASS",
+    )
+    if variant in ("ethernet", "ethernet-ram768", "ethernet-sdro", "container-qemu"):
+        markers += (b"OPENWRT_ROUTER_FORWARDING_TIME64_PASS", b"PASSWALL_TPROXY_TCP_TIME64_PASS",
+                    b"PASSWALL_TPROXY_UDP_TIME64_PASS")
+    if variant == "container-qemu":
+        markers += (b"CONTAINER_APPLICATIONS_QEMU_NATIVE_TMPFS_ROOT_PASS",
+                    b"OPENWRT_DOCKER_PROCD_OVERLAY_CGROUP_PASS", b"OPENWRT_DOCKER_FW4_DNS_NAT_PASS",
+                    b"OPENWRT_DOCKER_PASSWALL_XRAY_TPROXY_PASS", b"OPENWRT_DOCKER_PASSWALL_SINGBOX_TPROXY_PASS",
+                    b"OPENWRT_DOCKER_AFTER_PASSWALL_FW4_RELOAD_PASS", b"OPENWRT_DOCKER_CLEAN_SHUTDOWN_PASS")
+    return markers
+
+
+def test(source, memory_mib=512, taskbase=None):
+    source = source.resolve()
+    if taskbase is not None:
+        taskbase = taskbase.resolve()
+    images = source / "bin/targets/hi3798mv100/apps"
+    output = images / "checks"
+    suffix = "" if memory_mib == 512 else f"-{memory_mib}"
+    provenance_path = output / f"applications-qemu{suffix}.json"
+    # Invalidate before profile validation, wrapper preparation or compilation.
+    # A failed rerun must not leave a stale successful provenance record.
+    provenance_path.unlink(missing_ok=True)
     if (source / ".ty1208z-container-compile-only.json").exists():
         raise ValueError("Compile-only container packages have no application rootfs acceptance")
     variant = application_variant(source)
+    combined = variant == "container-qemu"
     ethernet = variant in ("ethernet", "ethernet-ram768", "ethernet-sdro")
-    if memory_mib not in (256, 512):
-        raise ValueError("Application memory experiment must be 256 or 512 MiB")
+    networking = ethernet or combined
+    if (combined and memory_mib != 768) or (not combined and memory_mib not in (256, 512)):
+        raise ValueError("Application QEMU memory must match its profile: 256/512 MiB, or combined 768 MiB")
     kernel = unique((source / "build_dir").glob(
         "target-*/linux-hi3798mv100_apps/linux-6.12.112/arch/arm/boot/zImage"), "application kernel")
-    images = source / "bin/targets/hi3798mv100/apps"
     initrd = unique(images.glob("*rootfs.cpio.gz"), "application initrd")
-    output = images / "checks"
     output.mkdir(exist_ok=True)
-    suffix = "" if memory_mib == 512 else "-256"
+    manifest = unique(images.glob("*.manifest"), "application package manifest")
+    ntp_source = Path(__file__).with_name("ntp-qemu-fixture.c")
+    test_inputs = {
+        "test_harness": Path(__file__),
+        "ntp_server_source": ntp_source,
+        "ntp_guest": Path(__file__).with_name("openwrt-ntp-guest.sh"),
+        "applications_guest": Path(__file__).with_name("openwrt-applications-guest.sh"),
+    }
+    if networking:
+        test_inputs["router_guest"] = Path(__file__).with_name("openwrt-router-guest.sh")
+    if combined:
+        project = Path(__file__).resolve().parents[1]
+        test_inputs.update({name: project / relative for name, relative in (
+            ("qemu_wrapper", "tools/prepare_container_applications_qemu.py"),
+            ("container_fixture_builder", "tools/test_openwrt_container_runtime.py"),
+            ("initramfs_writer", "tools/make_initramfs.py"),
+            ("container_configuration", "openwrt/containers/applications.config"),
+            ("container_kernel_configuration", "openwrt/containers/applications-kernel.config"),
+            ("container_resource_source", "tools/container-resource-probe.c"),
+            ("container_helper_configuration", "config/busybox-container-qemu.fragment"),
+            ("container_helper_base_configuration", "config/busybox-diagnostic.fragment"),
+            ("container_helper_sources", "config/sources.lock.json"),
+            ("container_helper_time64_patch", "patches/0002-busybox-stat-time64.patch"),
+            ("qemu_stage", "initramfs/container-applications-qemu-init"),
+            ("container_guest", "tools/openwrt-container-applications-guest.sh"),
+        )})
+    native_paths = {
+        "kernel": kernel, "rootfs": initrd, "packages": manifest,
+        "config": kernel.parents[3] / ".config",
+        "feeds": source / ".ty1208z-application-lock.json",
+        "toolchain": source / ".ty1208z-toolchain.json",
+        "overlay": source / ".ty1208z-overlay.json",
+        "openwrt_config": source / ".config",
+    }
+    if combined:
+        native_paths["container_profile"] = source / ".ty1208z-container-qemu-only.json"
+    frozen = {path: identity(path) for path in (*native_paths.values(), *test_inputs.values())}
     # Conservatively account for the board's low-16-MiB reservation. virt
     # does not reserve that region, so cap its usable memory for this trial.
-    memory_limit_mib = 240 if memory_mib == 256 else 512
-    provenance_path = output / f"applications-qemu{suffix}.json"
+    memory_limit_mib = 240 if memory_mib == 256 else memory_mib
+    extra_inputs = {}
+    native_initrd = initrd
+    if combined:
+        if taskbase is None:
+            raise ValueError("Combined application QEMU requires its explicit pinned build taskbase")
+        from prepare_container_applications_qemu import prepare
+        initrd, extra_inputs = prepare(source, taskbase, output)
     transcript_path = output / f"qemu-applications{suffix}.log"
-    # A failed rerun must not leave a stale successful provenance record.
-    provenance_path.unlink(missing_ok=True)
-    ntp_source = Path(__file__).with_name("ntp-qemu-fixture.c")
     ntp_binary = output / f"ntp-qemu-fixture{suffix}.armhf"
     # Build against the same pinned native ARM/musl toolchain as this rootfs.
     compiler = unique((source / "staging_dir").glob(
@@ -88,20 +165,31 @@ def test(source, memory_mib=512):
                      for i in range(0, len(encoded_ntp), 192)]
     commands += [b"base64 -d /tmp/ntp-fixture.b64 > /tmp/ntp-qemu-fixture; chmod 700 /tmp/ntp-qemu-fixture\n",
                  b"base64 -d /tmp/ntp-test.b64 > /tmp/ntp-runtime-test.sh\n"]
-    if ethernet:
+    if networking:
         encoded_router = base64.b64encode(Path(__file__).with_name("openwrt-router-guest.sh").read_bytes())
         commands += [b"printf %s '" + encoded_router[i:i+192] + b"' >> /tmp/router-test.b64\n"
                      for i in range(0, len(encoded_router), 192)]
         commands.append(b"base64 -d /tmp/router-test.b64 > /tmp/router-runtime-test.sh\n")
     commands.append(b"base64 -d /tmp/application-test.b64 > /tmp/application-test.sh; "
                     b"sh /tmp/application-test.sh\n")
+    test_inputs.update(ntp_server_binary=ntp_binary, unzip_archive=zip_fixture, **extra_inputs)
+    if combined:
+        test_inputs["unmodified_native_initrd"] = native_initrd
+    artifact_paths = {"kernel": kernel, "rootfs": initrd, "packages": manifest,
+                      "config": kernel.parents[3] / ".config"}
+    for path in (*artifact_paths.values(), *test_inputs.values()):
+        current = identity(path)
+        if path in frozen and frozen[path] != current:
+            raise ValueError(f"Application QEMU input changed during preparation: {path.name}")
+        frozen[path] = current
     # No disk, host network, port forwarding or external server is exposed.
     # Memory size is an emulation allocation, not a board throughput result.
     process = subprocess.Popen([
         "qemu-system-arm", "-machine", "virt,gic-version=2", "-cpu", "cortex-a7",
         "-m", f"{memory_mib}M", "-smp", "1", "-nographic", "-monitor", "none", "-serial", "stdio",
         "-no-reboot", "-nic", "none", "-kernel", str(kernel), "-initrd", str(initrd),
-        "-append", f"console=ttyAMA0 rdinit=/init panic=0 mem={memory_limit_mib}M",
+        "-append", (f"console=ttyAMA0 rdinit=/qemu-init ty1208z.qemu_container_apps=1 panic=0 mem={memory_limit_mib}M"
+                    if combined else f"console=ttyAMA0 rdinit=/init panic=0 mem={memory_limit_mib}M"),
     ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     selector = selectors.DefaultSelector()
     selector.register(process.stdout, selectors.EVENT_READ)
@@ -111,7 +199,7 @@ def test(source, memory_mib=512):
     sent = 0
     activation_at = None
     activations = 0
-    deadline = time.monotonic() + 360
+    deadline = time.monotonic() + (720 if combined else 360)
     try:
         with transcript_path.open("wb") as log:
             while time.monotonic() < deadline:
@@ -143,40 +231,17 @@ def test(source, memory_mib=512):
             else:
                 raise ValueError(f"Application QEMU timeout; see {transcript_path.name}")
         report = bytes(transcript).replace(b"\r", b"")
-        markers = (
-            b"XRAY_UNSYNCHRONIZED_CLOCK_PASS",
-            b"NTP_ERA_TIME64_PASS", b"CERTIFICATE_TIME64_PASS", b"DNS_TIME64_PASS", b"HTTPS_TIME64_PASS",
-            b"LUCI_CHINESE_DEFAULT_PASS", b"PASSWALL_LUCI_AUTH_TIME64_PASS",
-            b"LUCI_RPCD_TIME64_PASS", b"PASSWALL_XRAY_SOCKS_TIME64_PASS",
-            b"PASSWALL_XRAY_TLS_TIME64_PASS",
-            b"PASSWALL_SINGBOX_SOCKS_TIME64_PASS", b"PASSWALL_SINGBOX_TLS_TIME64_PASS",
-            b"UNZIP_ARCHIVE_TIME64_PASS", b"LUCI_EMPTY_ROOT_LOGIN_PASS",
-            b"NFT_EXPRESSIONS_AND_COUNTER_PASS", b"OPENWRT_APPLICATIONS_QEMU_PASS",
-        )
-        if ethernet:
-            markers += (b"OPENWRT_ROUTER_FORWARDING_TIME64_PASS", b"PASSWALL_TPROXY_TCP_TIME64_PASS",
-                        b"PASSWALL_TPROXY_UDP_TIME64_PASS")
+        markers = required_markers(variant)
         if (process.returncode != 0 or sent != len(commands)
-                or any(b"\n" + marker + b"\n" not in report for marker in markers)
+                or any(report.splitlines().count(marker) != 1 for marker in markers)
                 or b"Kernel panic" in report or b"OPENWRT_APPLICATIONS_QEMU_FAIL" in report
                 or not re.search(rb"\nTIME64_PASS sizeof\(time_t\)=8 realtime=22089888[0-9]{2} ", report)):
             raise ValueError(f"Application QEMU check failed; see {transcript_path.name}")
-        manifest = unique(images.glob("*.manifest"), "application package manifest")
-        artifacts = {}
-        for name, path in (("kernel", kernel), ("rootfs", initrd), ("packages", manifest),
-                           ("config", kernel.parents[3] / ".config"),
-                           ("console", transcript_path)):
-            with path.open("rb") as source_file:
-                artifacts[name] = {"bytes": path.stat().st_size,
-                                   "sha256": hashlib.file_digest(source_file, "sha256").hexdigest()}
-        test_inputs = {
-            "ntp_server_source": ntp_source, "ntp_server_binary": ntp_binary,
-            "ntp_guest": Path(__file__).with_name("openwrt-ntp-guest.sh"),
-            "applications_guest": Path(__file__).with_name("openwrt-applications-guest.sh"),
-            "unzip_archive": zip_fixture,
-        }
-        if ethernet:
-            test_inputs["router_guest"] = Path(__file__).with_name("openwrt-router-guest.sh")
+        for path, expected in frozen.items():
+            if identity(path) != expected:
+                raise ValueError(f"Application QEMU input changed while running: {path.name}")
+        artifacts = {name: frozen[path] for name, path in artifact_paths.items()}
+        artifacts["console"] = identity(transcript_path)
         provenance = {
             "schema": 1, "result": "OPENWRT_APPLICATIONS_QEMU_PASS",
             "application_variant": variant,
@@ -184,9 +249,8 @@ def test(source, memory_mib=512):
             "memory_limit_mib": memory_limit_mib,
             "host_network": False, "disks": False, "clock_year": 2040,
             "artifacts": artifacts, "passed_markers": [marker.decode() for marker in markers],
-            "test_inputs": {name: {"bytes": path.stat().st_size,
-                                   "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}
-                            for name, path in test_inputs.items()},
+            "test_inputs": {name: frozen[path] for name, path in test_inputs.items()},
+            "native_inputs": {name: frozen[path] for name, path in native_paths.items()},
             "feeds": json.loads((source / ".ty1208z-application-lock.json").read_text()),
             "toolchain": json.loads((source / ".ty1208z-toolchain.json").read_text()),
             "limits": "No MV100 peripherals, hardware routing/TPROXY, performance or Wi-Fi acceptance",
@@ -194,8 +258,10 @@ def test(source, memory_mib=512):
         provenance_path.write_text(json.dumps(provenance, indent=2) + "\n")
         print("OPENWRT_APPLICATIONS_QEMU_PASS: installed NTP crosses 2036/2038 and sets 2040; ARM DNS/TLS/LuCI/Passwall pass")
         print("nft counters and TPROXY expressions passed; physical forwarding/TPROXY/Wi-Fi remain untested")
-        if ethernet:
+        if networking:
             print("Actual netifd/fw4 forwarding and Passwall TCP/UDP TPROXY passed in isolated network namespaces")
+        if combined:
+            print("Actual procd Docker/overlay2/cgroups/seccomp/fw4/NAT and both container-namespace proxy cores passed")
     finally:
         selector.close()
         if process.poll() is None:
@@ -210,9 +276,10 @@ def test(source, memory_mib=512):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", type=Path, required=True)
-    parser.add_argument("--memory-mib", type=int, choices=(256, 512), default=512)
+    parser.add_argument("--memory-mib", type=int, choices=(256, 512, 768), default=512)
+    parser.add_argument("--taskbase", type=Path)
     args = parser.parse_args()
-    test(args.source, args.memory_mib)
+    test(args.source, args.memory_mib, args.taskbase)
 
 
 if __name__ == "__main__":

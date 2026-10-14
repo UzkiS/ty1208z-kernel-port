@@ -1,0 +1,11 @@
+#!/qemu-helper/busybox sh
+# QEMU-only entry gate; the unmodified native /init switches to tmpfs.
+set -eu
+helper=/qemu-helper/busybox
+"$helper" mount -t proc proc /proc
+"$helper" mount -t sysfs sysfs /sys
+"$helper" grep -q 'linux,dummy-virt' /sys/firmware/devicetree/base/compatible
+"$helper" grep -qw 'ty1208z.qemu_container_apps=1' /proc/cmdline
+"$helper" umount /sys
+"$helper" umount /proc
+exec /init

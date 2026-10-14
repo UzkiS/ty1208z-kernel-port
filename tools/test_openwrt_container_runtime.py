@@ -128,14 +128,19 @@ def build_busybox(taskbase, work, output):
     return payload, probe
 
 
-def docker_fixture(busybox, probe, destination):
+def docker_fixture(busybox, probe, destination, native_libraries=None):
+    native_libraries = native_libraries or {}
+    if native_libraries and set(native_libraries) != {
+            "lib/libc.so", "lib/ld-musl-armhf.so.1", "lib/libgcc_s.so.1"}:
+        raise ValueError("Native tini fixture requires exactly its ARM musl and libgcc runtime")
     layer = io.BytesIO()
     with tarfile.open(fileobj=layer, mode="w", format=tarfile.USTAR_FORMAT) as archive:
-        for name in ("bin", "etc", "tmp", "proc", "sys", "dev"):
+        for name in ("bin", "etc", "tmp", "proc", "sys", "dev", *(("lib",) if native_libraries else ())):
             info = tarfile.TarInfo(name)
             info.type, info.mode = tarfile.DIRTYPE, 0o755
             archive.addfile(info)
-        for name, payload in (("bin/busybox", busybox), ("bin/resource-probe", probe)):
+        for name, payload in (("bin/busybox", busybox), ("bin/resource-probe", probe),
+                              *sorted(native_libraries.items())):
             data = payload.read_bytes()
             info = tarfile.TarInfo(name)
             info.size, info.mode = len(data), 0o755

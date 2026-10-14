@@ -76,10 +76,10 @@ capacity/mount/cleanup/missing-shutdown/failed-shutdown/reset-refusal. The same
 raw kernel/initramfs pass isolated generic QEMU time64 checks. QEMU does not
 emulate the physical MV100 controller, card or watchdog.
 
-The board still runs the accepted Chinese native SD low768 RAM router.
-Fresh SSH/configuration/Chinese authenticated LuCI/empty-password and IRQ
-Err0 checks pass. .NET and Win32/control-line receivers receive zero while
-SSH-triggered output advances board TX. No new reset was sent during these
-checks. The second trial's final original-router return remains pending;
-the first exact-image return is separate prior evidence. Physical eMMC
-testing waits for that return and working UART recovery.
+After user TTL reconnection, actual UART reception and interactive input
+recovered. The second native SD trial completed a guarded command restart,
+verified controller shutdown, fresh CA-loader inspection and the exact
+original low256 router's two device CRCs. Current configuration, Chinese
+authenticated LuCI, empty root login, restart binding and IRQ Err0 pass after
+return. Physical eMMC testing still requires its own fresh loader/CRC gates
+and actual block/filesystem/shutdown/restart observations.

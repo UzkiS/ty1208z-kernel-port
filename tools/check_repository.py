@@ -8,7 +8,7 @@ import subprocess
 
 root = Path(__file__).resolve().parents[1]
 skip = {".git", ".work", "artifacts", "evidence", "__pycache__", ".ruff_cache"}
-container_scripts = {"container-qemu-init", "container-qemu-guest"}
+container_scripts = {"container-qemu-init", "container-qemu-guest", "container-applications-qemu-init"}
 lock = json.loads((root / "config/sources.lock.json").read_text(encoding="utf-8"))
 for kind in ("linux", "busybox"):
     assert lock[kind]["url"].startswith("https://")

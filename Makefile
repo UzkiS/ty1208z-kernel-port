@@ -41,6 +41,7 @@ help:
 	@echo 'make usb-host - build isolated host0 enumeration RAM candidate after physical capability acceptance'
 	@echo 'make openwrt-container-packages - compile/check separate native Docker APKs; no boot/runtime acceptance'
 	@echo 'make openwrt-container-qemu - test actual ARMv7 Docker in isolated QEMU; no board acceptance'
+	@echo 'make openwrt-container-applications - build/test/export native Docker + fw4 + dual-core Passwall in QEMU'
 
 lint:
 	python3 tools/check_repository.py
@@ -52,6 +53,7 @@ lint:
 	shellcheck initramfs/emmc-ro-diag
 	shellcheck initramfs/ram768-diag
 	shellcheck initramfs/container-qemu-init initramfs/container-qemu-guest
+	shellcheck --external-sources -s sh initramfs/container-applications-qemu-init
 	python3 -m ruff check tools
 	python3 tools/test_baseline_collector.py
 	python3 tools/test_pinned_archives.py
@@ -206,6 +208,13 @@ openwrt-container-packages:
 .PHONY: openwrt-container-qemu
 openwrt-container-qemu:
 	python3 tools/test_openwrt_container_runtime.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)"
+
+.PHONY: openwrt-container-app-config openwrt-container-applications
+openwrt-container-app-config:
+	bash tools/build-openwrt-container-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" config
+
+openwrt-container-applications:
+	bash tools/build-openwrt-container-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" build
 
 .PHONY: openwrt-router768
 openwrt-router768:

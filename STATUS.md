@@ -23,15 +23,16 @@ variant now physically passes 512-MiB/PFN stress with about 744.43 MiB usable,
 64 MiB of verified TCP data in each direction, both proxy cores and automatic
 return/configuration restoration; [native report](verification/openwrt-router768-board-20261014.md).
 The restored ordinary router still uses low 256 MiB. Storage/production
-integration and actual Docker remain pending.
+integration and physical Docker remain pending.
 The independent native read-only SD router now physically passes SD block/
 VFAT reads, 512-MiB/PFN stress, both physical TCP directions and both proxy
-cores. Its first exact-image trial completed command restart and original
-router/configuration return; the second completed runtime trial remains
-healthy over SSH while host serial RX-zero is investigated before final
-return. No card/persistent writes occurred;
+cores. Both exact-image trials completed command restart and original
+router/configuration return. After the user reconnected the TTL adapter,
+actual COM9 reception and interactive input recovered; the second runtime
+trial returned automatically with fresh configuration backup and both
+device CRCs verified. No card/persistent writes occurred;
 [native SD report](verification/openwrt-sdro-board-20261014.md).
-Clean remote native SD CI, eMMC blocks/backups and Docker runtime remain pending.
+Clean remote native SD CI, eMMC blocks/backups and physical Docker remain pending.
 The eMMC user-area read-only groundwork passes actual request/queue/slot and
 both block-core suppression paths under ASan/UBSan, selected Kconfig and ARM
 objects; [object report](verification/emmc-ro-offline-20261014.md).
@@ -40,25 +41,36 @@ partitions, ext4 ro,noload, controller shutdown and guarded restart. Actual
 functions, ARM guest-shell, layout/CRC, PTY and QEMU checks pass. Physical
 block/filesystem/shutdown/restart and full backups remain unverified;
 [RAM candidate report](verification/emmc-ro-ram-offline-20261014.md).
-Fresh UART checks establish working host-to-board input but zero host RX
-despite board TX progress; the current native SD router and its 14 restored
-config hashes/Chinese authenticated UI remain healthy. TTL USB reconnection
-is pending; a bounded receive-only monitor can start one guarded return when
-actual reception recovers. No additional box power cycle or reboot was sent.
-The latest monitor completed its 45-minute receive-only window at 07:20:25
-Asia/Shanghai with no received marker, no restart attempt and COM9 released.
-A fresh SSH/config/Chinese UI/empty-password/restart-binding/IRQ Err0 check
-still passes; the second native SD trial's final return is pending.
+The latest receive-only monitor expired at 08:42:59 Asia/Shanghai without a
+restart attempt. The subsequent user TTL reconnection restored actual UART
+reception. One guarded command restart at 08:59 verified SD controller shutdown,
+fresh CA-loader inspection, exact original-router transfers/device CRCs and
+current configuration restoration. Chinese authenticated LuCI, empty root
+login, restart binding and IRQ Err0 pass after return. COM9 is released;
+no manual box power cycle was needed.
 Actual native Docker now passes an isolated ARMv7 QEMU runtime suite: overlay2,
 default seccomp, cgroup CPU/memory enforcement, container lifecycle, bridge
 DNS/HTTP, guest-only masquerade/DNAT and daemon shutdown. The dependency profile
 now supplies the missing nft NAT modules. These large QEMU-only outputs remain
-separate from board images; physical Docker, fw4/Passwall composition and fresh
+separate from board images; physical Docker and fresh
 runtime CI remain pending; [runtime report](verification/container-qemu-runtime-20261014.md).
+The independent combined native application/Docker profile now passes actual
+procd/overlay2/cgroups/seccomp/tini, netifd/fw4/DNS/NAT/published ports, both
+installed Passwall cores from an actual container network namespace and clean
+shutdown alongside Chinese/empty-password/unzip/time64 checks. The canonical
+build/test/export command passes all 26 required markers; 17 combined and 13
+native core delivery files were independently verified and copied. This uses
+the current E848 patch and remains QEMU-only, without a board image or physical
+Docker/storage/Wi-Fi acceptance. Fresh combined CI is pending;
+[combined report](verification/container-applications-qemu-20261014.md).
 Downloaded clean diagnostic
 CI on f48bb5e passed 16 manifests/162 files and 15 uImage CRCs, including
 actual memory/SD/ARM-mount checks; [CI report](verification/ram768-ci-20261014.md).
 The new native memory integration has not yet completed clean remote CI.
+The newer diagnostic run on `76009fb` also passes: 18 downloaded manifests,
+178 declared files and 16 uImage CRCs were independently verified, including
+actual eMMC RO object/guest/probe/shutdown/reset/profile checks and exact
+committed source identities; [eMMC CI report](verification/emmc-ro-ci-20261014.md).
 The user removed Kwrt customization and requires both Xray and sing-box in
 Passwall, plus unzip. Both cores and InfoZIP now build in the plain/router
 variants and pass both QEMU budgets, including actual Passwall SOCKS/TLS,
@@ -116,7 +128,7 @@ a separate, newer development branch. Additional package/runtime work remains.
 | Whole-system Y2038 | Not established; core, selected applications and one-shot NTP emulation passed. Persistent filesystems, other protocols and physical whole-system behavior remain unverified |
 | LuCI Chinese default | Shared application/router configuration includes base/firewall/Passwall Chinese catalogues and defaults first boot to `zh_cn`. Actual installed files/packages, translated login labels and HTML language pass both QEMU budgets; backward RAM-artifact compatibility, evidence/payload/resource mutations and two-CRC gates pass. The exact Chinese image now runs physically after fresh inspection/TFTP/both-device-CRC gates; untouched first-boot language, current DNS/NTP/time64, restored 15 user files/password, authenticated Chinese Passwall UI and application namespace fixture all pass. Bidirectional physical TCP has zero additional error/drop/FIFO counts; cleanup/config preservation verified. [Chinese report](verification/luci-chinese-default-20261013.md), [board report](verification/openwrt-router-board-20261013.md). Fresh application CI pending; external routing and radio/AP remain separate |
 | Xray + sing-box + unzip | Both plain/router variants explicitly include Xray 26.10.10, sing-box 1.14.3 and InfoZIP 6.0-r9. Actual ARM rootfs and both 512/240-MiB QEMU budgets pass Passwall-generated SOCKS/VLESS TLS for both cores, expired-certificate rejection, Chinese/empty-password login and ZIP64/Chinese/2040 extraction. Router fw4/netifd/Xray TCP/UDP TPROXY still passes. Selected sing-box omits Tailscale/ACME/gVisor while retaining QUIC/uTLS/WireGuard/Clash API. Pinned upstream libdeflate level 12 reduces initrds to 33291872/33408575 bytes; the interim 36-MiB cap is corrected to `min(32 MiB, 512 * 65535 - 1)`, expansion stays 96 MiB. Actual immutable snapshot/curl transfers pass with 512/1468-byte blocks; packaged candidates and resource/provenance/size/two-CRC mutation gates pass, [report](verification/passwall-dual-core-20261013.md). The exact final router now passes both physical device CRCs, Chinese/empty-root login, Xray/sing-box VLESS-TLS SOCKS, ZIP64/Chinese/2040 RAM extraction and namespace forwarding/Xray TCP/UDP TPROXY, with user configuration preserved. Plain physical boot and fresh CI remain pending |
-| Docker package compilation | Separate official Docker/dockerd 29.6.1, containerd 2.2.5, runc 1.3.6 and tini 0.19.0 ARM APKs compile and pass actual package/staging equality, source/recipe hashes, EABI5, qemu-arm version and Linux/ARMv7 Go metadata checks. Version checks use real libc/libgcc1/libseccomp APK payloads. Compile-only kernel enables container dependency features but excludes board storage/network/USB/SMP; no boot/rootfs/daemon/container acceptance. [Report](verification/container-packages-20261013.md). The later isolated ARMv7 runtime passes overlay2/cgroups/seccomp/DNS/NAT/lifecycle/shutdown locally; [runtime report](verification/container-qemu-runtime-20261014.md). Physical Docker/eMMC, fw4/Passwall composition and fresh runtime CI remain pending |
+| Docker package compilation | Separate official Docker/dockerd 29.6.1, containerd 2.2.5, runc 1.3.6 and tini 0.19.0 ARM APKs compile and pass actual package/staging equality, source/recipe hashes, EABI5, qemu-arm version and Linux/ARMv7 Go metadata checks. Version checks use real libc/libgcc1/libseccomp APK payloads. Compile-only kernel enables container dependency features but excludes board storage/network/USB/SMP; no boot/rootfs/daemon/container acceptance. [Report](verification/container-packages-20261013.md). The later standalone ARMv7 runtime passes overlay2/cgroups/seccomp/DNS/NAT/lifecycle/shutdown locally; [runtime report](verification/container-qemu-runtime-20261014.md). The independent combined native rootfs now passes actual procd/Docker/tini/fw4 networking, both container-namespace Passwall proxy cores, reload coexistence and graceful cleanup alongside the application/time64 suite, with 26 required markers and coherent export; [combined report](verification/container-applications-qemu-20261014.md). Physical Docker/eMMC and fresh runtime CI remain pending |
 | Wi-Fi scan-result parsing | Actual NETINFO lengths and every IE are checked before publication; full SSIDs/rates and discard/error/list IE ownership pass real-function ASan/UBSan, complete ARM module link and core regression locally. [Report](verification/wifi-scan-results-20261013.md). Remote parser CI passed on `e52cfb5` with actual artifact verification; firmware transactions/radio and asynchronous teardown remain unverified; named-roaming/capability startup is still blocked |
 | Wi-Fi association frames | Actual original STA-response/AP-request parser reproduces a short-frame ASan overflow. Patched actual standalone/native functions pass received-header/HT/fixed-field/IE bounds, prior-data preservation, replacement/empty IEs, station-allocation failure and ownership/lock checks. Full ARM module, native APK/ABI/eight broken-package guards and core build/time64 pass; actual manifest files and matching source verified. [Report](verification/wifi-association-frames-20261013.md). Standalone diagnostic CI on `45762c2` passes with actual files/patches/marker verified; native package CI on `918366f` also passes with all 17 actual files and source/log identities verified. The later native sanitizer CI, other association/event paths, concurrent teardown and physical STA/AP remain pending. Startup transport remains unsupported |
 | Native OpenWrt RDA package | Separate native cfg80211/USB kernel and real APK compile locally with GCC 14/WERROR. Actual APK payload, USB alias, built-in symbol providers, stripped-module equality and exact kernel ABI pass; eight broken-package cases are rejected. Native package CI [38318338689](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38318338689) and standalone diagnostic CI [38318338712](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38318338712) passed on `5aa1af4`; downloaded manifests and actual log markers were verified, [report](verification/openwrt-wifi-package-20261013.md). No boot image, installation, host enumeration, firmware startup or radio acceptance |

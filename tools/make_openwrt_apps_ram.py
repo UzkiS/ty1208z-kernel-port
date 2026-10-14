@@ -24,6 +24,8 @@ def unique(paths, label):
 
 
 def make(source, output):
+    if (source / ".ty1208z-container-qemu-only.json").exists() or application_variant(source) == "container-qemu":
+        raise ValueError("Combined container applications are QEMU-only and cannot become a board RAM image")
     if (source / ".ty1208z-container-compile-only.json").exists():
         raise ValueError("Compile-only container packages must not become a board RAM image")
     check(source, built=True)

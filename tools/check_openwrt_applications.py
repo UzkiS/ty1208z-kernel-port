@@ -15,6 +15,12 @@ def check(source, built=False):
     variant = application_variant(source)
     ethernet = variant in ("ethernet", "ethernet-ram768", "ethernet-sdro")
     config = (source / ".config").read_text()
+    if variant == "container-qemu":
+        for package in ("docker", "dockerd", "containerd", "runc", "tini", "kmod-nft-nat", "ip-full", "iperf3"):
+            if f"CONFIG_PACKAGE_{package}=y\n" not in config:
+                raise ValueError(f"Combined QEMU application option missing: {package}")
+        if re.search(r"^CONFIG_PACKAGE_firewall=[ym]$", config, re.MULTILINE):
+            raise ValueError("Combined QEMU applications must use firewall4, without legacy firewall")
     if variant in ("ethernet-ram768", "ethernet-sdro") and "CONFIG_KERNEL_PROC_PAGE_MONITOR=y\n" not in config:
         raise ValueError("Higher-memory native configuration lacks the OpenWrt pagemap selection")
     for option in (
@@ -85,6 +91,8 @@ def check(source, built=False):
         for option in ("BLOCK", "MMC", "MTD", "USB_SUPPORT", "SMP",
                        "HI3798MV100_EMMC_AUDIT", "MMC_DW_HI3798MV100_IDENT"):
             if variant == "ethernet-sdro" and option in ("BLOCK", "MMC"):
+                continue
+            if variant == "container-qemu" and option == "BLOCK":
                 continue
             if re.search(rf"^CONFIG_{option}=[ym]$", kernel_config, re.MULTILINE):
                 raise ValueError(f"Unreviewed hardware subsystem in application kernel: {option}")
