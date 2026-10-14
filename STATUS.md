@@ -1,7 +1,10 @@
 # TY1208Z kernel port status
 
-Updated: 2026-10-14. The board has returned to integrated readonly RAM OpenWrt
-after the authorized single-sector write/readback/restore.
+Updated: 2026-10-14. The user authorized the explained full p6/p9 installation
+and necessary recovery scope. After current-config backup, fresh guarded reboot,
+both RAM CRCs and whole-original-backup revalidation, p9 writing is in progress
+under the exact accepted installation RAM kernel. Full installation and disk-root
+persistence are not yet accepted. SD remains read-only; UART monitoring is active.
 Latest milestone: RDA5995 WPA2 STA, phone AP handshake/DHCP/page access and
 netifd AP/STA switching pass on the integrated RAM system. The final module fixes
 attach ownership, association IE reporting, AP GTK state and USB TX padding.
@@ -12,13 +15,15 @@ integrated. An isolated headless browser now verifies the Chinese Docker overvie
 with live engine data and the wireless editor/WPA2 input, without saving wireless
 changes; see the [UI report](verification/luci-ui-board-20261014.md).
 The specifically authorized p9 last-sector write/readback/restore
-now passes; the original readonly RAM system/configuration has been restored.
+now passes; the original readonly RAM system/configuration was restored before
+the separately authorized full installation started.
 Full installation and disk-root persistence remain unfinished.
 See the [current progress report](verification/progress-20261014.md) and
 [wireless report](verification/rda-wireless-board-20261014.md);
 historical boundaries below describe earlier artifacts.
-No full installation, persistent boot changes or OTP writes were performed.
-Only the authorized 512-byte probe and its restoration wrote eMMC data.
+The authorized full p9 write is now in progress; p6 follows only after complete
+cache-cleared p9 readback matches. No persistent boot-environment or OTP writes
+are performed.
 Offline implementation and repository push are authorized.
 
 A separate private installation candidate now builds offline: p6/p9-only
@@ -28,7 +33,7 @@ and filesystem/content/ownership checks pass. Its RAM kernel physically passes
 the limited write and command-restart return; see the [write report](verification/native-emmc-write-board-20261014.md).
 The queue now accepts a page while MMC transfers remain single-sector. Fixed
 p6/p9 installation and recovery tools and exact private disk images are prepared,
-but full writes and disk-root boot are not authorized or accepted; see the
+with full writes and disk-root boot now authorized but not yet accepted; see the
 [specific preparation and hashes](docs/installation-plan.md).
 
 Target: modern Linux, official native OpenWrt, Passwall, board Wi-Fi and verified
