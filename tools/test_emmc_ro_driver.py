@@ -24,21 +24,38 @@ typedef uint32_t u32;
 #define SDMMC_CLKENA 0x10
 #define SDMMC_IDINTEN 0x90
 #define SDMMC_CTRL 0
+#define SDMMC_CLKSRC 0x0c
+#define SDMMC_RINTSTS 0x44
+#define SDMMC_CTRL_INT_ENABLE (1U << 4)
 #define SDMMC_CTRL_DMA_ENABLE (1U << 5)
 #define SDMMC_CTRL_USE_IDMAC (1U << 25)
+#define STATE_IDLE 0
 static bool ro_mode;
 #define CONFIG_HI3798MV100_EMMC_READ_ONLY ro_mode
 static bool native_mode;
 #define CONFIG_TY1208Z_ROUTER_EMMC_RO native_mode
 #define CONFIG_TY1208Z_OPENWRT_SYSTEM 0
+static bool install_mode;
+#define CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE install_mode
 #define IS_ENABLED(option) (option)
 struct device { void *of_node; };
 struct platform_device { struct device dev; };
 struct resource { uint64_t start, end; };
 struct irq_data { unsigned hwirq; };
-struct dw_mci { u32 regs[64]; };
+struct mmc_host { unsigned claimed; };
+struct dw_mci_slot { struct mmc_host *mmc; };
+struct dw_mci {
+    u32 regs[64];
+    struct dw_mci_slot *slot;
+    int state;
+    void *mrq, *cmd, *data;
+};
 static struct dw_mci host;
+static struct mmc_host mmc;
+static struct dw_mci_slot slot = {&mmc};
 #define mci_readl(host, reg) ((host)->regs[SDMMC_##reg / 4])
+#define mci_writel(host, reg, value) ((host)->regs[SDMMC_##reg / 4] = (value))
+static void mmc_claim_host(struct mmc_host *h) { assert(h == &mmc); h->claimed++; }
 static int mv100_ident_data;
 static struct resource resources[3];
 static u32 crg, controller[1024];
@@ -69,7 +86,8 @@ static u32 readl(void *address)
 }
 static int dev_err_probe(struct device *d, int code, const char *format, u32 value)
 { assert(d && format); (void)value; return code; }
-static void dev_info(struct device *d, const char *format) { assert(d && format); completion++; }
+static void dev_info(struct device *d, const char *format, ...)
+{ assert(d && format); completion++; }
 static void dev_err(struct device *d, const char *format) { assert(d && format); errors++; }
 static int dw_mci_pltfm_register(struct platform_device *p, void *data)
 { assert(p && data == &mv100_ident_data && maps == 2 && reads == 3); registered++; return 0; }
@@ -139,6 +157,36 @@ int main(void)
         host.regs[offsets[i] / 4] = 0;
     }
     puts("EMMC_RO_PROBE_SHUTDOWN_PASS: actual identity/resource/IRQ/provider/map guards and conditional host removal/readback; no hardware access");
+    install_mode = true;
+    memset(&host, 0, sizeof(host));
+    host.slot = &slot;
+    host.regs[SDMMC_INTMASK / 4] = 0xffffffff;
+    host.regs[SDMMC_CLKENA / 4] = 1;
+    host.regs[SDMMC_CLKSRC / 4] = 1;
+    host.regs[SDMMC_IDINTEN / 4] = 0xffffffff;
+    host.regs[SDMMC_CTRL / 4] = SDMMC_CTRL_INT_ENABLE | SDMMC_CTRL_DMA_ENABLE | SDMMC_CTRL_USE_IDMAC;
+    unsigned prior_removed = removed, prior_completion = completion;
+    mv100_ident_shutdown(&p);
+    assert(mmc.claimed == 1 && removed == prior_removed && completion == prior_completion + 1);
+    assert(!mci_readl(&host, INTMASK) && !mci_readl(&host, CLKENA) && !mci_readl(&host, CLKSRC));
+    assert(!mci_readl(&host, IDINTEN) && !mci_readl(&host, CTRL));
+    assert(mci_readl(&host, RINTSTS) == 0xffffffff);
+    for (unsigned active = 0; active < 4; active++) {
+        host.state = active == 0;
+        host.mrq = active == 1 ? &p : NULL;
+        host.cmd = active == 2 ? &p : NULL;
+        host.data = active == 3 ? &p : NULL;
+        host.regs[SDMMC_CLKENA / 4] = 1;
+        unsigned prior_errors = errors;
+        mv100_ident_shutdown(&p);
+        assert(errors == prior_errors + 1 && removed == prior_removed);
+        assert(completion == prior_completion + 1 && mci_readl(&host, CLKENA) == 1);
+    }
+    host.slot = NULL;
+    unsigned prior_claimed = mmc.claimed;
+    mv100_ident_shutdown(&p);
+    assert(mmc.claimed == prior_claimed && removed == prior_removed);
+    puts("EMMC_PERSISTENT_SHUTDOWN_PASS: actual idle host retained and IRQ/PIO clock quiesced; active/missing hosts do not write MMIO");
 }
 '''
 

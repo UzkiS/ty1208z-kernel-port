@@ -188,7 +188,9 @@ def test(source, memory_mib=512, taskbase=None):
         "qemu-system-arm", "-machine", "virt,gic-version=2", "-cpu", "cortex-a7",
         "-m", f"{memory_mib}M", "-smp", "1", "-nographic", "-monitor", "none", "-serial", "stdio",
         "-no-reboot", "-nic", "none", "-kernel", str(kernel), "-initrd", str(initrd),
-        "-append", (f"console=ttyAMA0 rdinit=/qemu-init ty1208z.qemu_container_apps=1 panic=0 mem={memory_limit_mib}M"
+        # The combined archive exceeds rootfs tmpfs's default half-RAM limit.
+        # Unpack into ramfs; native /init still pivots to its own tmpfs root.
+        "-append", (f"console=ttyAMA0 rootfstype=ramfs rdinit=/qemu-init ty1208z.qemu_container_apps=1 panic=0 mem={memory_limit_mib}M"
                     if combined else f"console=ttyAMA0 rdinit=/init panic=0 mem={memory_limit_mib}M"),
     ], stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     selector = selectors.DefaultSelector()
