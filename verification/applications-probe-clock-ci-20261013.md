@@ -1,4 +1,6 @@
-# Fresh Xray/probe application CI
+# Xray 与时间探针干净 CI（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Application CI [38351038848](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38351038848)
 completed successfully on `1ac00af24f1c01f89634547b8a4a203ef013f6f1`.

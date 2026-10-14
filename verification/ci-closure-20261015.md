@@ -1,38 +1,44 @@
-# Fresh-build CI repairs
+# 干净构建 CI 修复与结果（2026-10-15）
 
-2026-10-15. The installed system's physical acceptance is separate from these
-fresh-source checks. Three failures on 40cd3f0 were traced to:
+安装系统的实机验收与干净源码构建分别记录，当前功能见 [STATUS](../STATUS.md)。
 
-- The eMMC driver harness lacked stubs for the newly accepted persistent
-  shutdown. It now checks the actual idle host retention/IRQ/clock writes and
-  the active/missing-host refusals, preserving its read-only tests. ASan/UBSan
-  passes locally against the current authoritative driver functions.
-- Independent application variants did not explicitly deselect the new system
-  Kconfig symbol, causing noninteractive syncconfig to prompt. The shared
-  application fragment now explicitly disables this separate opt-in profile.
-  Both existing SD/eMMC configurations resolve against current actual system
-  Kconfig with olddefconfig and closed-stdin syncconfig, without enabling system
-  mode or prompting. Full fresh variant builds are still checked remotely.
-- The larger combined QEMU archive exceeded the initial rootfs tmpfs quota.
-  Selecting ramfs fixes extraction, but copying a complete second root then
-  exceeds 768 MiB. A 386217472-byte synthetic archive reproduces guest-global
-  OOM killing cp with the original native /init copy operation. The gated
-  QEMU-only entry now copies/unlinks each file into a tmpfs root before starting
-  native /sbin/init/procd, limiting the extra copy to one file. Its tmpfs quota
-  is 90% of the unchanged 768-MiB allocation. The same large fixture then reaches
-  the native shell with a verified tmpfs root and no guest-global OOM.
+## 已修复的构建边界
 
-The native source/archive and its /init remain unchanged; the QEMU fixture's
-handoff now replaces execution of that /init. No disks or host networking are
-added and no runtime success markers are removed. This repairs emulation
-bootstrap only; it does not change installed firmware or establish a new board
-memory claim. Earlier combined runtime evidence used the older native /init
-handoff; the current full fresh-build run must pass independently.
+- `40cd3f0` 的实际eMMC driver harness缺少新持久shutdown的stub。
+  已补齐并验证idle host保留、IRQ/clock写入和active/missing-host拒绝，
+  原只读检查保留；实际函数ASan/UBSan通过。
+- 新system Kconfig选项使独立应用变体的syncconfig询问。
+  应用fragment已显式关闭该opt-in，SD/eMMC实际配置的olddefconfig和闭合stdin检查通过。
+- 组合QEMU根变大，初始tmpfs配额不足；ramfs展开后整根再复制又超过768 MiB。
+  386217472 B合成fixture在旧路径复现全局OOM杀cp；
+  新QEMU专用入口逐文件复制/删除到90%配额tmpfs，再启动原生
+  `/sbin/init`/procd。相同fixture可达shell且无全局OOM。
+  原归档和 `/init` 不改，但fixture不再执行旧 `/init` 的整根复制。
+  未添加磁盘/主机网络、删减成功marker或放宽实际内存要求。
+- SD干净构建进一步暴露 `CONFIG_TY1208Z_ROUTER_EMMC_RO` 缺省项。
+  主target fragment现显式关闭它，专用eMMC fragment仍单独选择。
+  实际Linux Kconfig的缺省版本在listnewconfig列出该项；
+  修复版本无此新项，闭合stdin的syncconfig返回0。
+  该配置改动不改变已经接受的运行镜像。
 
-Full local make lint passes. Remote results are pending. The first 5bba089
-combined rerun stopped at a BusyBox HTTPS download timeout, before compilation/
-runtime. Its retry was superseded by 086df54's corrected memory handoff. Duplicate
-unchanged application/RAM checks were cancelled; the required application run
-from 5bba089 and corrected combined run from 086df54 continue separately. The
-diagnostic run uses cancel-in-progress and was superseded by later pushes, so
-its final current-source run still needs to finish.
+## 实际运行记录
+
+| 检查 | 提交 / run | 当前结果 |
+|---|---|---|
+| 完整诊断 | `559c2d8` / [38642766702](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38642766702) | 成功，包括实际eMMC shutdown harness及后续独立profile |
+| 应用矩阵原运行 | `5bba089` / [38639747752](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38639747752) | 其余应用仍在构建；SD因上述配置项失败，router768构建机失联 |
+| 修复后的SD单项 | `32cab4a` / [38650502790](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38650502790) | 已启动，待实际结果 |
+| router768单项重跑 | `32cab4a` / [38650507793](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38650507793) | 已提交，待实际结果 |
+| Docker/fw4/双核心组合 | `086df54` / [38641050654](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38641050654) | 仍在构建，待实际结果 |
+
+router768失联由GitHub check annotation明确记录，发生在toolchain完成前，
+没有可用编译错误或产物，不能报告为源码失败或成功。
+保留其他正在运行的任务；新增手动target选择只重跑所需profile，
+默认push/PR仍保留完整五项矩阵。
+
+配置/工作流提交跳过自动广泛触发，随后明确派发上述两个精确提交的单项构建；
+跳过自动触发不构成通过证据。未变化组件复用既有验收，
+未为了CI修复重复设备安装、内存、无线或应用实机测试。
+
+此前组合构建还遇到BusyBox HTTPS下载超时，发生在编译/运行前；
+后续由修复内存交接的运行替代。重复、无变化的任务取消记录不作成功计数。

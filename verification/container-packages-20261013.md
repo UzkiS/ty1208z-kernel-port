@@ -1,4 +1,6 @@
-# Native Docker package compilation — 2026-10-13
+# 原生 Docker 软件包编译（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 This is a compile-only milestone. No board image/rootfs was emitted, no Docker
 daemon or container was started, and no board memory, storage or networking

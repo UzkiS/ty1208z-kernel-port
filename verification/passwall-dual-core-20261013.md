@@ -1,12 +1,14 @@
-# Passwall dual cores and InfoZIP — 2026-10-13
+# Passwall 双核心与 unzip 验收（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Official OpenWrt `openwrt-25.12` remains pinned to
 `58efa9917d4cc53fceed173529a286187649e827`. Passwall UI/control is from
 `openwrt-passwall/openwrt-passwall` at `14b4ef0b`, version 26.10.4; both proxy
 recipes come from `openwrt-passwall/openwrt-passwall-packages` at `1af0a5c4`.
 The delivered cores are Xray 26.10.10 and sing-box 1.14.3. InfoZIP unzip
-6.0-r9 comes from the pinned official packages feed. Kwrt customization has
-been removed from the requested scope; the board's Linux support is retained.
+6.0-r9 comes from the pinned official packages feed. The build uses official
+OpenWrt with the reviewed board support.
 
 ## Actual native builds and runtime
 

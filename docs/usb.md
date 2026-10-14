@@ -1,160 +1,53 @@
-# TY1208Z USB host0 bring-up
+# USB host0 与外接存储
 
-The board's onboard RDA USB Wi-Fi `1e04:8888` is on bus 1, port 2 of the
-Hinas EHCI host at `0xf9890000`. The running FDT, USB topology and original
-boot log agree. This establishes wiring/controller identity, not operation
-under the new kernel or an RDA firmware revision.
+当前系统已整合EHCI/OHCI host0、板载RDA无线和USB mass storage，
+最新内核内置NTFS3。USB2 `320a:827b`、58.2 GiB设备已完成
+VFAT与NTFS只读文件访问及卸载；NTFS读取前后写计数相同。
+未进行USB写入/测速、格式化、修复或自动挂载配置，
+见[存储实测](../verification/usb-storage-board-20261015.md)。
 
-## Pinned source and measured resource boundary
+## 资源与来源
 
-SDK references are pinned to `07bug/HiSTBLinuxV100R005C00SPC060`
-`a9f05973129d738e175416dd4a91b2c264ffcdd4`; file identities are recorded in
-`reference/reference-manifest.json`. The selected `clk-hiusb2.c`, MV100 clock
-binding and `cpu-hi3798mv100.c` carry Apache-2.0 notices. Preserve those notices
-in future derived clock/PHY code; do not import a different chip's recipe.
-
-| Resource | Runtime FDT / pinned source |
+| 资源 | 地址/中断 |
 |---|---|
-| EHCI host0 | `0xf9890000`, size `0x10000`, SPI 66 |
-| OHCI companion | `0xf9880000`, size `0x10000`, SPI 67 |
-| Shared CRG46 / CRG47 | `0xf8a220b8` / `0xf8a220bc` |
-| PERI_CTRL_USB0 / USB1 | `0xf8a20120` / `0xf8a20124` |
-| SYSID0 | `0xf8000ee0`; exact source mapping through `REG_BASE_SCTL + REG_SC_SYSID0` |
+| EHCI host0 | `0xf9890000/0x10000`，SPI66 |
+| OHCI companion | `0xf9880000/0x10000`，SPI67 |
+| CRG46 / CRG47 | `0xf8a220b8` / `0xf8a220bc` |
+| USB0 / USB1控制 | `0xf8a20120` / `0xf8a20124` |
+| SYSID0 | `0xf8000ee0`，本板 `0x37980100` |
+| 板载无线 | bus1 port2，RDA `1e04:8888`，480 Mbps |
 
-The SDK's host0 sequence asserts controller/UTMI/PHY reset, adjusts interface
-mode, opens PHY reference clocks, writes PLL/test controls, releases PHY/port
-reset and enables the shared controller clocks. It selects tuning by
-`(get_chipid(0) & 0xf0) == 0x10`. Inspection of the pinned MV100 implementation
-shows this low-byte branch comes directly from SYSID0; the SOC_FUSE high-part
-read is unnecessary for that decision. The new audit reads SYSID0 only, not
-the fuse block. The [physical read-only audit](../verification/usb-audit-board-20261013.md)
-measured SYSID0 `0x37980100` and inherited controller/PHY resets; capability
-reads were correctly skipped because the required readiness state was absent.
+SDK固定 `07bug/HiSTBLinuxV100R005C00SPC060`
+`a9f05973129d738e175416dd4a91b2c264ffcdd4`，文件身份见来源清单。
+所参考clock/MV100文件保留Apache-2.0许可。
+host0 tuning分支只需SYSID0低字节，不访问fuse。
+host1不属于该适配范围。
 
-Host1 has different registers/resources and stays outside the first audit.
-EHCI/OHCI host0 share PHY/clock ownership; later support must coordinate their
-enable/disable lifetime and 32-bit DMA. The existing standalone RDA module is
-not a host controller and cannot enumerate a device by itself.
+## 时钟、PHY与所有权
 
-## Independent read-only audit
+独立实现按固定SDK顺序处理controller/UTMI/PHY reset、
+interface、reference clock、PLL/test和共享时钟。
+一个CCF provider供EHCI/OHCI共用，prepare/unprepare按引用计数管理，
+避免仍有companion工作时关闭PHY。注册时不写控制寄存器，
+last-user按SDK关闭；不会把易失模拟tuning恢复为继承值。
 
-`make usb-audit` builds `usb-audit1` after `make build`. The separate kernel
-uses the measured CPU0/UART/timer and RAM footprint, with USB_SUPPORT, NET,
-BLOCK, MMC, MTD, modules, SMP and debugfs disabled. Its sole added peripheral
-is an exact-resource register observer, not an EHCI/OHCI driver.
+差分回归对全部256个低字节revision和8组初态，
+逐项比较SDK原函数的写入/延时；实际helper及oracle运行ASan/UBSan。
+无效SYSID不写；reset/readback失败报告错误，
+不能把失败关闭报告为完成。源码与验证细节见
+[编译报告](../verification/usb-host-compile-20261013.md)。
 
-The actual snapshot helper reads CRG46, CRG47, USB0, USB1 and SYSID0 in that
-order. It reads only EHCI CAPBASE/HCSPARAMS/HCCPARAMS and OHCI revision when
-the SDK-derived inherited clock/reset/interface readiness conditions hold.
-Otherwise it reports that capability reads were skipped. It does not read
-operational schedules, PORTSC, FIFOs or device endpoints, acknowledge IRQs,
-write controls, initialize controllers or load any firmware. A reported
-capability word is an observation; no expected value is invented for it.
+## 独立实验与结果
 
-Actual helper execution under ASan/UBSan checks control-bit mutations,
-invalid revision values, exact read order/addresses and the absence of
-writes. Compiled DT/config/image/placement and common RAM protocol checks
-bound the resources and reject another peripheral or broader subsystem.
-QEMU validates generic userspace/time64 only. The fixed board CLI profile is
-`python tools/board_diag_cli.py --port COM9 --profile usb-audit1` after a
-separately prepared RAM boot; its evidence requires the USB completion marker.
-The built candidate and completed local checks are recorded in the
-[offline acceptance report](../verification/usb-audit-offline-20261012.md).
+| 入口 | 范围与证据 |
+|---|---|
+| `make usb-audit` | 只读固定control/SYSID；状态未就绪时不读controller capability；[实机审计](../verification/usb-audit-board-20261013.md) |
+| `make usb-clock-audit` | 精确初态下受限写时钟/PHY，读EHCI/OHCI能力并核对关闭；[实测](../verification/usb-clock-audit-board-20261013.md) |
+| `make usb-host-compile` | 编译provider和主线HCD对象；无启动镜像 |
+| `make usb-host` | 独立 `usb-host1` RAM枚举；关闭class/storage/network/firmware/PM/SMP等；[实机枚举](../verification/usb-host-board-20261013.md) |
 
-## Remaining milestones
-
-Inherited controls, SYSID0 and bounded clock/PHY capabilities are now measured;
-the [physical clock report](../verification/usb-clock-audit-board-20261013.md)
-records EHCI 1.0, two ports, OHCI 1.0 and verified shutdown. The exact separate
-host0 profile is now eligible for RAM validation and EHCI/OHCI enumeration.
-The later [physical host report](../verification/usb-host-board-20261013.md)
-confirms both HCDs/root hubs, RDA at 480 Mbps and shared-clock removal/rebind.
-Check exact RDA revision, firmware source/license/hash, bounded control and
-bulk transfers, firmware startup, scan/association and AP support separately.
-The Hinas log warned that the high-speed RDA bulk endpoints `03/83` advertise
-64-byte maximum packets. Enumeration is insufficient to justify an override;
-review the source's transfer sizing and actual hardware behavior first.
-
-## Separate bounded clock/capability experiment
-
-`make usb-clock-audit` creates the independent `usb-clock-audit1` RAM profile.
-It requires the exact five controls measured by the read-only audit: CRG46
-`0x0013707f`, CRG47 `0x00000b01`, USB0 `0x000c71a8`, USB1 zero and SYSID0
-`0x37980100`. A foreign board/resource, an active controller or any changed
-initial control inhibits all writes and controller reads.
-
-The experiment uses the same independently implemented, SDK-differentially
-tested host0 helper as the optional CCF provider. After fixed clock/PHY
-initialization and readiness readback, it reads only EHCI CAPBASE/HCSPARAMS/
-HCCPARAMS and OHCI revision. Basic structural checks reject absent/invalid
-capabilities. Both success and failure execute the SDK last-user shutdown and
-verify stopped clock/reset controls. Analog PHY tuning is volatile but is not
-restored to the inherited values; this is a control-writing experiment, not
-the earlier read-only audit.
-
-USB_SUPPORT, HCDs, NET, storage, firmware loading, modules, SMP and debugfs
-remain disabled. No operational register, schedule/DMA, PORTSC or endpoint is
-accessed. The exact profile and separate collector identity prevent it from
-entering ordinary diagnostic/router images. Actual helper/probe sanitizer
-checks cover every initial-state bit, active foreign state, capability errors,
-initialization/stop failures, exact resource/mapping gates and error propagation.
-Physical capability acceptance and review are complete; see the physical
-clock report. This opens only the exact `usb-host1` enumeration RAM profile.
-
-## Optional compile experiment
-
-`make usb-host-compile` separately compiles `clk-ty1208z-usb.o` and the
-mainline EHCI/OHCI core/platform objects. It produces no DTB, kernel image or
-RAM-boot permission. The option is absent from all existing diagnostic,
-native-network and router images. A distinct offline host0 profile now supplies
-the only board DTS that can bind this provider; its RAM boot remains disabled.
-
-The new GPL-2.0-only implementation represents the pinned SDK's hardware
-register protocol as independent command tables and bounded read/modify/write
-operations. The test verifies the original file's locked hash, preserves its
-full Hisilicon/Apache-2.0 notice and executes its actual host0 functions in a
-temporary oracle; no SDK C implementation is vendored into the driver. For
-all 256 low-byte revisions and eight initial control states, the new helper
-must match every original write and delay through last-user shutdown. Actual
-helper/oracle code runs under ASan/UBSan. Invalid SYSID0 causes no writes;
-stuck reset/interface or missing required clock bits cause failure and the
-documented shutdown sequence before an HCD can start. This cannot establish
-PLL stability or the board's actual revision/capabilities.
-Shutdown readback failures are reported as errors rather than as a successful
-clock/PHY stop. The [compile report](../verification/usb-host-compile-20261013.md)
-records the actual objects and completed local checks.
-
-One common-clock-framework core exposes one provider output to both HCDs.
-Its sleepable prepare/unprepare callbacks use CCF ownership and serialization,
-rather than separate EHCI/OHCI reset sequences. Mainline platform HCDs take
-and release clocks around probe/removal; their default coherent DMA mask is
-32 bits. The clock provider performs no control writes during registration
-and has no shutdown callback that could reset a still-running companion.
-Last-user shutdown follows the SDK; it does **not** restore the inherited
-analog PHY tuning. PM, modules, network and storage are disabled for this
-compile experiment. Companion lifetime, probe-failure and system-shutdown
-behavior still require validation in the eventual real host profile.
-
-## Offline enumeration image
-
-`make usb-host` builds the independent `usb-host1` kernel/initramfs and board
-DTS. It enables only the generic EHCI/OHCI host0 controllers and shared clock
-provider. Exact MMIO/IRQ/clock-phandle/config checks exclude host1, class
-drivers, firmware loading, networking, storage, PM, modules and SMP. VT is
-explicitly disabled because it would otherwise select INPUT despite an
-explicit `# CONFIG_INPUT is not set` line.
-
-The ARM `usb-diag` script observes platform bindings and USB device descriptor
-attributes in sysfs. It reports whether root hubs and RDA `1e04:8888` were seen;
-it does not report firmware or radio acceptance. The same embedded script runs
-under QEMU virt to check actual ARM shell behavior, where it correctly reports
-no board controllers/devices. Image/layout and time64 checks pass; see the
-[offline report](../verification/usb-host-offline-20261013.md).
-
-Following the physical clock/capability acceptance, `prepare_ram_boot.py`
-accepts this exact profile with the ordinary CRC, measured bootloader and
-bounded RAM/layout gates. DT/config mutations still reject other resources,
-class drivers, storage, firmware loading and larger memory profiles.
-The currently bootable native-Ethernet and router images do not acquire USB
-permissions through this addition. No additional physical reboot is requested
-for this offline milestone.
+独立host实验通过EHCI1.0、OHCI1.0、root hub、RDA高速枚举和共享时钟解绑/重绑。
+`usb-diag` 只读取sysfs描述符，不代表固件或无线通过；
+后续无线证据见[无线说明](wifi.md)。
+低级审计、独立枚举和完整系统的存储权限分别由各profile控制。
+QEMU只检查ARM shell及通用启动，不模拟真实USB/PHY。

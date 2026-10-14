@@ -1,4 +1,6 @@
-# RDA USB Linux 6.12 module port, 2026-10-12
+# RDA USB Linux 6.12 模块移植（2026-10-12）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 The optional USB driver compiles and links as an ARM module against its own
 Linux 6.12.112 configuration. This is a software milestone. It has not been

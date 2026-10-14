@@ -1,5 +1,7 @@
 # 现有 Hinas 的只读 SSH 基线
 
+> 本页用于原系统基线采集；已安装 OpenWrt 的状态见 [STATUS](../STATUS.md)。
+
 `tools/collect-baseline.sh` 经 SSH 标准输入运行，不在盒子上保存脚本或报告。
 内容包括当前内核/用户空间、内存/中断、分区、USB/SDIO ID、Wi-Fi 驱动线索、
 运行设备树和内核日志。不安装软件、不加载模块、不修改分区或时间、不重启。

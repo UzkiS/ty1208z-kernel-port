@@ -1,4 +1,6 @@
-# OpenWrt applications — local ARM QEMU acceptance
+# 原生应用 ARM QEMU 验收（2026-10-12）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Date: 2026-10-12. No board transfer, storage writes or hardware operation.
 The final local application build and runtime gates passed. Clean application

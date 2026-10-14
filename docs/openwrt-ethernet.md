@@ -1,66 +1,39 @@
-# Independent native Ethernet RAM experiment
+# 原生 OpenWrt 独立网口实验
 
-`make openwrt-net TASKBASE=<native-build-base>` builds a separate OpenWrt
-Ethernet image after the fixed native compiler/musl installation is complete.
-`make openwrt-net-config` resolves and checks the configuration only.
-Sources live in `<native-build-base>/ethernet`; the plain RAM target and
-application-validation tree keep their own output directories.
+`make openwrt-net TASKBASE=/absolute/linux/build-root` 在原生工具链完成后，
+使用独立 `TASKBASE/ethernet/` 构建。`make openwrt-net-config` 只解析配置。
+这是保留的低256、单核、UART/timer 网口 profile，当前系统状态另见[STATUS](../STATUS.md)。
 
-The `net` subtarget inherits the measured single-core UART/timer/low-256-MiB
-memory description and the separate diagnostic Ethernet DTS. Its root
-compatible is `tianyi,ty1208z-ca-openwrt-net`. The native OpenWrt build fixes
-the actual UTS release to `6.12.112` despite the requested local-version
-configuration. Both the built-header checker and UART collector require that
-actual release; the collector also checks the pinned rootfs revision, native
-target and board-compatible identity. Clock, PHY and MAC guards recognize this
-profile while retaining exact measured resources, inherited-state controls,
-32-bit DMA, dedicated FESTAv220 identity and no-reset behavior. The original
-diagnostic profile cannot borrow the native profile's identity.
+身份为 `tianyi,ty1208z-ca-openwrt-net`，实际 UTS release 为 `6.12.112`。
+构建和采集同时核对该 release、官方源码 revision、rootfs 与 DT 身份；
+普通诊断不能借用该例外。驱动引用权威板级补丁，使用32位 DMA和专用 FESTAv220，
+不导入独立 Linux 模块。
 
-The build references the authoritative board patch; it does not duplicate
-drivers or import standalone kernel modules. The compiler/musl reuse helper
-belongs to the native source layer. No Passwall or other application feed is
-required: only the complete pinned iperf3 recipe is copied from a SHA-256
-verified packages archive, preserving its license and upstream source hash.
+netifd 只提供 eth0 DHCP 客户端；包含 iperf3、ethtool、BusyBox ping/HTTP/netcat/hash，
+没有 DHCP 服务、fw4、SSH、Wi-Fi、持久存储。仅从固定 packages 归档复制完整
+iperf3 配方，保留许可与上游来源哈希，不依赖整个应用层。
 
-netifd configures loopback and one DHCP client on `eth0`. The experiment has
-no DHCP server, firewall4, SSH daemon, Wi-Fi or persistent storage support.
-The image includes iperf3, ethtool and actual ARM BusyBox ping/HTTP/netcat/hash
-tools. Servers are started only for explicit bounded test operations.
+构建检查选择、manifest、实际 DT/config、uImage CRC、解压范围及安装工具。
+真实 datapath 函数运行 ASan/UBSan；QEMU 验证 procd/ubus/UCI、日志、time64 和
+iperf3 回环，不附加 NIC，不模拟本机 MAC/PHY/DMA。
 
-The build checks resolved OpenWrt selection, manifest identities, actual
-kernel configuration and compiled DT, uImage structure/CRC, appended DTB,
-decompression footprint and actual installed rootfs tools/configuration.
-It extracts the actual patched Ethernet datapath functions for ASan/UBSan
-regression. QEMU runs native procd/ubus/UCI/logging and core time64 at 2040,
-plus an iperf3 loopback exchange; no guest NIC is attached and QEMU does not
-validate the MV100 MAC/PHY/DMA.
+## 采集与证据
 
-Canonical boot inputs are exported to `artifacts/openwrt-net1`. The common
-RAM planner independently enforces low-16-MiB decompression, low-256-MiB RAM,
-measured CA loader commands/addresses, the exact native Ethernet profile
-and disabled storage/USB/modules/SMP. No installation recipe is defined.
-
-After a separately planned RAM boot, use:
+独立 RAM 输出为 `artifacts/openwrt-net1/`，无安装配方。
+在完成精确 RAM 规划与启动后，使用实际串口名执行：
 
 ```text
-python tools/openwrt_ethernet_board_cli.py --port COM9
-python tools/openwrt_ethernet_board_cli.py --port COM9 --iperf-start
-python tools/openwrt_ethernet_board_cli.py --port COM9 --iperf-collect
+python tools/openwrt_ethernet_board_cli.py --port SERIAL_PORT
+python tools/openwrt_ethernet_board_cli.py --port SERIAL_PORT --iperf-start
+python tools/openwrt_ethernet_board_cli.py --port SERIAL_PORT --iperf-collect
 ```
 
-The CLI refuses bootloader/Hinas/foreign-rootfs identities, records raw RX,
-TX journal and metadata, and requires standalone completion markers. The
-iperf server binds the lease address, accepts one test and has a 60-second
-idle timeout. Reports stay local until anonymized. Build acceptance does
-not establish physical OpenWrt networking or router/Passwall throughput;
-those require their own evidence.
+采集器拒绝 bootloader/Hinas/其他根身份，要求独立完成 marker，
+iperf server 绑定 DHCP 地址、只接收一次测试并设60秒空闲超时。
+原始 RX/TX 和元数据保留本地。
 
-The separate native `net` image has now passed physical RAM startup, DHCP,
-bidirectional TCP and cable down/up recovery; see the [board report](../verification/openwrt-ethernet-board-20261013.md).
-That report also distinguishes measured host WSL clock drift and the driver's
-busy-queue counter semantics from hardware drops and router performance.
-The two BUSY branches now preserve drop/FIFO statistics, with actual-function
-ownership/retry/DMA regression and rebuilt Ethernet/router acceptance recorded
-in the [TX report](../verification/femac-xmit-20261013.md). The corrected
-kernel's physical traffic result remains pending.
+[实机记录](../verification/openwrt-ethernet-board-20261013.md)已通过 RAM 启动、
+DHCP、双向 TCP 和网线重连；其中区分主机 WSL 时钟漂移和驱动 BUSY 计数语义。
+[TX 修复记录](../verification/femac-xmit-20261013.md)补充真实函数的
+ownership/retry/DMA 回归和后续集成结果。
+物理流量与模拟吞吐不能互相替代。

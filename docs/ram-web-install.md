@@ -16,7 +16,7 @@ LuCI/sysupgrade，详见[持久安装与升级](installation-plan.md)。
 5. 使用现有 eMMC p6 加载路径启动，在线扩容至 6846 MiB p9。分区表和持久
    boot 环境不变；后续使用 sysupgrade 包。
 
-当前盒子已经安装，无需再次首刷。first-install 与 sysupgrade 格式不同，
+已完成安装的设备使用后续升级流程。first-install 与 sysupgrade 格式不同，
 后端会拒绝错误场景，没有强制绕过板型/布局检查的入口。
 
 ## 实测与交付边界
@@ -25,9 +25,9 @@ LuCI/sysupgrade，详见[持久安装与升级](installation-plan.md)。
 完整在线扩容及配置/Docker 冷开机保留已通过。首刷写 p9 约 29 分钟、读回约 11 分钟。
 底层单扇区 PIO 仍是速度瓶颈；网页入口改善操作和写入量，不代表高速 MMC/DMA。
 
-最新私有首刷包为 132,260,041 B（约 126 MiB），SHA-256
-`9ab558d6ca8a86082efde96154fd867125da02ea9cb1af2f56f892f102d13ad7`。
-内核 ABI `6.12.112~3ff30746f86cc6101046198a6e9bf330-r1`，大小 4,560,012 B。
+最新私有首刷包为 132,372,681 B，SHA-256
+`895305f7d0bf2200dbb3bb6b7641e5ae50136d770f3fd861add18e65ac2d4e76`。
+内核 ABI `6.12.112~120d00c44db5befcdb6ed8d1f6825a56-r1`，大小 4,677,436 B。
 最新全包未再次覆盖设备首刷，复用已测流程及改变的扩容/内核/应用边界证据；
 文件名保留 UNTESTED，避免把离线重打包写成完整实机重刷。
 

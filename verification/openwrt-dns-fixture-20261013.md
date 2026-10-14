@@ -1,4 +1,6 @@
-# Isolated application DNS handover, 2026-10-13
+# 隔离应用 DNS 切换验证（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Application CI [run 38318338793](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38318338793)
 on `5aa1af4` built the native application image, then failed during QEMU

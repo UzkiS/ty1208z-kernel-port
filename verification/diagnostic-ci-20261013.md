@@ -1,4 +1,6 @@
-# Complete diagnostic CI acceptance, 2026-10-13
+# 完整诊断 CI 验收（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 [Run 38300887226](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38300887226)
 completed successfully on `7bad0897e9caabfa6d9ea1c0697dcc18e98ace34`.

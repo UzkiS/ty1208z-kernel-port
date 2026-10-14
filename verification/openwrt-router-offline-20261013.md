@@ -1,4 +1,6 @@
-# Native application/Ethernet RAM integration — 2026-10-13
+# 原生应用与网口离线集成（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Result: a separate native OpenWrt kernel/rootfs with Passwall/Xray/LuCI and the
 measured Ethernet drivers built successfully. Actual netifd/fw4 forwarding and

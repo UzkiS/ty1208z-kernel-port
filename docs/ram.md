@@ -1,65 +1,42 @@
-# Bounded higher-memory experiment
+# 内存范围与独立低768验证
 
-The measured board contains 1 GiB of DDR. Accepted ordinary diagnostics and
-the current native router expose low 256 MiB with low 16 MiB reserved. The
-original loader's eleven observed allocations begin at 0x3e507000; ddrfree
-alone does not subtract them or establish the complete secure-memory map.
+板上物理 DDR 为1 GiB。当前集成系统只启用低768 MiB，
+低16 MiB和上方256 MiB继续保留，原生内核约744 MiB可用。
+最小诊断及普通旧 router profile仍限制低256。
+原引导器十一项分配从 `0x3e507000` 起，`ddrfree` 不扣除这些分配，
+也不能建立完整安全内存图。
 
-`make ram768` creates a separate single-core, low-768-MiB candidate. It keeps
-low 16 MiB reserved, excludes the upper 256 MiB and enables no disk, network,
-USB, module, highmem, PM or watchdog-device subsystem. Its dedicated reset
-driver uses the independently measured MV100 identity/inactive-register gate,
-with no startup writes and one explicit restart callback.
-ARM normally returns its own freed init pages to the allocator, including
-pages below the DT reservation boundary. This dedicated profile retains its
-init area to keep every stress-test allocation above 16 MiB; generic and
-ordinary router reclamation remain unchanged.
+## ram768 profile
 
-RAM planning requires the actual immediately preceding guarded reboot's
-hash-verified allocation table in addition to the fresh attached inspection.
-All eleven addresses/sizes and the CA/1-GiB identity must match; changed or
-stale evidence denies the enlarged profile. Kernel/load/decompressor placement
-remains independently checked below the existing limits. This experiment
-does not authorize increasing ordinary router memory or persistent installation.
+`make ram768` 生成单核独立诊断，关闭磁盘、网络、USB、模块、
+highmem、PM和 watchdog设备服务。只使用实测 MV100 restart helper。
+ARM 默认回收 init 页会暴露低16内页，因此这个精确 profile保留自己的 init 区；
+不能把此配置随意扩展到其他板型。
 
-The explicit diagnostic creates a new file in a dedicated tmpfs under /tmp.
-It verifies at least 700 MiB MemTotal and 560 MiB available before allocating
-512 MiB. Two complete address-dependent/complement patterns are written and
-read back. Pagemap must report every page present, unswapped and within the
-profile's physical range, with at least 256 MiB of pages above 256 MiB.
-The file and mount are removed before restart. Device files are never opened;
-wall time is unchanged. QEMU tests generic shell/time64 and actual helper
-mutations; its physical address map does not validate these board PFNs.
+RAM 规划同时要求紧邻受控重启的完整、哈希校验十一项 allocation，
+以及新连接的引导器检查。CA/1GiB身份、地址或尺寸改变、记录过期均拒绝。
+kernel、压缩数据和解压位置另行校验。
 
-Physical acceptance now passes: 763068 KiB MemTotal (about 745.18 MiB), two
-complete 512-MiB patterns and every mapped PFN within the boundary. 76207
-pages (about 297.68 MiB) lie above 256 MiB. File/mount cleanup, command restart
-and restoration of the exact Chinese router/configuration pass without user
-power cycling; [physical report](../verification/ram768-board-20261014.md).
-The ordinary restored router retains its original memory bound. The separate
-native integration below now passes physically. Docker still requires its
-own kernel, storage, daemon, container, resource and network acceptance.
+诊断在专用 `/tmp` tmpfs 创建512 MiB文件，
+先要求至少700 MiB MemTotal和560 MiB可用，
+完成地址相关及反相两种全量模式。
+pagemap要求每页present、未swap、PFN在范围内，并至少256 MiB页位于256 MiB以上。
+完成后清文件和挂载，不打开设备文件，不改墙钟。
 
-## Independent native-router integration
+[实机结果](../verification/ram768-board-20261014.md)：
+763068 KiB MemTotal，512 MiB双模式与全部PFN通过；
+76207页在256 MiB以上，清理、命令重启和原系统配置返回通过。
+QEMU只验证通用 shell/time64及helper，不验证真实PFN图。
 
-The new make target openwrt-router768 builds the pinned official OpenWrt
-applications and measured Ethernet in its own router768 source tree, with a
-separate board identity, kernel configuration and artifact directory.
-The ordinary application and router builds keep their original memory bounds.
+## 原生与系统组合
 
-The new configuration retains the low init pages only on that exact board.
-Its Ethernet clock/MAC/PHY and external restart-module probes accept the
-new identity only when the matching higher-memory configuration is selected.
-It still excludes block storage, MMC, USB and SMP. This step integrates
-memory and Ethernet; it does not yet provide SD/eMMC or Docker runtime.
+`make openwrt-router768` 使用独立身份、配置和 `router768` 构建树，
+整合原生应用及网口，仍不启用存储/USB。
+实机762296 KiB MemTotal、131072个PFN、双向64 MiB TCP、双代理核心、
+命令重启和配置返回通过；
+[原生记录](../verification/openwrt-router768-board-20261014.md)。
 
-The same fresh, complete loader-allocation table, low reservation, kernel
-layout, exact kernel/rootfs provenance and independent kernel/initrd device
-CRCs gate a physical boot. Both isolated application QEMU budgets remain
-required. QEMU does not establish the physical board's PFN bounds; the
-512-MiB probe and application checks were repeated on the native kernel.
-Physical acceptance passed with 762296 KiB MemTotal (about 744.43 MiB),
-all 131072 PFNs in bounds, 64-MiB TCP transfers in both directions, both
-proxy cores and automatic configuration/Chinese-router restoration;
-[native board report](../verification/openwrt-router768-board-20261014.md).
-Clean CI for this new integration remains pending.
+后续只读SD、eMMC及完整Docker系统沿用已测内存边界，
+并各自验证新的集成依赖。持久系统不需要每次串口人工启动；
+上述新分配证据要求用于主动切换 RAM profile，
+不能由旧记录放宽新的RAM加载范围。

@@ -1,4 +1,6 @@
-# RDA control-response regression, 2026-10-12
+# RDA 控制响应回归（2026-10-12）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 The complete optional USB module links after replacing its control-response
 parser and completion loop. This fixes software defects in the pinned driver;

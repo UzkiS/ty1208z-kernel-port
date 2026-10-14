@@ -1,4 +1,6 @@
-# Physical serial stream interruption, 2026-10-13
+# 串口传输中断与接收排查（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 The board still ran the previously accepted RAM-only
 `6.12.112-ty1208z-ethernet-net1` image. A fresh fixed diagnostic returned

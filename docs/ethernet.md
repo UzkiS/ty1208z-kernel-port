@@ -1,211 +1,58 @@
-# Hi3798MV100 Ethernet source audit
+# Hi3798MV100 有线网络
 
-The existing Hinas uses `hieth` at `0xf9840000` and has demonstrated a
-100-Mbit/s full-duplex link. The runtime FDT identifies internal PHY address
-**1**, MII, GIC SPI 71 and a 0x4000-byte MAC resource. The reference SDK DTS
-uses PHY address 2; the runtime measurement takes precedence. A working
-Ethernet driver under Linux 6.12 has not yet been demonstrated.
+Linux 6.12与原生OpenWrt已通过本板网口实测：
+100 Mbps全双工、DHCP、双向TCP及网线断开/重连。
+当前集成系统沿用该数据通路；历史状态和测量见
+[物理网口记录](../verification/ethernet-net-20261012.md)、
+[原生网口记录](../verification/openwrt-ethernet-board-20261013.md)。
 
-## Reuse boundary
+## 资源与来源
 
-The pinned SDK's `drivers/net/ethernet/hieth/{hieth.h,mdio.h}` register layout
-matches substantial portions of Linux 6.12.112's
-`drivers/net/ethernet/hisilicon/hisi_femac.c` and
-`drivers/net/mdio/mdio-hisi-femac.c`:
+| 资源 | 实测值 |
+|---|---|
+| Port0 MAC | `0xf9840000/0x400` |
+| Global MAC | `0xf9841300/0x200` |
+| MDIO | `0xf9841100/8` |
+| 中断 | GIC SPI71 |
+| 内部PHY | 地址1，ID `0x20669823`，FESTAv220 |
+| 时钟控制 | CRG51 `0xf8a220cc`，继承值 `0x3`，启用后 `0xb` |
+| PHY控制 | CRG `0xf8a22120`、选择 `0xf8a20008`、地址 `0xf8a20118`、LDO `0xf8a20844` |
 
-| Function | MV100 address/offset | Mainline representation |
-|---|---|---|
-| Port 0 | `0xf9840000` | First MAC resource |
-| Port mode/link/frame limit | `+0x200/+0x208/+0x210` | Same register fields |
-| Queue configuration/status | `+0x344/+0x36c` | Same depth and ready fields |
-| RX descriptor/address | `+0x354/+0x358` | Same FIFO interface |
-| TX address/length | `+0x360/+0x364` | Same FIFO interface |
-| Global control | `+0x1300` | Second MAC resource, relative offsets |
-| Forward/filter control | `+0x1310/+0x1314` | Same port-0 control fields |
-| IRQ status/enable/raw | `+0x1330/+0x1334/+0x1338` | Same port-0 interrupt fields |
-| MDIO control/read data | `+0x1100/+0x1104` | Separate MDIO resource |
+固定SDK的hieth布局与主线 `hisi_femac.c`、`mdio-hisi-femac.c` 的
+FIFO/队列、MDIO和全局寄存器对应，因此复用主线DMA mapping、NAPI和PHY框架。
+SDK参考PHY地址2不适用于本机，实测地址1优先。
+来源与逐文件哈希在 `reference/reference-manifest.json`。
 
-The MDIO ready flag is bit 15, write flag bit 13, PHY address bits 12:8,
-register bits 4:0 and write data bits 31:16. Mainline uses bounded polling
-before and after each operation. A read command writes the MDIO controller
-command register; it does not write a PHY register.
+## 板级适配
 
-Matching offsets justify reuse of the upstream datapath and MDIO protocol,
-but do not establish complete compatibility. Mainline also configures RX
-coalescing at +0x340; the pinned SDK driver does not define that register.
-SDK port initialization explicitly sets endian, TX preamble/IPG, pause and
-RX checksum controls. These behaviors require comparison before hardware use.
-The second MAC port must remain disabled until its wiring is established.
+专用 `hisilicon,hi3798mv100-femac-inherited` 以32位DMA工作。
+时钟provider核对精确继承状态，只开启CRG51 bit3并验证 `0xb`、等待5ms；
+最后使用者释放时仅在仍为精确 `0xb` 时恢复 `0x3`。
+不改PHY clock/reset/LDO/address或OTP寄存器，不宣称时钟频率测量。
 
-## Clock, reset and internal PHY
+专用FESTAv220先核对实际ID；MAC等待该驱动绑定，避免generic PHY soft-reset。
+普通10/100协商会作正常易失PHY配置写入；
+不复制厂商expanded fixup或MV200/MV300的OTP trim。
+这仍是继承PHY状态的设计，完整独立PHY冷初始化没有另行建立。
 
-The SDK DTS supplies `PERI_CRG51_SF` to hieth, and the MV100 clock table uses
-offset 0xcc with mask/value 0x000b and reset bit 4. Its name and apparent reuse
-by another peripheral are insufficient to establish Ethernet clock ownership
-or frequency. Live register state and a complete clock-reference audit are
-needed before a new clock provider writes this field.
+MAC采用SDK双软件reset、little-endian、TX preamble和checksum设置，
+不访问未确证的 `+0x340` coalescing，pause offload未启用。
+RX-ready会弹出描述符，IRQ确认必须保留它到RX函数消费；
+长度先验证再扣FCS或扩展skb。关闭时同步IRQ并先reset再unmap。
+20ms TX回收monitor处理单向流量；TX-ready只在credit耗尽时武装，
+NAPI只为pending RX继续循环，zero-budget只回收TX。
 
-The pinned SDK `phy.c` and `mach-hi3798mx/include/mach/platform.h` describe:
+## 回归与实机边界
 
-- CRG internal PHY control at `0xf8a22120`: clock enable bit 0, reset bit 4.
-- Peripheral control at `0xf8a20008`: internal/external PHY selection bit 8.
-- Internal PHY address at `0xf8a20118`, low 5 bits.
-- Internal PHY LDO control at `0xf8a20844`; the MV100 fallback writes 0x68.
-- Reset order that gates the MAC clock before loading the PHY address, and
-  waits at least 15 ms after PHY reset before MDIO access.
+`tools/femac_patch.py` 维护检查式上游替换；
+`tools/test_femac_datapath.py` 提取实际函数在ASan/UBSan下验证RX长度、
+IRQ、预算、TX-only和monitor。旧版无限TX-only循环能够复现；
+BUSY路径保留skb所有权，不再把正常背压计为drop/FIFO错误，
+见[TX报告](../verification/femac-xmit-20261013.md)。
 
-These are source facts, not newly measured board state. The first network
-candidate should inspect the inherited control state and identify the PHY
-before enabling MAC DMA, changing LDO/clock/reset or applying PHY fixups.
-Reading PHY IDs via MDIO requires a bounded, explicitly read-only PHY command
-path; attaching the generic PHY state machine can cause resets/writes and
-must not be described as a register-only audit.
-
-## Independent inherited-state diagnostic
-
-`make ethernet-audit` now builds a separate `ethernet-audit1` RAM candidate.
-It keeps NET/MMC/BLOCK/MTD/USB/MODULES/SMP/debugfs disabled and reuses the plain
-diagnostic UART/timer/userspace. The driver validates six exact resources
-before mapping them. It first reads CRG51, internal PHY CRG, selection, address
-and LDO; none is written.
-
-MAC/MDIO access is conditional on the inherited SDK fields: CRG51 mask 0x1b
-equals 0x0b, PHY CRG mask 0x11 equals 1, selection bit 8 clear and PHY address
-low five bits equal the measured address 1. Otherwise it reports a skip and
-finishes without touching the MAC. This is an observation gate, not proof
-of clock frequency or complete SoC initialization.
-
-When the gate passes, only fixed MAC mode/queue/reset/forward/IRQ/control
-registers are observed; no MAC address or FIFO/descriptor is read. Exactly
-PHY 1 Clause 22 ID registers 2 and 3 are then read. Each operation polls MDIO
-ready before and after its command with a 1-ms bound. The two possible command
-values are 0x102 and 0x103. These write the MDIO command controller to request
-a PHY read, with the PHY-write bit and hardware-ready bit clear; there are
-no PHY register, clock/reset, IRQ-enable, packet/DMA or storage writes.
-
-The real helper is executed under ASan/UBSan with an MMIO seam covering ready
-and busy states, both completion timeouts, data masking and absent/all-ones
-IDs. Profile tests reject changed resources and unreviewed subsystems. The
-standalone build, serial identity gates, image layout and QEMU are checked
-separately. A completed audit may report unavailable PHY ID; that must not be
-described as Ethernet working. The [physical audit](../verification/ethernet-audit-20261012.md)
-measured CRG51 `0x3` and skipped MAC/MDIO access because bit 3 was absent.
-The internal PHY clock/reset, selection and address fields met the remaining
-conditions; LDO was `0x8`. No PHY ID has been measured.
-
-The vendor driver selects different volatile expanded-register fixup tables
-by actual PHY ID. The [clock/ID experiment](../verification/ethernet-clock-id-20261012.md)
-measured `0x20669823`, matching FESTAv220. The
-SDK's OTP-derived trim routine explicitly excludes MV100 and must not be
-copied from MV200/MV300 support. No OTP/eFuse writes belong in this port.
-
-## Integration and acceptance
-
-`make ethernet-clock-id` builds a distinct `ethernet-clock-id1` RAM experiment,
-with a different compatible, release and an eight-byte MDIO resource. It
-requires the exact measured controls: CRG51 `0x3`, PHY CRG `0x101`, select
-`0x0e000004`, address `0x03000001`, LDO `0x8`. Only CRG51 bit 3 is enabled;
-the complete readback must be `0xb`. After the SDK's 5-ms MDCK settling delay,
-the same bounded PHY 1 ID helper runs and CRG51 is restored to `0x3` on success,
-MDIO timeout or absent ID. Restoration is verified. Unexpected changed
-control state stops the experiment without overwriting that state and without
-claiming completion. NET/storage/USB/debugfs remain disabled.
-
-This experiment makes volatile clock writes and MDIO read-command writes;
-it is not the inherited-state read-only audit. It never changes the PHY clock,
-reset, address, selection or LDO and never starts MAC DMA. The SDK clock table
-sets mask/value `0xb` at `PERI_CRG51_SF` (`0xcc`), and the SDK DTS assigns this
-clock to hieth. The common vendor prepare/enable path also toggles reset,
-so it is deliberately not called by this limited experiment. Clock rate and
-a complete cold-start sequence remain unresolved. Exact-state guards,
-bit-only writes, busy/invalid-ID errors and restoration/readback failures are
-executed under ASan/UBSan; DT/profile, serial identity, build and QEMU gates
-are separate. A successful PHY read still does not establish network traffic.
-The physical experiment passed with the exact clock restoration sequence
-and FESTAv220 ID. No reset, fixup, link or MAC data transfer ran.
-
-## Inherited-PHY datapath candidate
-
-`make ethernet-net` builds the distinct `ethernet-net1` RAM image. It reuses
-upstream FEMAC DMA mapping, FIFO queues, NAPI, PHY negotiation and bounded MDIO.
-The explicit `hisilicon,hi3798mv100-femac-inherited` compatible selects the
-MV100 adaptation. Port/global/MDIO resources do not overlap:
-`0xf9840000/0x400`, `0xf9841300/0x200` and `0xf9841100/8`; IRQ is SPI 71.
-DMA has an explicit 32-bit mask. The low-256-MiB RAM limit and low-16-MiB
-allocation reservation remain in force.
-
-The separate clock provider requires the five exact measured control values,
-enables only CRG51 bit 3, verifies `0xb` and waits 5 ms. It claims no clock
-frequency. MAC and MDIO share the prepared-clock reference count. Final
-unprepare restores `0x3` only if CRG51 is still exactly `0xb`; unexpected state
-is reported without overwriting another owner. PHY clock/reset/LDO/address/
-selection and OTP registers are not written.
-
-The dedicated FESTAv220 driver reads and verifies actual PHY ID `0x20669823`
-at address 1. Before connecting, the MAC requires that driver to be bound
-and defers otherwise, preventing generic PHY soft-reset fallback. It supplies
-no soft-reset, firmware or expanded-register fixup. Generic 10/100 negotiation
-and status callbacks may make ordinary volatile PHY configuration writes.
-This is an inherited-state experiment, not complete PHY cold-start support.
-Link may fail if inherited PHY firmware/state is insufficient; measure that
-before adding a vendor fixup or initialization sequence.
-
-MAC setup uses the SDK double software-reset pulse, little-endian controls,
-TX preamble limit and disabled bad-payload checksum drop. Pause offload stays
-disabled until negotiated behavior is implemented. The unestablished
-coalescing register `0x340` is untouched. The experiment uses RX-ready bit 0
-and TX-queue-ready bit 6. RX-ready pops a FIFO descriptor, so ISR/poll interrupt
-acknowledgment preserves it until the RX function consumes that packet.
-Receive lengths are checked before FCS subtraction and `skb_put`. Closing
-the new variant synchronizes IRQ and resets MAC before unmapping buffers;
-reopening reinitializes MAC controls after reset.
-
-TX-ready is armed only when the transmit queue runs out of credits, rather
-than as a continuously enabled completion interrupt. The MV100 ISR reads
-enabled interrupt status, so a masked TX-ready flag cannot claim another
-device's shared IRQ. NAPI repeats only for pending RX on this variant; a
-sticky TX-only flag cannot spin without consuming RX budget. A 20-ms monitor
-schedules the upstream NAPI TX-reclaim path while outstanding buffers exist,
-including one-way traffic with no reply packets. Close synchronously deletes
-the monitor before disabling NAPI. Zero-budget NAPI only reclaims TX.
-
-`tools/test_femac_datapath.py` compiles and executes the actual patched RX,
-NAPI, ISR and monitor functions with FIFO/skb seams under ASan/UBSan. It
-checks every descriptor length, pending-RX preservation, a persistent TX-ready
-flag, masked shared IRQs, packets arriving between polls, budget exhaustion,
-zero-budget TX-only work and monitor behavior. The pre-fix source at `f60474c`
-reproduced an unbounded TX-only NAPI loop; the corrected source passes.
-
-Checked upstream replacements live in `tools/femac_patch.py`; new board files
-remain in `overlay/`. Actual clock/setup/reset/length helpers execute under
-ASan/UBSan, including 160 inherited-state bit mutations and all 4096 descriptor
-lengths. Profile checks reject changed resources/PHY/clock connections, reset
-properties, extra peripherals and storage/USB/modules/SMP/filter subsystems.
-Only this exact profile receives the RAM planner's NET exception; existing
-diagnostic gates remain. Compiled DT/config, image placement and QEMU time64
-are separate checks. QEMU does not emulate this MAC/PHY.
-
-The interface stays down by default. `ethernet-diag --dhcp` brings up only
-`eth0`, obtains a bounded temporary DHCP lease using a RAM-only hook, pings
-the advertised gateway and captures link/IRQ/TX/RX/error counters.
-`tools/ethernet_board_cli.py` verifies the exact kernel before this fixed
-command. Linux PTY tests cover wrong-kernel/bootloader refusal and false pass
-through command echo. Hardware binding and DHCP/ping are separate acceptance
-results; building does not establish working board Ethernet.
-
-Keep network experiments separate from the storage and plain diagnostic
-profiles. Use an MV100 compatible and an explicit upstream adaptation where
-needed; do not masquerade as a hi3516 board to skip SoC integration work.
-The production path should retain upstream DMA mapping, NAPI, PHY state and
-error handling, with a 32-bit DMA mask and the measured RAM reservations.
-
-Hardware acceptance must include PHY ID, IRQ progress, link negotiation,
-ARP/ping, DHCP, TX/RX counters, checksum behavior and sustained bidirectional
-traffic before routing/Passwall throughput testing. Tests must also cover
-link loss/reconnection and cold boot without depending on Hinas to initialize
-the PHY first. MAC addresses and identifying logs remain local.
-
-Source identities are pinned in `config/sources.lock.json` and
-`reference/reference-manifest.json`. This document records source analysis
-and inherited-state measurements; a working Ethernet driver/image has not
-yet been demonstrated.
+`make ethernet-audit` 仅观察继承寄存器；
+`make ethernet-clock-id` 受限启用时钟、读PHY-ID并恢复；
+`make ethernet-net` 才运行独立数据通路。
+各profile具有独立身份和RAM门禁；QEMU不模拟MV100 MAC/PHY。
+实际路由、Passwall与最大吞吐不能由PHY-ID或一次ping推断。
+原生构建和采集见[独立网口说明](openwrt-ethernet.md)。

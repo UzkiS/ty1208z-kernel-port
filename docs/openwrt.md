@@ -1,71 +1,28 @@
-# Official native OpenWrt integration
+# 官方 OpenWrt 来源与集成
 
-The intended result is official OpenWrt with working Ethernet, onboard
-Wi-Fi/AP, Docker and Passwall. A new kernel and a successful RAM diagnostic are necessary
-steps; neither is a working OpenWrt target or an installable image.
+当前系统基于官方 `openwrt/openwrt` 的 `openwrt-25.12`，
+固定提交 `58efa9917d4cc53fceed173529a286187649e827`，Linux 6.12.112。
+中文 LuCI、Passwall 双核心、Docker、板载无线和 eMMC 安装已经整合；
+当前结果见[状态页](../STATUS.md)。
 
-On 2026-10-13 the user removed Kwrt customization from the requested scope.
-Use official OpenWrt plus the reviewed board support, Chinese interface,
-Docker, Passwall with Xray and sing-box, and unzip. The earlier Kwrt audit
-below remains source-selection history. Live GitHub commit/compare queries
-confirmed pinned `58efa991` still equals the `openwrt-25.12` branch head
-(zero commits ahead/behind). The master head was `ba45d608` at that check.
+## 固定来源
 
-## Audited upstream state
+`openwrt/sources.lock.json` 固定基础源码归档；
+`openwrt/applications/sources.lock.json` 固定 packages、LuCI、Passwall 与
+Passwall packages 的完整归档、提交和 SHA-256。容器配方另有来源锁。
+构建不执行上游定制脚本，不使用移动 feeds。
 
-The separate [native Ethernet experiment](openwrt-ethernet.md) integrates the
-physically measured inherited-PHY datapath without changing the plain RAM
-target or application-validation profile.
+基础 Linux 压缩包 SHA-256 为
+`164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03`。
+OpenWrt 会继续叠加 generic 补丁并使用自己的配置和编译器；
+相同基础版本并不意味着独立 Linux、Hinas 和 OpenWrt 的模块 ABI 相同。
 
-The 2026-10-12 audit is pinned in
-[`reference/openwrt-kwrt-audit.lock.json`](../reference/openwrt-kwrt-audit.lock.json):
+最初的 `reference/openwrt-kwrt-audit.lock.json` 保留来源比较记录，Kwrt 不参与当前构建。
+所审计的官方 target 没有 Hi3798MV100 专用板型；`armsr` 依赖 SystemReady/EFI，
+不能替代本机 CA fastboot/uImage 加载路径。
+CPU 使用 `cortex-a7` / `neon-vfpv4`，并不借用其他板型身份。
 
-| Repository | Observed branch | Audited commit |
-|---|---|---|
-| kiddin9/Kwrt | `25.12` | `d59e8be835f5a6ff9bfc2034ca14184c4b89b916` |
-| openwrt/openwrt | `openwrt-25.12` | `58efa9917d4cc53fceed173529a286187649e827` |
-
-Kwrt contains device customizations and a build workflow. Its common settings
-point to the upstream OpenWrt repository, and its workflow selects a release
-tag or the moving `openwrt-25.12` branch. The inspected device list has no
-TY1208Z or Hi3798MV100 target. Upstream's inspected target list also has no
-dedicated Hi3798MV100 target. `armsr` requires Arm SystemReady/EFI and is not a
-drop-in target for the measured CA fastboot/uImage boot path.
-
-The audited OpenWrt `target/linux/generic/kernel-6.12` selects **6.12.112**
-with SHA-256
-`164dc9d1f6c93c61a15e1f071c48379b467f2b17c469cce7223471968208ed03`,
-matching this project's pinned upstream archive. OpenWrt still applies its
-own generic patches and uses its own compiler/configuration. Matching the
-base version does not make standalone modules ABI-compatible.
-
-The Cortex-A7 CPU can use the existing OpenWrt CPU definitions
-`CPU_TYPE:=cortex-a7`, `CPU_SUBTYPE:=neon-vfpv4`; the audited sunxi target is
-evidence for these definitions, not compatible board support. Initial target
-configuration must retain the measured boot/memory constraints and only
-enable separately validated SoC peripherals.
-
-## Source and build boundaries
-
-The independent target now lives in `openwrt/overlay/target/linux/hi3798mv100`.
-Its single `ty1208z_ca_ram` profile inherits the measured CPU0/UART/timer and
-bounded RAM DT, uses native ARMv7 hard-float musl userspace, and emits only an
-UNTESTED initramfs uImage plus rootfs archive. No sysupgrade or install image
-is defined. BLOCK, MMC, MTD and USB remain disabled; only loopback is configured.
-This bring-up profile is not the eventual router configuration.
-
-`openwrt/sources.lock.json` fixes the complete OpenWrt source archive and has
-an empty feed list. Core package/toolchain recipes and their source versions
-and hashes come from that archive. `prepare_openwrt.py` validates the archive,
-extracts into a separate Linux build tree, installs the reviewed overlay and
-copies the authoritative board patch, BusyBox stat time64 patch and time64
-probe. The BusyBox custom configuration enables stat/format without changing
-the other inherited defaults. Native GCC/musl compilation, image checks and
-QEMU core time64 acceptance now pass locally; see
-[the exact artifact and limits](../verification/openwrt-native-20261012.md).
-CI and physical acceptance are tracked separately.
-
-Run these commands as a regular user on a Linux filesystem (including WSL):
+## 最小原生入口
 
 ```sh
 make openwrt-config TASKBASE=/absolute/linux/build-root
@@ -73,71 +30,26 @@ make openwrt-toolchain TASKBASE=/absolute/linux/build-root
 make openwrt-ram TASKBASE=/absolute/linux/build-root
 ```
 
-The full build checks the resolved storage exclusions, image CRC/DTB/load
-addresses and the existing low-16-MiB decompression bound. It then boots the
-actual native initramfs kernel on QEMU virt without a disk or network, and
-checks installed musl time64, UCI, procd/ubus and logging at a 2040 wall clock.
-The independent OpenWrt CI repeats that build. A configured workflow is not
-evidence of a passing run; results are recorded when it finishes. MV100 RAM
-boot still needs a dedicated profile gate and physical validation before the
-native image can be sent to the board; the diagnostic CLI does not accept it.
+使用普通 Linux 用户和 Linux 文件系统。`prepare_openwrt.py` 校验基础归档，
+安装 `openwrt/overlay/target/linux/hi3798mv100`，引用权威板级补丁、
+BusyBox stat time64 修复和 probe。原生 GCC 14.3.0 / musl 1.2.5 作为后续应用工具链。
 
-Keep the native target/integration files separate from `overlay/` and
-`wifi/overlay/`. Generate board patches from the authoritative Linux files,
-then apply them to the fixed OpenWrt kernel and resolve generic-patch overlap
-explicitly. Build the optional RDA driver as an external kernel package
-against OpenWrt's prepared kernel; do not copy the standalone `.ko` into it.
-Wi-Fi can be disabled while wired routing is being validated.
+这里的 `ram` 子目标仍是低256、单核、UART/timer 的独立最小 profile，
+关闭 BLOCK/MMC/MTD/USB，仅回环网络，输出未实机验收的 initramfs uImage 与根归档。
+它的限制不能套用到当前完整系统。镜像检查包括 CRC、DTB、加载地址和低16解压界限，
+QEMU 使用实际原生用户空间检查 musl、UCI、procd/ubus、日志和 2040 年时间。
 
-The audit manifest fixes the inspected files only. It is not a complete
-build lock. Before a reproducible build, fix the OpenWrt and Kwrt commits,
-all feed commits, required Kwrt modifications, package sources and hashes.
-Kwrt's current common customization script references moving feeds, other
-repositories and raw downloads. It has only been read, not executed. Translate
-the needed customizations into reviewed, pinned integration steps.
+## 应用与完整系统
 
-Start with a native RAM root filesystem and fixed CA uImage loading. Provide
-UART login, network configuration and minimal routing tools before adding
-LuCI and application packages. Do not add sysupgrade installation support or
-stock partition write actions until backups and recovery have been established
-and the exact installation plan has session authorization.
+[应用构建](openwrt-applications.md)选择 Passwall 26.10.4、Xray 26.10.10、
+sing-box 1.14.3、unzip 和中文界面，固定 Go 1.27.1 工具链配方。
+其他代理核心和 geodata 不默认引入；支持的功能以实际选择和测试为准。
 
-## Passwall and Y2038 acceptance
+[网口集成](openwrt-router.md)在独立构建树加入测量过的 FEMAC/MDIO/PHY；
+[无线包](openwrt-wifi.md)使用原生 Linux 6.12 cfg80211，避免混入 backports。
+[完整系统](../openwrt/system/README.md)组合精确内核、APK、Docker 和无线，
+并提供独立持久候选及安装打包流程。
 
-The initial read-only recipe audit is pinned separately in
-`reference/passwall-audit.lock.json`: Passwall 26.10.4 at
-`14b4ef0bcfeb8a01a22f70a3c4f01cdb87fd0b1d`, and the package repository at
-`1af0a5c4fb3a227201683b64d32f61c65db9be72`. Its audited recipes select
-Xray 26.10.10 or sing-box 1.14.3 through the external packages feed's Go
-toolchain. Passwall also needs LuCI/Lua, dnsmasq-full, DNS/proxy helpers and
-transparent-proxy kernel modules. These are not in the native RAM profile.
-Default Passwall options pull multiple engines/plugins; the router profile
-must select an explicit set and measure size/memory rather than accepting
-the entire default list. This file audit does not fix all feeds, Go modules,
-runtime downloads or choose a working backend.
-
-The separate `apps` subtarget now fixes complete feeds and selects Xray only.
-It has passed a real native build and ARM QEMU tests of DNS/TLS, authenticated
-LuCI/Passwall, controller-generated Xray SOCKS data flow and nft expressions
-at 2040. It emits no hardware CA image. See [application build and boundaries](openwrt-applications.md)
-and [exact local acceptance](../verification/openwrt-applications-20261012.md).
-
-Pin Passwall and its actual selected backend/transport/DNS dependencies as a
-separate application layer. The user requires Passwall; the choice of engine
-must be buildable on ARMv7 and validated under the board's measured memory
-and network constraints. Package availability or an enabled LuCI option does
-not establish an operational proxy path.
-
-Use musl/time64 userspace from the fixed OpenWrt toolchain and test the built
-artifacts. Validate the whole selected application set in an isolated ARM
-QEMU guest with a 2040 wall clock: libc conversion, file timestamps, BusyBox,
-logging, DNS, certificate validity, LuCI/rpcd and the chosen Passwall engine.
-Exercise actual application start/configuration and data flow where emulation
-allows it. The current diagnostic time64 probe alone does not cover these.
-
-On the board, verify cold boot, DHCP/DNS, forwarding and firewall behavior,
-Passwall traffic, reconnects, memory pressure and throughput. Include Wi-Fi
-scan, association and AP only after its separate acceptance. Future wall-clock
-testing remains confined to QEMU. Keep boot and runtime evidence separate from
-software build results, and retain the existing CA bootloader and Hinas until
-a later installation has been explicitly authorized.
+编译检查、QEMU、CI 和实机结果分别记录。time64 的未来墙钟仅在隔离 QEMU 设置，
+真实设备只作正常时间运行和 RAM 文件时间验证。
+源码锁定与构建成功不能替代 p6/p9 备份、设备身份、恢复条件和精确包校验。

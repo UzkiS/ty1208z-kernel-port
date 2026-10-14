@@ -1,117 +1,64 @@
-# Required Docker integration
+# Docker 构建与运行
 
-Docker is a required feature of the final official OpenWrt system, alongside
-Chinese LuCI, Passwall with Xray and sing-box, unzip and board Wi-Fi/AP support.
-The [integrated native RAM system](../openwrt/system/README.md) now physically
-runs a small ARMv7 container with overlay2, cgroup limits, default seccomp,
-gateway DNS and TCP/HTTP through Ethernet. The exact runtime and safe return
-are recorded in the [board report](../verification/openwrt-system-board-20261014.md).
-Persistent Docker storage, final package registration and installation remain
-unfinished. The earlier independent experiments below retain their original scope.
-The board has 1 GiB of physical DDR and a 32-bit Cortex-A7/ARMv7 CPU. The
-current RAM experiment intentionally exposes only the low 256 MiB, with the
-low 16 MiB reserved. It is not a Docker installation candidate.
-An independent [768-MiB memory experiment](ram.md) now passes physical 512-MiB
-stress/PFN checks and autonomous return. Its independent native router768
-integration now also physically passes memory/PFN, Ethernet/application and
-automatic return checks; [native report](../verification/openwrt-router768-board-20261014.md).
-Storage and actual Docker runtime acceptance remain separate.
+当前持久系统包含 Docker/dockerd 29.6.1、containerd 2.2.5、runc 1.3.6、
+tini 0.19.0、Compose 和中文 Dockerman。小型 ARMv7 容器、资源限制、默认 seccomp、
+DNS 和物理网口 HTTP 已实测；容器数据位于 `/opt/docker`，
+跨断电保留和 Docker 冷启动自启通过。
+见[系统实测](../verification/openwrt-system-board-20261014.md)和
+[持久升级实测](../verification/native-web-upgrade-board-20261015.md)。
 
-Before integration, establish usable higher memory and independently validate
-the eMMC driver, block I/O and filesystem/recovery plan. Storage installation
-and persistent boot changes retain their separate authorization boundary.
+## 使用边界
 
-Use pinned OpenWrt container packages and review their real dependencies:
-cgroups/resource limits, namespaces, overlayfs, veth/bridge and netfilter.
-Keep container bring-up separate from the existing diagnostic/router RAM
-profiles until their measured memory and storage boundaries are satisfied.
-Compiling Docker packages alone does not establish working container support.
-The separate `make openwrt-container-packages TASKBASE=/absolute/linux/build-root`
-entry now builds the official pinned Docker/dockerd 29.6.1, containerd 2.2.5,
-runc 1.3.6 and tini 0.19.0 recipes under `TASKBASE/container-packages/`.
-`openwrt/containers/sources.lock.json` pins the five recipe/source identities
-against the same official packages feed. `make openwrt-container-config` only
-resolves and checks their selection.
+CPU 是 32 位 Cortex-A7，应使用 `linux/arm/v7` 镜像；ARM64 镜像不能原生运行。
+单核、约744 MiB可用内存及慢速 eMMC 决定实际服务预算。
+磁盘根的 Docker snapshotter 是 overlayfs；早期 RAM 容器实验的 overlay2 结果
+属于相应实验版本。大镜像、外部仓库、IPv6 和综合吞吐未全部验收。
 
-These packages are selected as `m`, separate from the application rootfs.
-Their dependency kernel enables block support for upstream Btrfs dependencies,
-namespaces, cgroups and seccomp, while MMC, MTD, USB, board Ethernet and SMP
-stay excluded. The entry produces no rootfs/board image and refuses use by
-the application QEMU or RAM packager. On successful compilation, the checker
-extracts real APKs, checks ARM EABI5, verifies source/recipe hashes and runs only
-`--version` through qemu-arm. It exports packages and provenance as compile-only
-artifacts; no daemon or container is started by that check.
-Clean remote compilation on `3e89e05` also passed; all 13 downloaded artifact
-files, five package/source records, checker identities and actual version-check
-marker were independently verified, [CI report](../verification/container-packages-ci-20261013.md).
+## 独立构建入口
 
-The separate `make openwrt-container-qemu TASKBASE=/absolute/linux/build-root`
-entry now tests those actual native packages in a Cortex-A7/ARMv7 QEMU guest
-with 768 MiB, no NIC, disks or host mounts. Run `make build` and
-`make openwrt-container-packages` first. Its BusyBox helper, deterministic local
-Docker archive, complete APK dependency closure and exact kernel/config/input
-hashes are recorded under `artifacts/openwrt-container-qemu/`.
+先完成 `make openwrt-toolchain`；下列命令均接受
+`TASKBASE=/absolute/linux/build-root`。
 
-Actual containers pass overlay2, PID/hostname isolation, default seccomp,
-CPU throttling, memory-cgroup OOM enforcement, writable-layer persistence,
-stop/start/restart and cleanup. User-defined bridge DNS/HTTP, default and
-user-defined bridge masquerading, and published-port DNAT pass through another
-guest-only network namespace. The daemon/containerd also shut down normally.
-The clock reaches 2040 only inside the guest. The native package profile now
-selects `kmod-nft-nat`: its absence previously prevented Docker's iptables-nft
-backend from creating NAT chains; the compiled-config checker also rejects
-that regression. [Runtime report](../verification/container-qemu-runtime-20261014.md).
+| 入口 | 验证内容与输出 |
+|---|---|
+| `make openwrt-container-config` | 解析并核对包选择 |
+| `make openwrt-container-packages` | 构建真实 APK，核对 ARM EABI5、来源和 qemu-arm `--version`；不启动 daemon |
+| `make openwrt-container-qemu` | 先完成诊断 `make build` 和容器包构建；隔离 ARMv7 QEMU 测容器运行 |
+| `make openwrt-container-applications` | 同一原生根中组合 fw4、Passwall 双核心和容器运行 |
+| `make openwrt-system` | 将已验收原生归档和本次板级内核组合成 RAM 系统 |
 
-These are QEMU-only outputs, separate from every board RAM candidate. They
-exceed the existing physical router initrd transfer budget. The isolated
-dependency closure provides legacy `firewall`; this experiment does not run
-OpenWrt fw4 or Passwall, perform physical storage I/O or establish a final
-router installation. Fresh remote runtime CI remains pending.
+容器配方和源码身份由 `openwrt/containers/sources.lock.json` 固定。
+独立 package profile 把包选为 `m`，只提供编译产物；
+其内核依赖包含 block/Btrfs、namespace、cgroup、seccomp 和 nft NAT，
+但不启用板载 MMC/USB/网口或 SMP，不能作为安装镜像。
+曾缺少 `kmod-nft-nat` 导致 Docker iptables-nft 无法创建 NAT 链；
+实际配置检查现覆盖这项依赖。
 
-The independent `make openwrt-container-applications TASKBASE=/absolute/linux/build-root`
-entry now builds the Chinese application rootfs, firewall4 and all five native
-container cores from one source/kernel profile, runs the combined ARMv7 suite
-at 768 MiB and exports verified QEMU-only delivery under
-`artifacts/openwrt-container-applications-qemu/`. Its actual native `/init`,
-BusyBox and procd are preserved. A separate gated fixture archive starts the
-real dockerd service with guest-RAM storage and the real native tini. The
-deterministic container includes that same rootfs's musl/libgcc libraries.
+## QEMU 验证范围
 
-The combined suite passes overlay2, default seccomp, actual CPU throttling and
-memory-cgroup OOM, PID-limit readback, embedded DNS, bridge masquerading and
-published DNAT through real netifd/fw4 configuration. Both installed Passwall
-cores also pass transparent TLS requests from an actual container network
-namespace; native curl runs in that namespace. Direct requests fail before
-and after each proxy. Docker networking survives the firewall and Passwall
-reloads, and containers/network namespaces and the procd daemon shut down
-cleanly. The original application checks still cover Chinese/empty-password
-LuCI, both SOCKS/TLS cores, unzip, DNS/TLS and NTP/time64 across 2036/2038/2040.
-All 26 required markers appear exactly once; input hashes are frozen before
-preparation/runtime and verified afterwards. The exporter independently checks
-native/core/kernel/fixture/console consistency and copied file hashes.
-See [combined report](../verification/container-applications-qemu-20261014.md).
+独立容器 QEMU 使用 Cortex-A7、768 MiB，无磁盘、主机挂载或物理网络。
+真实容器测试 PID/hostname 隔离、overlay2、默认 seccomp、CPU 限流、
+memory-cgroup OOM、可写层、生命周期和清理；
+guest-only namespace 验证 bridge DNS/HTTP、masquerade 和发布端口 DNAT。
+未来时钟只存在于 guest。该 profile 使用独立防火墙依赖，不代表 fw4/Passwall 组合通过。
 
-This profile has no CA/uImage, board DTB or installation path and is explicitly
-refused by the physical RAM packager. It enables block support for declared
-container dependencies while excluding MMC, MTD, USB, board Ethernet and SMP.
-It is separate from the physically accepted SD router. Its workflow builds
-from a fresh Linux checkout; a configured workflow is not successful CI
-evidence. Physical storage-backed Docker, external Internet/registry access,
-IPv6, performance and board integration remain pending.
+组合 profile 使用真实 netifd/fw4、dockerd/procd 和 tini，
+从容器 network namespace 运行原生 curl，验证两种 Passwall 核心的透明 TLS 流量；
+关闭代理前后的直连必须失败，并检查重载后 Docker 网络和服务关闭。
+原应用检查保留中文/空密码、DNS/TLS、双核心、unzip 和 NTP/time64。
+26 个必需 marker 与精确 kernel/rootfs/fixture/console 哈希绑定。
 
-Physical/final-router acceptance still needs a small `linux/arm/v7` container,
-DNS and outbound/forwarded networking with fw4/Passwall, measured memory/CPU
-limits and clean shutdown/restart. Confirm image architecture before download;
-ARM64-only images cannot run natively on this CPU.
+较大的组合根先以 ramfs 展开，再由仅 QEMU 启用的入口逐文件复制并删除到 tmpfs，
+避免同时保存两份完整根导致 768 MiB 全局 OOM；随后启动原生 `/sbin/init`/procd。
+原归档和 `/init` 不修改，但测试入口不再执行原 `/init` 的整根复制路径。
+新全局 OOM 直接判失败，不能以局部成功 marker 掩盖。
+历史结果与最新干净 CI 分别见
+[组合报告](../verification/container-applications-qemu-20261014.md)和
+[CI 记录](../verification/ci-closure-20261015.md)。
 
-One GiB permits modest workloads; the current single-core experiment, storage
-I/O, proxy load and actual free memory must determine the eventual service
-budget. Physical Docker and full storage/final-router acceptance remain pending.
+## 系统集成
 
-`tools/prepare_native_userspace.py` now prepares a RAM network-delivery
-supplement from the accepted native archives without rebuilding or rerunning
-applications. Fourteen application/runtime files are byte-identical between
-the native eMMC and combined deliveries. The prepared 75-file supplement is
-91123638 bytes compressed and excludes kernel modules and APK database state.
-It is not installed or board-tested; the integrated board kernel must supply
-its own modules, and final package registration remains to be integrated.
+`prepare_native_userspace.py` 从已有原生归档生成 supplement；
+最终离线 APK 事务登记包和本次内核模块，不能直接把独立容器内核模块复制进板级系统。
+模块平铺目录、WAN/Docker 防火墙区域及冷启动预读/有界重试均在系统层整合。
+安装、升级保留数据的具体目录见[安装说明](installation-plan.md)。

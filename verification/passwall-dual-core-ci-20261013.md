@@ -1,4 +1,6 @@
-# Clean CI acceptance for Passwall dual cores and unzip
+# 双代理核心与 unzip 干净 CI（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 [Application run 38415519493](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38415519493)
 completed successfully on `3e89e05655edd749ae61683988e9ba44013fc24f`.

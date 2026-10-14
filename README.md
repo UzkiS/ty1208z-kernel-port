@@ -1,29 +1,44 @@
-# TY1208Z CA kernel port
+# 天邑 TY1208Z CA：Linux 与 OpenWrt 适配
 
-[![Diagnostic CI](https://github.com/UzkiS/ty1208z-kernel-port/actions/workflows/diagnostic.yml/badge.svg)](https://github.com/UzkiS/ty1208z-kernel-port/actions/workflows/diagnostic.yml)
+[![诊断 CI](https://github.com/UzkiS/ty1208z-kernel-port/actions/workflows/diagnostic.yml/badge.svg)](https://github.com/UzkiS/ty1208z-kernel-port/actions/workflows/diagnostic.yml)
 
-为天邑 TY1208Z 高安版 / Hi3798MV100 准备现代 Linux 板级适配，后续目标是
-官方原生 OpenWrt、中文 LuCI、Docker、Passwall（Xray 和 sing-box）、unzip、
-板载 Wi-Fi/AP，以及可验证的 64 位时间支持。用户已取消 Kwrt 定制要求。
+本仓库为天邑 TY1208Z 高安版 / Hi3798MV100 提供 Linux 6.12 板级支持和基于官方
+OpenWrt 25.12 的系统集成。**已完成实机 eMMC 安装、中文 LuCI 网页升级和普通命令重启**。
+当前能力、证据和限制见 [STATUS.md](STATUS.md)，操作流程见[安装与升级](docs/installation-plan.md)。
 
-**Linux 6.12 RAM 诊断已在盒子上启动，仍不是可刷入的路由器固件。**
-现有 fastboot 和 Hinas 没有被修改。状态见 [STATUS.md](STATUS.md)。
+## 当前系统
 
-## 先做什么
+- 官方 OpenWrt 固定提交 `58efa9917d4cc53fceed173529a286187649e827`，Linux 6.12.112。
+- 简体中文 LuCI；默认账号 `root`、空密码；升级可保留已有配置和密码。
+- Passwall 26.10.4，含 Xray 26.10.10、sing-box 1.14.3；InfoZIP unzip。
+- Docker 29.6.1、中文 Dockerman、Compose；eMMC 数据持久化和冷启动自启已实测。
+- 有线 DHCP、双向 TCP；板载 RDA5995 的 WPA2 STA/AP 已分别实测，无线默认关闭。
+- eMMC ext4 可写根和完整 p9 在线扩容；USB 存储的 VFAT/NTFS3 只读文件访问已实测。
 
-Linux 6.12.112、单核、串口、GIC、自带 RAM 根文件系统和诊断 shell。
-存储和网络驱动关闭，因此首轮不依赖也不会挂载现有 Hinas 分区。
-QEMU virt 用同一个原始 zImage 验证通用启动和用户空间，使用它自己的设备树；
-它不能验证本机定时器、USB、Wi-Fi、高安校验或内存布局。
+当前使用单核、低 768 MiB 内存范围，约 744 MiB 可用；eMMC 仍是受限单扇区 PIO，
+安装和升级较慢。SD 保持请求级只读。无线 STA 上联组合旁路由、STA/AP 同时工作、
+USB 写入及吞吐没有新增验收。time64 已覆盖选定用户空间与应用的 QEMU 案例，
+不代表所有软件或整机未来时钟行为全部验证。
 
-实机已通过低 256 MiB 范围的诊断启动，低 16 MiB 按实测 DDR free 下界保留。
-当前 CA 引导器接受了普通 unsigned uImage，镜像头地址为 `0x01ffffc0`，
-加载和入口地址为 `0x02000000`。这只验证了具体诊断镜像和本次 RAM 路径；
-完整内存保留图、外设和安装条件仍需逐项确认。每次加载都会重新校验镜像与当前引导。
+## 安装与使用
 
-## 构建与测试
+首次安装采用 TTL 加网线启动专用临时 OpenWrt，再通过官方 LuCI“系统 → 备份与更新”
+上传 first-install 包；已安装的系统使用独立 sysupgrade 包。两种包不能互换。
+首刷只替换已核对的 p6/p9，沿用现有 CA fastboot 和持久启动环境。
 
-在 Ubuntu 24.04 / WSL Linux 文件系统中构建，Python 3.11 或更高：
+镜像包含私有 RDA 固件，当前仅本地交付，GitHub 不提供可直接下载的完整刷机包。
+仓库中的 CI 产物按构建身份标记 `HARDWARE-UNTESTED`；已验收的组件不能使任意新产物
+自动成为实机通过的镜像。操作前阅读：
+
+- [安装与升级](docs/installation-plan.md)：备份、包身份、写入范围、恢复和升级行为。
+- [临时网页首刷](docs/ram-web-install.md)：专用 RAM 安装环境和首刷顺序。
+- [系统构建说明](openwrt/system/README.md)：内核、APK、无线和安装包的集成方式。
+- [验证记录索引](verification/README.md)：按阶段查阅实机、模拟和 CI 证据。
+
+## 源码构建
+
+使用 Ubuntu 24.04 / WSL 的 Linux 文件系统、普通用户和 Python 3.11 或更新版本。
+各原生 OpenWrt 工作流列出了其构建依赖。最小 Linux 诊断构建可按下列方式复现：
 
 ```sh
 sudo apt-get update
@@ -37,71 +52,19 @@ export PATH="$PWD/.work/lint-venv/bin:$PATH"
 make verify
 ```
 
-默认源码/编译目录是 `.work/`；可用 `make build TASKBASE=/absolute/work/path`
-指定。上游压缩包按 [sources.lock.json](config/sources.lock.json) 校验 SHA-256，
-构建脚本不访问盒子。环境变量 `JOBS` 控制并行度，`CROSS_COMPILE` 指定兼容工具链。
-版本、时间戳、输入文件和哈希固定；不同编译器/主机包版本仍可能产生不同二进制。
+`make verify` 输出独立最小诊断环境，并非完整 OpenWrt 安装包。
+OpenWrt 集成入口见[构建架构](docs/architecture.md)和[官方来源说明](docs/openwrt.md)。
+默认构建目录为 `.work/`，可用 `TASKBASE=/absolute/linux/build-root` 指定；
+`JOBS` 控制并行度。源码版本、下载哈希、补丁和产物清单随构建记录，
+工具只处理本地构建文件，不会因执行构建命令自动操作设备。
 
-输出在 `artifacts/diag1/`：
+## 开发资料
 
-- `uImage-UNTESTED.bin`：附带 DTB 与 initramfs 的普通 legacy uImage。
-- `zImage`：不带本机 DTB，供 QEMU virt 验证。
-- `linux.config`、`busybox.config`、补丁、源码锁定表、`manifest.json`。
-- `checks/`：镜像结构、ELF、工具链及 QEMU 结果。
+[硬件依据](docs/hardware.md) · [eMMC](docs/emmc.md) · [SD](docs/sd.md) ·
+[网口](docs/ethernet.md) · [USB](docs/usb.md) · [无线](docs/wifi.md) ·
+[Docker](docs/containers.md) · [验证方法](docs/validation.md)
 
-CI 在干净环境执行相同构建，并提供名称含 `HARDWARE-UNTESTED` 的 Actions
-产物。不会自动发布刷机包或执行设备操作。
-
-## 项目边界
-
-内核、无线和 OpenWrt 集成有各自的输入、依赖及验收边界。
-当前内核构建独立于其他两层。目录和依赖见 [architecture.md](docs/architecture.md)，
-硬件依据见 [hardware.md](docs/hardware.md)，Wi-Fi 线索见 [wifi.md](docs/wifi.md)。
-网口主线驱动对照见 [Ethernet 审计](docs/ethernet.md)，官方原生 target、历史 Kwrt 来源审计和
-Passwall/time64 验收边界见 [OpenWrt 集成](docs/openwrt.md)。
-独立 `openwrt/` RAM target 已完成原生 GCC/musl 镜像构建，并通过核心用户空间的
-QEMU 2040 年验证。`make openwrt-ram` 使用锁定 OpenWrt 源码和 musl，
-复用板级及 BusyBox time64 补丁，执行原生用户空间的 QEMU 验证。
-它目前仅提供 RAM bring-up，没有网口、Wi-Fi 或 Passwall 的实机验收。
-独立 `make openwrt-applications` 已在 ARM QEMU 的 2040 年时钟下通过真实
-DNS/TLS、LuCI 登录与 Passwall 页面、Xray SOCKS 数据流和 nftables 检查；
-见 [应用构建说明](docs/openwrt-applications.md) 与 [验收记录](verification/openwrt-applications-20261012.md)。
-该应用测试仅输出 QEMU kernel/initrd，不提供刷机镜像。
-
-已有 Hinas 的只读 SSH 基线见 [baseline.md](docs/baseline.md)。本机已确认
-RDA USB `1e04:8888` 无驱动绑定；下一步先按 [TTL 记录步骤](docs/ttl-baseline.md)
-了解已实测的引导器检查、YMODEM/CRC 内存启动和诊断采集流程。Linux 6.12 已在
-本机进入串口 shell，timer/IRQ 和 RAM 文件 time64 通过；详见
-[实机 RAM 报告](verification/ram-boot-20261012.md)。这仍是最小诊断环境。
-TTL 记录直接使用仓库中的 Python CLI，不依赖 HiTool。安装锁定的串口依赖后，
-`make test-serial` 可在 Linux 伪终端验证接收工具，不连接盒子。
-eMMC 的 [独立寄存器审计](docs/emmc.md) 已实机通过；`make emmc-audit` 不启用
-MMC/BLOCK，`make emmc-ident` 的受限 PIO 卡识别已实机通过，型号和容量与 Hinas 一致；
-见 [卡识别记录](verification/emmc-identification-20261012.md)。`make emmc-read` 另行通过
-四个固定扇区的只读实测，Hinas 内核头和 ext4 超级块正确；没有块设备、挂载或写入，
-尚未启动原 Hinas，见 [固定读取记录](verification/emmc-reads-20261012.md)。
-`make wifi-usb-audit` 独立编译 RDA USB 对象；`make wifi-port` 已完成完整模块的
-本地编译链接及制造入口/密钥回归，尚未加载到盒子或证明联网。
-`make openwrt-wifi-port` 另外在独立的原生 OpenWrt 内核下生成实际 APK，
-模块/内核 ABI、包内文件与错误包拒绝已通过本地验证，见
-[打包说明](docs/openwrt-wifi.md) 和 [验收记录](verification/openwrt-wifi-package-20261013.md)。
-实机 USB、固件初始化及无线联网仍待验证。
-
-源码和研究说明可提交；原始固件、fastboot、DTB、源码下载和大体积编译产物
-保存在本地。厂商参考只提交出处和哈希，可执行 `make references` 重新获取。
-
-## 2038 验证范围
-
-ARMv7 诊断用户空间使用静态 glibc、`_TIME_BITS=64` 和 BusyBox time64 配置。
-QEMU 内测试 2040 年时钟设置/读回、日期转换、睡眠和 RAM 文件时间。
-另有 BusyBox `stat` 的时间输出修复：原版仍会将 64 位 `time_t` 缩窄为 ARM32
-的 `long`。原生 musl 应用测试另行覆盖了所选 Passwall/Xray、DNS、证书和
-LuCI 的 2040 年行为；所选一次性 NTP 客户端的 2036/2038/2040 案例也已通过
-QEMU 和 CI，见 [NTP 记录](verification/openwrt-ntp-time64-20261013.md)。现有 Hinas、
-实机 NTP 服务、持久文件系统和整机仍未完成验收。
-
-## 贡献和许可
-
-修改前阅读 [AGENTS.md](AGENTS.md)。许可证和第三方来源见
-[LICENSES/README.md](LICENSES/README.md)，具体里程碑采用
-[CONTRIBUTING.md](CONTRIBUTING.md) 中的验证要求。
+新增 Linux 文件维护于 `overlay/`，无线维护于 `wifi/`，OpenWrt 集成维护于
+`openwrt/`；生成补丁不作为唯一修改入口。原固件、备份、串口原始日志、下载源码及
+大型二进制不纳入 Git。贡献流程见 [CONTRIBUTING.md](CONTRIBUTING.md)，
+许可与第三方来源见 [LICENSES/README.md](LICENSES/README.md)。

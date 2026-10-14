@@ -1,4 +1,6 @@
-# Native OpenWrt Ethernet physical RAM experiment
+# 原生网口 RAM 实测（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Later source correction and fresh offline TX ownership/retry checks are
 recorded in the [TX report](femac-xmit-20261013.md), including physical corrected
@@ -21,7 +23,7 @@ files used RAM; no flash, persistent boot or security-state writes occurred.
 | Native target / board compatible | `hi3798mv100/net` / `tianyi,ty1208z-ca-openwrt-net` |
 | PHY | FESTAv220, ID `0x20669823`, address 1 |
 | Link | 100 Mbps, full duplex |
-| DHCP | `10.0.0.104/24`, gateway `10.0.0.1`; netifd DHCP up |
+| DHCP | Private /24 lease and gateway acquired; netifd DHCP up |
 | Gateway check | 4/4 replies, no loss |
 | RAM-file time64 | Timestamp `2208988800`; `sizeof(time_t)=8` |
 

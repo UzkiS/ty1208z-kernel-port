@@ -1,22 +1,18 @@
-# Contributing
+# 贡献说明
 
-Read `AGENTS.md` and `STATUS.md` first. Keep patches focused on an independently
-testable change. Record the upstream version, why the change is needed, and the
-validation that actually ran.
+修改前阅读 [STATUS.md](STATUS.md) 和 [AGENTS.md](AGENTS.md)。
+每个改动应说明具体问题、最终行为、上游版本和实际执行的验证。
 
-For kernel or diagnostic userspace changes:
+1. 修改权威源码、配置或生成器，再更新生成补丁；不要只改补丁。
+2. 内核和运行时改动按依赖执行 `make lint`、`make build`、`make test`。
+   已通过且未变化的组件复用原证据，只验证新边界。
+3. 检查实际配置、补丁差异、产物清单和哈希；分别记录编译、QEMU、实机及应用结果。
+4. 更新对应中文使用说明和状态。带日期的报告保留当时结论，标明阶段并链接当前状态。
+5. 提交源码和简洁结果，推送后检查对应 GitHub Actions 的真实结果。
 
-1. Edit authoritative source/config/generators, not just the generated patches.
-2. Run `make lint`, `make build`, then `make test` in Linux.
-3. Review generated patch and config differences. Check the output manifest.
-4. Update the relevant status/assumptions. Attach logs for failures or hardware
-   observations; remove credentials, MAC addresses and personal paths.
-5. Commit source, patches and concise results. Keep firmware and binary output
-   outside Git. Confirm the corresponding GitHub Actions run after pushing.
+纯文档修改执行定向格式、链接和事实核对，不重复编译内核。
+固件、备份、原始串口日志、大型二进制和凭据不纳入 Git。
+公开证据不包含真实网络身份、设备唯一编号或个人本地路径。
 
-Documentation-only changes require lint and a review for accuracy. Do not repeat
-a full build for unchanged kernel/userspace sources after tests passed.
-
-Do not infer physical-board validation from QEMU virt results. Storage, wired
-network, Wi-Fi station/AP, Hinas compatibility and Passwall need their own tests.
-No persistent installation work belongs in an offline diagnostic milestone.
+QEMU virt 不验证板载控制器、CA 加载或真实内存范围；新增存储写入、外设或安装路径
+必须有相应硬件与恢复证据。不得改写历史测量，或把编译成功描述为实机功能通过。

@@ -1,4 +1,6 @@
-# Fixed RDA USB identity queries
+# RDA 固定 USB 身份查询（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 The user reported the visible chip marking **RDA5995** on 2026-10-13. This is
 a user observation, not an independently photographed or protocol-derived
@@ -114,7 +116,7 @@ previously accepted Chinese router image. The latest local RAM backup was
 All 15 configuration/password/authorized-key files were restored and verified
 on the board. Chinese login and authenticated Passwall pages passed with the
 preserved password; DHCP DNS, normal-date NTP, gateway pings and RAM-file
-time64 passed. The physical address changed to `10.0.0.100`.
+time64 passed. The physical DHCP lease changed and management access recovered.
 
 Final health raw SHA-256 is
 `ddb1d96342afbb78d60c3f8caae6e3de7a4e572bb1e2b71402861a9520badc14`.

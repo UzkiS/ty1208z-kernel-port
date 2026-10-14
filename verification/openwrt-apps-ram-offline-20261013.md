@@ -1,4 +1,6 @@
-# Native application external-initrd RAM candidate — 2026-10-13
+# 独立应用外置 initrd RAM 打包（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Result: the exact native OpenWrt application kernel/rootfs passes the full
 application fixture with a 240-MiB usable QEMU memory cap. A separate ordinary

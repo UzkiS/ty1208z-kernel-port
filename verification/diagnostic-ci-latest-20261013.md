@@ -1,4 +1,6 @@
-# Diagnostic CI after USB board acceptance and association bounds
+# USB 与关联边界修复后的诊断 CI（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 GitHub Actions [run 38374147701](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38374147701)
 completed successfully on `45762c2728dc40e1df323eed512419d9b0615e51`.

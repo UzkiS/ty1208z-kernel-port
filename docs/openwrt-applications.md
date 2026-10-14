@@ -1,163 +1,74 @@
-# Independent OpenWrt application validation
+# OpenWrt 应用构建与 time64 验证
 
-The `apps` subtarget builds actual ARMv7 musl packages and exercises Passwall
-under a 2040 wall clock in isolated QEMU. The ordinary application build emits
-a separate initrd and raw kernel. An additional `openwrt-app-ram` stage packages
-that exact tested pair for experimental RAM transfer; it supplies no sysupgrade
-or installation recipe. The plain `ram` target and standalone Linux diagnostic
-remain independent.
+`apps` 子目标构建真实 ARMv7 musl 应用，并在隔离 QEMU 的 2040 年时钟下运行。
+独立应用 profile 输出 raw kernel 和 initrd；`openwrt-app-ram` 另行封装 RAM 候选。
+当前持久系统复用应用层，安装状态见[状态页](../STATUS.md)。
 
-## Fixed inputs
+## 固定输入与实际选择
 
-The base OpenWrt source and board/BusyBox patches come from the existing native
-target. `openwrt/applications/sources.lock.json` fixes complete archives for
-packages, LuCI, Passwall and Passwall packages by commit and SHA-256. Only the
-selected package roots and their dependencies are installed into the build.
-Passwall 26.10.4 selects both Xray 26.10.10 and sing-box 1.14.3, with nftables.
-The sing-box recipe comes from the pinned Passwall packages feed, explicitly
-overriding the packages feed's alternative recipe. InfoZIP unzip 6.0-r9 comes
-from the official packages feed. Other proxy engines and geodata are disabled.
-The RAM candidate disables embedded Tailscale, ACME certificate issuance and
-gVisor to fit the 32-MiB compressed/96-MiB uncompressed archive limits.
-QUIC, uTLS, WireGuard and Clash API retain their recipe defaults;
-the requested Passwall proxy cores remain enabled. The
-full-defaults binary is independently buildable, but its initial
-rootfs exceeds this RAM profile's limits; do not relax those gates to boot it.
+`openwrt/applications/sources.lock.json` 固定 packages、LuCI、Passwall 和
+Passwall packages 完整归档。Passwall 26.10.4 选择 Xray 26.10.10 与 sing-box 1.14.3，
+后者明确使用 Passwall feed 的配方；InfoZIP unzip 6.0-r9 来自官方 packages。
+其他代理核心和 geodata 关闭。RAM profile 关闭 Tailscale、ACME 和 gVisor，
+保留 QUIC、uTLS、WireGuard、Clash API 的配方默认值。
 
-The application image recipe uses the pinned upstream libdeflate 1.25 host
-tool with level 12, sorted reproducible newc and no gzip timestamp. It reduces
-the same rootfs enough for the existing TFTP bound without removing QUIC,
-uTLS, WireGuard or Clash API. The checker verifies the compressor recipe and
-actual source archive, and compares decompressed output with the generated
-cpio before QEMU validates the exact final archive.
+工具链复用原生 GCC 14.3.0/musl 1.2.5并记录身份；Xray 所需 Go
+由固定 packages 中的 1.27.1 配方提供。
+Passwall Lua 的检查式补丁把自定义 CA 改为 Xray 要求的 `certificates` 数组，
+保留主机名及证书过期验证。
 
-New application/router builds include the Simplified Chinese LuCI, firewall
-and Passwall translations. A first-boot UCI default selects `zh_cn`; browser
-language detection is not required. Users can change the language in LuCI
-afterward. The built-rootfs checks require the language default, actual LMO
-catalogues and installed translation packages.
-The delivered root account has an empty password as requested. The runtime
-fixture verifies empty-password LuCI login before installing a guest-only
-password for the independent password-authentication check.
+简体中文 LuCI、防火墙和 Passwall 翻译包随根安装，首次启动设 `zh_cn`；
+root 默认为空密码。检查器核对真实 LMO、已安装包和 shadow 字段。
+测试先验空密码登录，再仅在 guest 设置临时密码测试认证。
 
-The application build reuses the completed native GCC 14.3.0/musl 1.2.5
-toolchain as an external compiler and records compiler/libc hashes. The pinned
-Xray requires Go 1.27. A checked recipe patch selects the versioned Go 1.27.1
-compiler already in the pinned packages feed; no moving Go download is added.
-Kernel modules are built against this application kernel, not copied from
-Hinas or the standalone diagnostic.
+## 复现
 
-A checked Passwall Lua patch emits custom TLS CAs as Xray's required
-`certificates` array. The pinned upstream emits an object and Xray rejects
-that configuration. Original/patched hashes are locked, and the built gate
-checks the actual installed Lua file. This preserves strict hostname and
-certificate expiry validation.
-
-## Reproduce
-
-Use a regular Linux user and a Linux filesystem. Install the dependencies in
-`.github/workflows/openwrt-applications.yml`, then run:
+在普通用户的 Linux 文件系统中，按
+`.github/workflows/openwrt-applications.yml` 安装依赖后执行：
 
 ```sh
 make openwrt-toolchain TASKBASE=/absolute/linux/build-root
 make openwrt-app-config TASKBASE=/absolute/linux/build-root
 make openwrt-applications TASKBASE=/absolute/linux/build-root
-# Also exercise a 240-MiB usable budget and package the checked RAM candidate:
 make openwrt-app-ram TASKBASE=/absolute/linux/build-root
 ```
 
-The application source/build lives under `TASKBASE/applications/`. Downloads
-are shared with the fixed base build; feeds and outputs remain separate. The
-build checks feed/recipe identities, selected options, actual installed package
-manifest and storage/hardware exclusions. QEMU gets no disk or host network.
-Writes, the fixture password and future clock exist only in the RAM guest.
+源码和输出位于 `TASKBASE/applications/`；下载可复用，配置与其他变体分开。
+`checks/applications-qemu.json` 绑定真实 kernel/config/initrd、包清单、
+console 和工具链哈希。干净 CI 的实际结果见[CI 记录](../verification/ci-closure-20261015.md)。
 
-`checks/applications-qemu.json` records the exact kernel, config, initrd, package
-manifest and console hashes, toolchain identity and passed runtime markers.
-The clean GitHub workflow repeats the native toolchain build and application
-acceptance. The [completed matrix report](../verification/openwrt-applications-ci-20261013.md)
-records verified plain/integrated TCP and RAM-packaging acceptance on `62db42b`;
-later UDP/NTP fixtures still require their own complete remote result.
+## 运行验证
 
-## Runtime acceptance and limits
+- libc 时间转换、文件时间、BusyBox、日志、dnsmasq、OpenSSL 与 curl/mbedTLS。
+  2040 年有效证书必须通过，过期或不可信证书必须失败。
+- LuCI 受保护页面、空密码与密码登录、rpcd session、已认证 Passwall 页面和真实 Lua API。
+- 安装的 Passwall 控制器生成并启动 Xray/sing-box SOCKS 与 VLESS/TLS，
+  真实 HTTPS 内容通过有效自定义 CA 链；过期代理证书必须失败并出现过期日志。
+  仅对已知 loopback 控制器返回码作受约束处理，同时仍要求配置及数据流成功。
+- InfoZIP 解压 stored/deflated、中文 UTF-8 文件名、ZIP64 local header、空文件和
+  2040 时间戳，核对内容哈希。
+- 安装的 BusyBox NTP 客户端连接 guest-only 服务端，跨 2036 era、2038 边界及
+  2026 → 2040 校时，读回实际结果；[NTP 记录](../verification/openwrt-ntp-time64-20261013.md)。
+- nft 实际回环计数及 socket/TPROXY 规则插入；这项本身不等于透明转发通过。
 
-The fixture first tests the installed BusyBox NTP client against a bounded,
-QEMU-only loopback server: 2036 era wrap, the signed 2038 boundary and correction
-from 2026 to 2040 must produce the actual expected clock. Neither test helper
-enters the delivered rootfs. Source/binary/shell hashes join the runtime
-provenance; see the [NTP result](../verification/openwrt-ntp-time64-20261013.md).
+默认 Cortex-A7 QEMU 使用 512 MiB；RAM 打包另用256 MiB和 `mem=240M`，
+保守计入低16保留。guest 无磁盘或主机网络，写入、临时密码和未来时钟只在 guest。
+这不是实际板上内存性能或所有协议的覆盖。
 
-The fixture also extracts a host-generated ZIP archive with the installed
-InfoZIP executable: stored and deflated data, UTF-8 Chinese filenames, ZIP64
-local headers, empty files and a 2040 timestamp must survive extraction. SHA-256
-checks verify actual content; the fixture archive hash joins QEMU provenance.
+## RAM 打包与网口变体
 
-The fixture checks libc/file time64, logging, real dnsmasq resolution, OpenSSL
-certificate validation and curl/mbedTLS HTTPS. It requires valid 2040 TLS to
-work and expired/untrusted certificates to fail. It checks LuCI's protected
-login response, real password login, authenticated Passwall page, rpcd session
-creation and the installed Passwall Lua API.
+固定 libdeflate 1.25 host 工具以 level 12 压缩排序后的 newc，无 gzip 时间戳；
+检查器比较解压内容与原 cpio。
+应用根不能嵌入低16解压范围，因此独立 DTB 指定 initrd 起点 `0x04000000`，
+压缩上限32 MiB、展开上限96 MiB。曾尝试36 MiB，但 TFTP 不支持块号回绕，
+传输检查拒绝；不能只因 RAM 放得下就放宽传输门禁。
 
-A UCI Xray node points only to a local microsocks server. The installed
-Passwall `app.sh run_socks` generates and starts the real Xray configuration;
-an HTTPS payload must pass through that SOCKS chain. The pinned controller
-ends with a conditional append and returns 1 for this loopback Xray node.
-The fixture permits that known status only alongside config validation and
-actual data flow. No controller or proxy stub is used.
+`make_openwrt_apps_ram.py` 保留已测 kernel/rootfs/modules，检查240 MiB QEMU证据、
+板级来源和外设禁用。RAM 规划器再检查实际引导器身份和 DDR，
+串口工具分别传输 kernel/initrd，两个设备 CRC 都通过才发送固定 boot 命令。
+输出 `artifacts/openwrt-apps-ram1/` 不包含板载网口、存储、USB 或 SMP，
+不提供安装后端。
 
-Two local VLESS TLS servers then test Xray's own certificate handling at
-2040. Passwall's custom-CA UCI option trusts the fixture CA; its real controller
-starts the clients. HTTPS content must pass through the valid TLS server;
-the expired proxy certificate must fail with Xray's certificate-expired log.
-The fixture waits for Passwall's asynchronous boot handler to finish before
-starting its instances, so a later service restart cannot erase their state.
-
-Equivalent real Passwall nodes exercise sing-box's generated configuration,
-SOCKS data flow and VLESS/TLS at 2040. The valid custom-CA connection must carry
-the HTTPS payload, and the expired proxy certificate must fail with an expiry
-log. These checks use the delivered ARM binary, not a host substitute. They do
-not establish every protocol/build-tag feature or sing-box TPROXY on hardware.
-
-nftables must count actual loopback packets and accept socket/TPROXY rules.
-Inserting those expressions is not transparent-proxy forwarding acceptance.
-The default QEMU test uses a Cortex-A7 with 512 MiB. The RAM stage repeats the
-same application acceptance with 256 MiB and `mem=240M`, conservatively
-accounting for the board's low-16-MiB allocation reservation. Neither trial is
-a board memory/performance measurement. Ethernet, cold boot, WAN/LAN routing,
-real Passwall TPROXY, physical clock/NTP service operation,
-persistent filesystems, Wi-Fi and whole-system Y2038 remain separate gates.
-See [the local result](../verification/openwrt-applications-20261012.md).
-
-## Separate RAM packaging
-
-The application archive is too large to embed while keeping the kernel's
-decompressed image/BSS below the low-16-MiB boundary. `make_openwrt_apps_ram.py`
-keeps the accepted raw kernel and its matching rootfs/modules unchanged and
-adds an explicit chosen initrd range to a standalone board DTB. The archive
-starts at `0x04000000`; its maximum compressed budget of 32 MiB ends below the
-unexplained bootloader Bound Addr `0x08e62000`. This conservative placement does
-not resolve the full memory map or establish a hardware boot.
-An interim 36-MiB offline cap had passed memory-layout/QEMU checks, but the
-actual immutable TFTP transport correctly rejected its oversized snapshot
-before device access because the current protocol forbids block-number
-rollover. The cap is restored to 32 MiB; RAM fit alone is insufficient to
-approve a transfer. The 96-MiB expansion cap also remains.
-
-The wrapper verifies the actual 240-MiB QEMU provenance, archive bounds,
-critical board source identities, kernel layout and explicit peripheral-free
-profile. `prepare_ram_boot.py` checks it against the recorded loader identity
-and DDR response. The UART tool loads the kernel and initrd separately and
-requires both device CRCs before sending the one measured `bootm` command.
-Address/profile/provenance mutations and either CRC failure stop the flow.
-
-The output is `artifacts/openwrt-apps-ram1/`, distinct from the native Ethernet
-candidate. It has no board Ethernet/storage/USB or SMP support. The application
-CI runs both memory trials and uploads the wrapper as HARDWARE-UNTESTED. The
-actual local checks and limitations are recorded in the
-[RAM packaging report](../verification/openwrt-apps-ram-offline-20261013.md).
-
-A distinct [applications/Ethernet variant](openwrt-router.md) integrates the
-measured drivers in its own source/build tree and exercises actual netifd/fw4
-forwarding and Passwall TCP/UDP TPROXY in isolated QEMU network namespaces. The
-plain application profile remains peripheral-free; physical integration
-acceptance is still required for the Ethernet variant.
+独立[应用与网口变体](openwrt-router.md)另测 netifd/fw4 和真实 TCP/UDP TPROXY。
+实机与 QEMU、普通应用与完整系统的证据保持区分；
+[历史应用记录](../verification/openwrt-applications-20261012.md)保留其当时范围。

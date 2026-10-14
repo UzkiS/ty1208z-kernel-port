@@ -1,107 +1,54 @@
 # 构建与集成边界
 
-原生应用与网口的独立集成入口为 `make openwrt-router`，它在自己的构建目录引用同一份
-板级驱动、固定应用 feeds 和匹配模块；普通诊断、网口和纯应用镜像仍分别验收。
-实际模拟转发/TCP TPROXY 与实机验收分别记录，见 [集成说明](openwrt-router.md)。
+当前集成系统已经完成 eMMC 安装；仓库同时保留各阶段独立 profile，便于定位与复现。
+profile 的配置限制只约束该 profile，不能据此推断当前完整系统仍停留在早期诊断阶段。
+实测状态见[状态页](../STATUS.md)，逐次证据见[验证索引](../verification/README.md)。
 
-同一仓库保存共同板级依据，并不要求组件同时启用。目录只表示边界，
-验收结果按内核、无线、系统集成分别记录。
+## 源码归属
 
-| 层 | 本仓库内容 | 输入/依赖 | 独立验收 |
-|---|---|---|---|
-| Linux 板级支持 | `overlay/`、内核配置、Linux 补丁生成器 | 固定 Linux 源码、交叉工具链、板级事实 | 编译、内存临时启动、逐项外设测试 |
-| 诊断环境 | `initramfs/`、BusyBox 配置、time64 probe | ARM 用户空间、现代内核系统调用 | QEMU 启动、shell、2040 年读写 |
-| Wi-Fi，可选 | 独立来源锁、API 补丁、`wifi/overlay/`、`make wifi-usb-audit`/`make wifi-port` | 真实芯片 ID、独立配置下的目标内核、相应驱动/固件 | USB 对象和完整模块已本地编译；扫描、联网、AP 分别验收 |
-| 官方 OpenWrt 集成 | `openwrt/` 独立 RAM target、来源锁及原生构建入口 | 板级补丁、原生工具链/用户空间、固定应用 feeds | 原生镜像、QEMU time64、网络、防火墙、Passwall、DNS 与性能 |
+| 层 | 维护入口 | 依赖与边界 |
+|---|---|---|
+| Linux 板级支持 | `overlay/`、`config/`、补丁生成器 | 固定 Linux 源码；新增文件以 overlay 为准，现有上游文件由检查锚点的生成器修改 |
+| 诊断用户空间 | `initramfs/`、BusyBox 配置、time64 probe | 普通 Linux 诊断独立于 OpenWrt feeds |
+| RDA 无线 | `wifi/overlay/`、`wifi/replacements/`、`wifi/Kbuild` | 固定驱动来源；不混入板级 overlay，模块必须匹配实际内核 ABI |
+| 官方 OpenWrt | `openwrt/` | 原生 GCC/musl、固定 feeds，引用同一份板级和 BusyBox 补丁 |
+| 完整系统与安装 | `openwrt/system/`、`tools/build_native_system.py` 等 | 组合已验收组件，生成本机构建的 APK/模块及私有安装输入 |
 
-Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线配置。
-`make ram768` 单独构建低 768 MiB 内存压力测试及已测 MV100 重启门禁；
-启动前必须核对本次引导器的完整分配表，见 [内存实验](ram.md)。
-`make sd-audit` 单独观察板载 TF 控制器与 CRG39/LDO，关闭 MMC/BLOCK；
-它与 eMMC 的识别、读取候选分开验收，见 [SD/TF](sd.md)。
-`make emmc-audit` 和 `make emmc-ident` 使用各自内核输出目录；前者只读寄存器且
-关闭 MMC，后者通过受限 PIO 请求识别卡且关闭块设备。两者均不进入普通 diag1。
-`make emmc-ro-compile` 单独编译用户区只读块支持和实际请求/块核心回归；
-它不输出镜像。`make emmc-ro` 另建低256 RAM-root 镜像，只有精确用户区只读、
-已测分区、ext4 ro,noload 与独立 shutdown/restart 配置可通过 RAM 规划器；
-编译/模拟及独立实机块/文件系统/关闭/命令重启/原系统恢复已通过；
-原生存储整合、完整备份和可写存储仍待完成，详见 [eMMC](emmc.md)。
-`make ethernet-audit` 另用独立配置/输出目录，只观察固定时钟/复位状态，并在
-继承状态符合条件时通过 MDIO 读取 PHY ID；关闭 NET、debugfs 和存储，不进入普通诊断。
-`make ethernet-clock-id` 单独验证暂时启用已实测的 MAC 时钟位、读取 PHY ID 并恢复；
-它有自己的设备树、配置、身份和验收，不属于只读寄存器观察，也不启动网口 DMA。
-`make usb-audit` 单独只读观察 host0 时钟/PHY 控制和 SYSID0；仅在继承状态符合
-来源条件时读取 EHCI/OHCI capability，不启用 USB 栈、不进行设备事务或控制写入。
-它有独立配置、产物和验收，见 [USB](usb.md)。
-`make restart` 单独验证 SP805 显式系统重启；启动时仅检查真实硬件 ID/禁用状态，
-仅在系统重启回调中写复位寄存器，不提供看门狗服务。严格 SP805 ID 候选仍未通过
-本机验证；原生 router 的精确临时模块已通过命令重启及自动重新加载 RAM 系统，
-见 [restart](restart.md)。SD 只读临时模块也能在该 router 中测量并卸载，
-无需切换镜像。
-`make sd-ident` 的独立 PIO/metadata/restart 候选已识别本机 SDHC，
-并通过命令重启自动返回；当前原生 router 的 MMC/BLOCK 仍关闭，
-生产系统的块设备/文件系统整合尚未完成。
-`make sd-ro` 在独立身份下启用块设备和受限只读文件系统；队列门禁继续拒绝卡
-写入。本机已完成块读取及 VFAT 文件读取/卸载，并自动返回原生 router。
-`make openwrt-router-sdro` 是另一个显式原生 SD/较大内存入口；它复用同一受限
-SD 策略，并在独立构建树中整合中文应用和网卡。实际配置依赖、镜像校验及
-新引导器分配证据单独检查，普通 router 仍关闭存储；
-[实机边界](../verification/openwrt-sdro-board-20261014.md)。
-`make openwrt-router-emmcro` 在独立低256构建树中整合已测 eMMC 用户区只读策略、
-网口和中文应用；它有内置控制器关闭/重启，完整电脑端备份工具另行核对实际 FDT、
-分区、只读标志和未挂载状态。原生块/ext4 读取、网口、完整用户区备份、
-内置关闭/命令重启及原中文系统/配置恢复均已实测，见 [eMMC](emmc.md)。
-`make wifi-usb-audit` 使用单独的内核输出目录和配置，不改变诊断镜像；目前只编译
-`wland_usb.o`，不链接模块、不加载固件。来源锁与适配范围见 [Wi-Fi 说明](wifi.md)。
-`make wifi-port` 另行编译完整模块并执行制造入口/密钥回归；同样不改变诊断镜像，
-不加载模块，不下载固件。无线新增 header 在 `wifi/overlay/`，与 Linux 板级文件分开。
-之后 OpenWrt 集成应引用固定版本的内核补丁，不能修改上层服务时暗中
-改变板级驱动。Wi-Fi 可关闭而不影响有线网络；未来可以在目标配置中选择它。
+`config/sources.lock.json`、`openwrt/sources.lock.json` 和各层来源锁记录版本、URL 与哈希。
+`tools/make_kernel_patch.py`、`tools/make_busybox_patch.py` 以及无线补丁生成器生成可审查结果；
+`patches/` 不单独维护一份不同实现。厂商参考通过 `tools/fetch_references.py` 获取，
+只提交来源和哈希，不提交完整 SDK、固件或下载源码。
 
-主线已有的无线驱动通过 Kconfig 选择，不再复制一份源码。只有确实需要外置
-驱动时才另设包和版本锁定。其 `.ko` 仍需与目标内核 ABI 一致，这一依赖不会
-因为拆分仓库而消失。与现有 Hinas 用户空间的兼容验证也是独立阶段。
+## 构建入口
 
-原生 target 与 Passwall 集成边界见 [OpenWrt/Kwrt](openwrt.md)，网口主线复用与
-内部 PHY/时钟待验证条件见 [Ethernet](ethernet.md)。原生 RAM target 已通过配置解析、
-OpenWrt 通用补丁叠加、完整原生 GCC/musl 镜像构建及核心用户空间 QEMU time64。
-新内核的基本网口收发已有[实机验收](../verification/ethernet-net-20261012.md)，
-原生 OpenWrt 的独立网口镜像也已完成 RAM 启动、DHCP、双向 TCP 和网线重连；
-时钟与驱动计数的实测边界见[实机记录](../verification/openwrt-ethernet-board-20261013.md)。
-完整路由、无线和持久安装仍需分别验证。
+| 命令 | 产物范围 |
+|---|---|
+| `make build` / `make verify` | 最小单核、低256诊断；关闭存储与网络，不是完整系统 |
+| `make emmc-audit` / `emmc-ident` / `emmc-read` / `emmc-ro` | eMMC 寄存器、识别、固定读取和只读块实验，依次独立 |
+| `make sd-audit` / `sd-ident` / `sd-ro` | 独立 SD 控制器审计、识别和强制只读读取 |
+| `make ethernet-audit` / `ethernet-clock-id` / `ethernet-net` | 网口寄存器、临时时钟/PHY-ID 和继承 PHY 状态的数据通路 |
+| `make usb-audit` / `usb-clock-audit` / `usb-host` | USB 只读审计、时钟能力测量和 host0 枚举 |
+| `make wifi-usb-audit` / `wifi-port` / `openwrt-wifi-port` | USB 单对象、完整模块和原生 APK 编译 |
+| `make openwrt-ram` / `openwrt-net` | 原生最小 RAM 系统与独立网口系统 |
+| `make openwrt-applications` / `openwrt-app-ram` / `openwrt-router` | 应用 QEMU、独立应用 RAM 包和应用/网口集成 |
+| `make ram768` / `openwrt-router768` | 独立较大内存诊断与原生内存/网口集成 |
+| `make openwrt-router-sdro` / `openwrt-router-emmcro` | 各自独立的只读 SD/eMMC 原生系统 |
+| `make openwrt-container-packages` / `openwrt-container-qemu` / `openwrt-container-applications` | 容器编译、隔离运行与应用组合 QEMU 验证 |
+| `make openwrt-system` | 组合内存、网口、只读存储、原生应用和 Docker 的 RAM 开发系统 |
+| `make openwrt-first-install` | 使用预先准备的精确内核和根文件系统生成私有紧凑首刷包 |
 
-## 源码与产物
+多数原生命令使用 `TASKBASE=/absolute/linux/build-root`，并先完成 `make openwrt-toolchain`。
+各入口的源码、配置、身份和输出目录相互隔离。完整系统与持久候选的后续打包参数见
+[系统说明](../openwrt/system/README.md)。
 
-`make openwrt-system` 现将已测的大内存、网口、只读 eMMC/SD 与原生应用和 Docker
-组合为单一 RAM 系统。实机小容器已通过资源限制读回、seccomp、DNS 和物理网口
-HTTP；双控制器停止后可命令重启并恢复原中文系统。构建入口和最终安装边界见
-[系统说明](../openwrt/system/README.md) 与 [实机记录](../verification/openwrt-system-board-20261014.md)。
-后续软件包登记、受限 p6/p9 写入、无线 STA/AP、紧凑网页首刷和完整在线扩容已完成。
-当前持久系统与原生升级状态见[安装说明](installation-plan.md)；早期独立 profile 的边界不变。
+## 验证与输出
 
-`make ethernet-net` 是独立的有线网口 RAM 实验入口：启用上游 FEMAC/MDIO、
-专用 MV100 初始化和保留状态的 FESTAv220 驱动，但关闭存储、USB、模块与 SMP。
-它有独立设备树、配置、BusyBox 网络工具、构建目录和 RAM 启动校验，不会改变
-默认诊断镜像或 OpenWrt 应用构建。完整 PHY 冷启动和实机收发按网口验收单独记录。
+独立 profile 保留自己的 DT、Kconfig、内核/rootfs 身份和检查结果。
+RAM 规划器验证实测加载地址、解压范围与设备 CRC；低768 profile 还要求紧邻重启的
+完整十一项 allocation 及新引导检查，不能由 `ddrfree` 推断安全内存。
 
+QEMU 验证通用内核、原生服务、time64 与虚拟网络；控制器、PHY、固件和真实 RAM 边界
+由实机报告证明。已经通过且未改变的组件复用既有证据，只检查改变的集成边界。
 
-- `config/sources.lock.json` 是下载版本、URL、哈希与已观察工具链的记录。
-- `openwrt/` 维护原生集成；引用板级及 BusyBox time64 补丁，不复制驱动源码。
-- `overlay/` 是新增 Linux 文件的唯一维护入口。
-- `tools/make_kernel_patch.py` 从已校验的原版压缩包生成新增和修改文件的补丁。
-- `tools/make_busybox_patch.py` 从原版 BusyBox 生成时间输出修复。
-- `reference/wifi-rda-usb.lock.json` 固定可选 RDA 来源与逐文件哈希；下载器不下载固件。
-- `wifi/Kbuild` 维护共享模块对象列表；`openwrt/wifi-port/` 只负责独立原生
-  OpenWrt 编译/打包入口，引用同一来源锁和生成补丁，不与普通诊断/路由镜像
-  同时启用。它使用原生 Linux 6.12 cfg80211，并排除 OpenWrt backports；
-  目标内核 ABI、实际 APK 与实机无线分别验收，见 [说明](openwrt-wifi.md)。
-- `tools/make_wifi_usb_patch.py` 生成单独的 USB API 审计补丁。
-- `tools/make_wifi_port_patch.py` 从锁定来源生成完整模块补丁；无线新增文件在
-  `wifi/overlay/`，现有控制协议函数的替换实现维护在 `wifi/replacements/`。
-- `patches/` 提交可审查的生成结果；CI 再生成并要求 Git 无差异。
-- `reference/` 提交来源清单，`reference/sdk/` 下载内容被忽略。
-- `evidence/` 保留本地固件解析结果，避免把用户原固件内容发布到仓库。
-- `.work/`、`artifacts/`、`logs/` 是可重新生成的本地文件。
-
-不保存整个 Linux/OpenWrt 源码树，不引入 Git 子模块。需要贡献给上游时，
-再建立对应 fork 和适合其审查规则的分支。
+`.work/`、`artifacts/`、`reference/sdk/` 与本地证据不作为源码交付；
+构建命令不自动连接设备。安装包、RAM 包和 QEMU 产物严格区分，不能互相替代。

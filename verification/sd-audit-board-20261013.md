@@ -1,4 +1,6 @@
-# Onboard SD controller command-free physical audit
+# SD 无卡命令寄存器实测（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Date: 2026-10-13 UTC. This is a register observation, not SD card acceptance.
 The exact Chinese native RAM router remained running throughout; no reboot,

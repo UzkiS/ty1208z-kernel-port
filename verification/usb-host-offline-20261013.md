@@ -1,4 +1,6 @@
-# USB host0 enumeration image: offline acceptance
+# USB host0 枚举镜像离线验证（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Update: the later [physical clock/capability experiment](usb-clock-audit-board-20261013.md)
 passed and its measurements were reviewed. The exact enumeration profile now

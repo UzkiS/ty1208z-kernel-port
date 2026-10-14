@@ -27,19 +27,19 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class NetworkTests(unittest.TestCase):
     def test_addresses_and_environment_are_not_shell_text(self):
-        self.assertEqual(network_addresses("10.0.0.121", "10.0.0.116"),
-                         ("10.0.0.121", "10.0.0.116"))
-        for host, board in (("10.0.0.121", "10.1.0.116"), ("10.0.0.1", "10.0.0.1"),
-                            ("10.0.0.1", "10.0.0.0"), ("10.0.0.1", "10.0.0.255"),
-                            ("169.254.1.1", "169.254.1.2"), ("10.0.0.1;reset", "10.0.0.2")):
+        self.assertEqual(network_addresses("192.0.2.10", "192.0.2.20"),
+                         ("192.0.2.10", "192.0.2.20"))
+        for host, board in (("192.0.2.10", "198.51.100.20"), ("192.0.2.1", "192.0.2.1"),
+                            ("192.0.2.1", "192.0.2.0"), ("192.0.2.1", "192.0.2.255"),
+                            ("169.254.1.1", "169.254.1.2"), ("192.0.2.1;reset", "192.0.2.2")):
             with self.subTest(host=host, board=board), self.assertRaises(ValueError):
                 network_addresses(host, board)
-        valid = (b'ipaddr=192.168.1.10\r\nserverip=192.168.1.1\r\n'
+        valid = (b'ipaddr=198.51.100.20\r\nserverip=198.51.100.10\r\n'
                  b'netmask=255.255.255.0\r\n## Error: "autostart" not defined\r\n')
         self.assertIsNone(environment(valid)["autostart"])
-        for reply in (valid.replace(b"192.168.1.10", b"1;saveenv"),
-                      valid + b"ipaddr=10.0.0.1\r\n", valid.replace(b'not defined', b'unknown'),
-                      valid.replace(b"192.168.1.10", b"\xff")):
+        for reply in (valid.replace(b"198.51.100.20", b"1;saveenv"),
+                      valid + b"ipaddr=192.0.2.1\r\n", valid.replace(b'not defined', b'unknown'),
+                      valid.replace(b"198.51.100.20", b"\xff")):
             with self.subTest(reply=reply), self.assertRaises(TransferError):
                 environment(reply)
 
@@ -50,7 +50,7 @@ class NetworkTests(unittest.TestCase):
             def command(self, _):
                 raise AssertionError("Restore must not write to unknown console state")
 
-        network = TemporaryTftpNetwork(LostConsole(), "10.0.0.121", "10.0.0.116")
+        network = TemporaryTftpNetwork(LostConsole(), "192.0.2.10", "192.0.2.20")
         network.active = True
         network.restore()
         self.assertFalse(network.restored)
@@ -64,7 +64,7 @@ class BootTests(unittest.TestCase):
         self.assertIsNotNone(shutil.which("curl"))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            original = {"ipaddr": "192.168.1.10", "serverip": "192.168.1.1",
+            original = {"ipaddr": "198.51.100.20", "serverip": "198.51.100.10",
                         "netmask": "255.255.255.0", "autostart": autostart}
             settings = dict(original)
             artifacts = ROOT / "artifacts/diag1"
@@ -145,7 +145,7 @@ class BootTests(unittest.TestCase):
                         elif command == "printenv ipaddr serverip netmask autostart":
                             response = dict(settings)
                             if mode == "restore-mismatch" and downloaded and settings == original:
-                                response["serverip"] = "10.0.0.9"
+                                response["serverip"] = "192.0.2.99"
                             reply(b"\r\n".join((f'{name}={value}' if value is not None else
                                                  f'## Error: "{name}" not defined').encode()
                                                 for name, value in response.items()))

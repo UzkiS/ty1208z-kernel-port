@@ -1,46 +1,32 @@
-# Native OpenWrt RDA package experiment
+# 原生 OpenWrt RDA 模块与 APK
 
-`make openwrt-wifi-port` compiles the optional RDA USB driver through native
-OpenWrt Kbuild and creates a real APK in its own build tree. Run
-`make openwrt-toolchain` first. The entry reuses only the fixed native
-GCC 14.3/musl toolchain, verified pinned source files and the same generated
-driver patches as `make wifi-port`. The shared module object list belongs to
-`wifi/Kbuild`. No firmware is fetched or packaged.
+板载 RDA5995 的实际 STA/AP 集成已通过，见[无线说明](wifi.md)和
+[无线报告](../verification/rda-wireless-board-20261014.md)。
+本页说明保留的独立编译/打包入口，其产物本身不包含启动或安装镜像。
 
-The ordinary diagnostic, Ethernet and application/router trees stay separate.
-This entry delivers compile/package artifacts under `artifacts/openwrt-wifi-port`,
-with no boot image or automatic module loading. It does not install the package,
-touch the box or establish a working Wi-Fi interface.
+先执行 `make openwrt-toolchain`，再执行 `make openwrt-wifi-port`。
+输出 `artifacts/openwrt-wifi-port/` 使用固定 GCC 14.3/musl、
+固定 RDA 文件和与 `make wifi-port` 相同的生成补丁；
+共享对象列表维护于 `wifi/Kbuild`。该入口不获取固件、不自动装包或加载模块。
 
-## cfg80211 ownership
+## cfg80211 与 ABI
 
-The locked OpenWrt `kmod-cfg80211` package uses wireless backports 6.18.55.
-The existing RDA port targets native Linux 6.12 cfg80211. This experiment
-therefore enables native `CONFIG_CFG80211=y` and USB in an independent kernel,
-and explicitly excludes the backports cfg80211/mac80211 packages. Mixing the
-two stacks or copying a module from the standalone kernel is unsupported.
+固定 OpenWrt `kmod-cfg80211` 使用 backports 6.18.55，
+而 RDA 适配针对原生 Linux 6.12 cfg80211。
+独立内核选择 `CONFIG_CFG80211=y` 和 USB，明确排除 backports cfg80211/mac80211。
+不得混用这两套栈，也不得复制独立 Linux 的模块。
 
-The package has an exact dependency on its own native kernel/config ABI.
-The checker reads the actual UTS release, kernel ABI hash, exported symbols,
-ARM module/vermagic/USB alias, and APK metadata and extracted files. It compares
-the packaged module with the actual linked module after OpenWrt's stripping
-step. No module-load/firmware hooks or firmware/autoload files are allowed;
-only standard OpenWrt package wrappers and the generated file inventory remain.
-Extraction does not install or execute scripts.
+检查器读取实际 UTS release、ABI hash、导出符号、
+ARM ELF/vermagic/USB alias、APK 元数据和解包清单，
+比较 strip 后的包内模块与本次真实模块。
+包依赖精确 kernel/config ABI；独立编译包不含 firmware/autoload 或加载钩子。
+解包检查不执行安装脚本。
 
-Host controllers, storage, debugfs and SMP are disabled in this compile
-experiment. A later bootable integration needs its own measured USB profile,
-kernel/config/modules and RAM resource acceptance.
+回归拒绝错误内核版本/ABI、空 kmod、过期模块、未审查固件及自动激活。
+独立 compile profile 关闭 host controller、存储、debugfs 和 SMP，
+与完整系统的可启动无线 profile 分开。
+早期 named-iovar 初始化阻碍是历史阶段，不能据此描述当前无线仍不可用。
 
-## Acceptance boundaries
-
-The actual-APK regression rejects another kernel release/config ABI, an empty
-kmod, stale module release, unreviewed firmware and automatic activation.
-The independent CI workflow rebuilds the pinned native compiler and package
-from a fresh checkout and uploads COMPILE-ONLY artifacts. Its actual outcome
-is recorded separately from local builds.
-
-RDA interface startup still fails on unsupported named roaming/capability
-transactions. Chip revision, firmware transfer, scanning, association, AP and
-performance remain unverified. Returning fabricated firmware capabilities or
-success is not an acceptable replacement for measured protocol behavior.
+最终系统使用匹配本次内核的 APK、私有原厂固件和 netifd/LuCI 适配。
+固件许可未确认为可再分发，公开源码仓库不附带固件；
+不允许用假成功或伪造 capability 替代设备响应。

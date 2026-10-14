@@ -1,4 +1,6 @@
-# Integrated native OpenWrt: physical Docker acceptance
+# 完整 RAM 系统与物理 Docker 实测（2026-10-14）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 The single RAM system physically runs the native ARMv7 Docker 29.6.1 daemon
 and a small container through OpenWrt procd, overlay2, cgroup v2 and default

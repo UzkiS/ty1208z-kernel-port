@@ -1,4 +1,6 @@
-# Guarded USB host0 clock/capability experiment
+# USB 时钟与能力候选离线验证（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Date: 2026-10-13. Offline build and emulation acceptance only. This candidate
 has not yet run on the TY1208Z. USB enumeration, RDA firmware, Wi-Fi STA/AP

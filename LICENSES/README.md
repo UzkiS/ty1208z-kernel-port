@@ -1,32 +1,24 @@
-# Licenses and sources
+# 许可与第三方来源
 
-This repository is not relicensed under a single blanket license.
+本仓库按文件来源保留各自许可，不用单一许可覆盖所有内容。
 
-- New Linux board/timer/DTS files in `overlay/` and wireless helpers in
-  `wifi/overlay/` use **GPL-2.0-only**, as stated by
-  their SPDX headers. Generated Linux patches retain upstream licensing.
-- BusyBox's `coreutils/stat.c` declares **GPL-2.0-or-later**. Its generated patch
-  follows that licensing. The complete BusyBox source/license is obtained from
-  the pinned archive in `config/sources.lock.json`.
-- `tools/time64-probe.c` uses **MIT**. Other project Python/shell/build scripts,
-  diagnostic shell scripts and CI files use **MIT**, with the license text below.
-- Project documentation and configuration use **MIT** unless otherwise marked.
-- Project control-protocol replacements in `wifi/replacements/` use **ISC**,
-  matching the surrounding vendor source; see [ISC.txt](ISC.txt). Generated
-  patches retain the original Rdamicro permission notices.
-- Vendor references are fetched from a pinned public SDK commit with per-file
-  hashes. They keep their original licenses (including GPL and Apache notices).
-  Downloaded reference files are not redistributed by this Git repository.
-- Original device firmware, bootloader binaries and extracted DTBs remain local.
-- Optional RDA source files retain their Rdamicro permission notices and module
-  GPL declaration. Checked patches preserve those notices; the locked original
-  code is fetched locally rather than vendored. No vendor firmware is fetched
-  or redistributed by the Wi-Fi build.
+- `overlay/` 的新增Linux板级/定时器/DTS文件和 `wifi/overlay/` helper按
+  SPDX使用 **GPL-2.0-only**；生成Linux补丁保留上游许可。
+- BusyBox `coreutils/stat.c` 使用 **GPL-2.0-or-later**，生成补丁遵循原许可。
+  完整源码/许可从 `config/sources.lock.json` 固定归档取得。
+- `tools/time64-probe.c`、项目自有Python/shell/构建/诊断/CI脚本、
+  文档和配置使用 **MIT**，另有说明的除外；正式许可原文保留在下方。
+- `wifi/replacements/` 的控制协议替换使用 **ISC**，与周围厂商源码一致，
+  见 [ISC.txt](ISC.txt)。生成补丁保留Rdamicro许可声明。
+- 厂商参考从固定公开SDK提交按逐文件哈希获取，保留GPL/Apache等原许可；
+  下载内容不由本Git仓库重新分发。
+- 可选RDA代码保留Rdamicro许可和模块GPL声明，代码从锁定来源本地获取。
+  Wi-Fi构建不下载或重新分发厂商固件。
+- 原设备固件、bootloader二进制、提取DTB、备份和含私有固件的完整镜像保持本地。
 
-Upstream source locks and patch generators ship with each local/CI diagnostic
-artifact. No ready-to-install binary release is published by this project.
+本地/CI诊断产物附带源码锁和补丁生成器；本项目当前没有公开的完整可安装二进制发布。
 
-## MIT license for project-owned scripts/docs/configuration
+## 项目自有脚本、文档和配置的 MIT 许可原文
 
 Copyright (c) 2026 UzkiS
 

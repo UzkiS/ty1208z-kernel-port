@@ -1,4 +1,6 @@
-# Fixed eMMC read samples — RAM diagnostic
+# eMMC 四个固定扇区读取（2026-10-12）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Date: 2026-10-12. No flashing, persistent environment changes, mounting,
 card-setting writes, data writes, erase, OTP/eFuse or security-state writes.

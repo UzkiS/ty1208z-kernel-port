@@ -1,4 +1,6 @@
-# RDA unsupported operations and AP-stop ordering, 2026-10-13
+# RDA 不支持操作与 AP 停止顺序（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 The later [startup rollback report](wifi-startup-20261013.md) supersedes the
 module identity below and records the active initialization blocker.

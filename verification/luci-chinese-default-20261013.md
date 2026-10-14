@@ -1,6 +1,8 @@
-# Simplified Chinese application/router default
+# 简体中文与空密码默认配置（2026-10-13）
 
-The user requested Chinese as the default in future builds. The shared
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
+
+Simplified Chinese is the image default. The shared
 application configuration now selects `LUCI_LANG_zh_Hans` and the LuCI base,
 firewall and Passwall `zh-cn` packages. Feed installation explicitly includes
 the base/firewall translations. A reviewed first-boot UCI script sets

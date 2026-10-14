@@ -1,4 +1,6 @@
-# USB host0 and RDA physical enumeration
+# USB host0 与 RDA 枚举实测（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Date: 2026-10-13. The exact independent `usb-host1` RAM candidate booted on
 TY1208Z following the [physical capability audit](usb-clock-audit-board-20261013.md).

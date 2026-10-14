@@ -1,4 +1,6 @@
-# Restricted eMMC identification — hardware acceptance
+# eMMC 受限卡识别实测（2026-10-12）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Date: 2026-10-12. The installed CA bootloader and Hinas were preserved.
 Only a RAM candidate was transferred and started; no flash, environment,

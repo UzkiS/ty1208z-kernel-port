@@ -1,4 +1,6 @@
-# Complete diagnostic CI including command-free SD audit
+# 含 SD 只读审计的诊断 CI（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 The [diagnostic run 38425001836](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38425001836)
 completed successfully on `7c4b816fd9de593e4a55d08c4756a839017a18e8`.

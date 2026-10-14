@@ -1,4 +1,6 @@
-# Inherited-PHY Ethernet RAM candidate: offline acceptance
+# 独立有线 RAM 候选离线验证（2026-10-12）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Date: 2026-10-12. This records build/emulation checks; separate [physical
 Ethernet acceptance](ethernet-net-20261012.md) identifies the booted image

@@ -1,4 +1,6 @@
-# Serial CLI validation — 2026-10-12
+# 串口 CLI 离线验证（2026-10-12）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Scope: replace routine HiTool terminal/logging with a receive-only command-line
 tool. No board commands, reboots, flashing or persistent boot changes were sent

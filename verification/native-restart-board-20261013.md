@@ -1,7 +1,9 @@
-# Native OpenWrt command-restart physical acceptance
+# 原生 RAM 系统命令重启实测（2026-10-13）
 
-2026-10-13: the user requested command reboots so repeated RAM experiments no
-longer require them to remain at the box. One graceful native OpenWrt `reboot`
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
+
+2026-10-13: autonomous command restart and RAM-system return were tested.
+One graceful native OpenWrt `reboot`
 physically returned to Boot ROM/DDR training/CA Fastboot; the exclusive COM9
 tool stopped autoboot and completed fresh read-only loader inspection. The
 same router kernel/initrd then passed separate TFTP filesize/device-CRC gates,

@@ -1,4 +1,6 @@
-# RDA STA/AP association-frame parsing
+# RDA STA/AP 关联帧边界与所有权（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Date: 2026-10-13. Source, actual-function sanitizer and standalone/native
 compile acceptance only. USB enumeration, firmware, scan, association and AP

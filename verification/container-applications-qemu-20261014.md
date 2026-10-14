@@ -1,4 +1,6 @@
-# Native Docker, fw4 and Passwall combined QEMU acceptance
+# Docker、fw4 与 Passwall 组合 QEMU 验收（2026-10-14）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 2026-10-14: one independent native OpenWrt source/kernel/rootfs now passes real
 Docker, procd, firewall4 and both installed Passwall cores together in isolated

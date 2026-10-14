@@ -1,88 +1,79 @@
-# Integrated native RAM system
+# 原生 OpenWrt 系统集成
 
-The board kernel combines measured low-768-MiB memory, native Ethernet,
-request-level read-only SD/eMMC, Docker kernel support and a restart handler
-that requires both controllers to be quiescent. The native userspace includes
-Chinese LuCI, an empty root password, Passwall with Xray and sing-box, unzip,
-Docker and Chinese Dockerman. RDA5995 WPA2 client and AP operation, netifd
-role switching and the RDA LuCI form now pass their integration checks.
-Storage writes and persistent installation remain unfinished.
+本目录维护 TY1208Z CA 的系统组合：单核、低768内存、网口、SD/eMMC、Docker、
+中文 LuCI、Passwall 双核心、unzip 和 RDA 无线。**持久安装、在线扩容、原生网页升级及
+普通重启已通过实机验证**，见[当前状态](../../STATUS.md)和[安装说明](../../docs/installation-plan.md)。
 
-Build the pinned native toolchain, `openwrt-router-emmcro` userspace and
-`openwrt-container-applications` userspace first. Their accepted application
-evidence is reused. On Linux, the integration entry is:
+## RAM 开发系统
+
+先完成固定原生工具链、`openwrt-router-emmcro` 和
+`openwrt-container-applications` 用户空间，再执行：
 
 ```sh
 make openwrt-system TASKBASE=/path/to/existing/taskbase
 ```
 
-The build tool reads the native source from
-`TASKBASE/router-emmc/build/openwrt-ram-<pinned-commit>`; `--native-source`
-can select another explicit baseline. `openwrt/system/kernel.config` records
-the exact configuration delta. The existing native compiler is checked by
-`toolchain_from_native`; no foreign target modules are used. The tools work
-only on build directories and artifacts and never access a physical device.
+默认读取 `TASKBASE/router-emmc/build/openwrt-ram-<pinned-commit>`；
+`--native-source` 可指定已有基线。`kernel.config` 维护系统内核配置差异，
+`toolchain_from_native` 核对实际编译器。所有模块来自本次内核，不能混用其他 target。
 
-The packager places the matching modules directly under
-`/lib/modules/6.12.112/`, because OpenWrt ubox kmodloader does not recurse into
-`kernel/`. The bootstrap fits the measured transfer/expansion limits; an SSH
-stream supplies the larger userspace supplement. Its first-boot defaults add
-the single DHCP interface `probe` to WAN, Docker's zone and Docker-to-WAN
-forwarding. The physical check used these UCI settings on the running board.
+RAM 开发 profile 保持 SD/eMMC 请求级只读；bootstrap 在已测传输和展开预算内，
+较大用户空间由 SSH supplement 提供。模块直接放在 `/lib/modules/6.12.112/`，
+因为 ubox kmodloader 不递归 `kernel/`。离线 APK 事务登记包与所有模块的归属。
+首次默认配置将 DHCP 接口 `probe` 加入 WAN，并建立 Docker 区域及 Docker → WAN 转发。
 
-`--resume` reuses an inspected build directory. Packaging refuses a completed
-output instead of silently replacing its delivery manifest; choose a fresh
-`--output`/`--work` when retaining a completed artifact. The supplement now uses
-a real offline APK transaction, with every module owned by a package from this
-exact board build. It remains a RAM development delivery, not an installable
-image. Booting requires fresh guarded-restart allocation
-evidence, both board CRCs and the exact `system` profile. See the
-[physical report](../../verification/openwrt-system-board-20261014.md) and
-[wireless report](../../verification/rda-wireless-board-20261014.md).
+`--resume` 只复用已经检查的构建目录；保留已完成产物时使用新的 `--work`/
+`--output`，打包器拒绝覆盖完整交付清单。构建工具不连接物理设备。
+RAM 启动仍要求精确 `system` profile、新引导分配表和双设备 CRC；
+RAM 包本身不作为持久安装包。早期验收见[系统 RAM 报告](../../verification/openwrt-system-board-20261014.md)。
 
-`wireless/rda.sh` owns the one radio's daemon and module lifetime. It loads
-the STA or AP firmware from user space, rather than re-enumerating USB while
-cfg80211 holds RTNL. Supported settings are one AP or routed STA, 2.4 GHz,
-HT20/legacy, open or WPA2-PSK/CCMP, and a fixed AP channel. The radio defaults
-to disabled and contains no private test credentials. Checked transformations
-in `tools/luci_rda_wireless.py` and `tools/netifd_wireless_eof.py` adapt the pinned
-official UI and terminate handler discovery at EOF. Original vendor firmware
-comes from the user's private backup and must not be redistributed.
+## 无线与管理
 
-The separate `build_native_system.py --persistent-candidate` build uses an
-independent output tree and permits only measured p6/p9 sector writes.
-`prepare_native_disk_root.py` creates the private full ext4 p9 and disk-root
-uImage from those exact kernel/APK files; it never opens a device.
-The ordinary RAM profile rejects this write-capable kernel. Only explicit
-authorized installation mode may load it. The default invocation of
-`probe_native_emmc_write.py` prints a one-sector write/readback/restore plan;
-`--apply` is reserved for specific user storage-write authorization.
-See [installation preparation](../../docs/installation-plan.md).
+`wireless/rda.sh` 管理单个无线接口的进程、模块和固件切换。
+角色切换在用户空间完成，避免在 cfg80211 持有 RTNL 时重枚举 USB。
+支持一个 AP 或路由型 STA、2.4 GHz、HT20/legacy、开放或 WPA2-PSK/CCMP、
+固定 AP 信道；无线默认关闭。不支持桥接 STA、mesh、WPA3、TKIP 或多接口。
 
-The specifically authorized last-sector probe now passes on the board, with
-the original content restored and an automatic return to the readonly RAM
-system/configuration; [physical report](../../verification/native-emmc-write-board-20261014.md).
-The candidate exposes a page-sized block queue while upstream MMC data preparation
-still trims every transfer to one sector. `install_native_emmc.py` defaults to
-a verified offline plan, writes only fixed p9 then p6 under separately authorized
-`--apply`, clears the block cache for SHA-256 readback and relocks each partition.
-Its `--mode restore` streams only the original backed-up p9 range and p6 payload.
-Full installation, recovery writes and disk-root boot remain unaccepted.
+`tools/luci_rda_wireless.py` 对固定官方 LuCI 表单作检查式适配；
+`tools/netifd_wireless_eof.py` 修复 handler discovery 的 EOF 循环。
+STA、AP 与角色切换的具体版本边界见[无线报告](../../verification/rda-wireless-board-20261014.md)。
+RDA 固件来自私有原厂备份，未纳入公开仓库；完整私有镜像不能直接公开发布。
 
-## Official web sysupgrade
+## 持久候选与恢复工具
 
-The persistent candidate installs `ty1208z-upgrade` as a real APK. It supplies the board's `/lib/upgrade/platform.sh`, so the standard LuCI **System → Backup / Flash Firmware** page and `/sbin/sysupgrade` validation path are used. Uploads are metadata checked, bound to the measured p6/p9 layout, and rejected before any write when the board, uImage CRC, root archive or free-space check differs. Stage2 pivots to RAM, verifies that no process, namespace, loop device or swap still references p9, then stages the new root on p9 and updates p6 with exact readback before the official reboot.
+`build_native_system.py --persistent-candidate` 使用独立输出树，只允许已测 p6/p9 范围。
+`prepare_native_disk_root.py` 用精确内核和 APK 生成私有 ext4 p9 与 disk-root uImage，
+只处理文件。普通只读 RAM 规划器拒绝这种可写内核。
 
-The firmware archive contains only managed system paths. `/opt` (including Docker's `/opt/docker`), `/root`, `/home`, `/mnt` and `/srv` remain on p9 and are never replaced by the archive. LuCI's **Keep settings** choice restores the trusted configuration backup into the staged `/etc`; cancelling it resets configuration to image defaults while keeping data directories. An incomplete transaction leaves a receipt for recovery instead of silently deleting the old root.
+`probe_native_emmc_write.py` 默认输出单扇区写入/读回/恢复计划；
+`install_native_emmc.py` 默认生成离线校验计划。`--apply` 会实际操作存储，
+应只用于已建立备份、恢复条件和精确设备身份的安装。
+安装器先 p9 后 p6，清块缓存后作 SHA-256 读回，再锁回只读；
+`--mode restore` 仅恢复备份对应的 p9 范围和 p6 内容。
+单扇区恢复、紧凑安装和 eMMC 根启动已实测；完整原系统写回恢复没有重复实测。
 
-## Compact RAM first installation
+## 官方网页升级
 
-`make openwrt-first-install` builds a private first-install image from an existing
-upgraded root and the exact disk-root kernel. Set `NATIVE_SOURCE`, `UPGRADED_ROOT`,
-`DISK_ROOT` and `OUTPUT` when those prepared inputs use other directories.
-The accompanying `ty1208z-first-install` APK is only for the temporary RAM system;
-it enables the same official LuCI upload and sysupgrade/stage2 path for first use.
-This image writes a 1-GiB ext4 p9, verifies it before activating p6, and carries
-`ty1208z-firstboot-grow` to expand p9 on its first disk boot. Subsequent upgrades
-use the separate file-level image above, preserving Docker and user directories.
-See the [physical checkpoint](../../verification/compact-first-install-board-20261014.md).
+持久系统安装真实 `ty1208z-upgrade` APK，提供 `/lib/upgrade/platform.sh`，
+沿用官方 LuCI“系统 → 备份与更新”和 `/sbin/sysupgrade`。
+校验设备、布局、uImage CRC、根归档和空间；差异在写入前拒绝。
+官方 stage2 切入 RAM，确认进程、namespace、loop 和 swap 不再引用 p9，
+再 staging 根文件并逐文件核验，更新/读回 p6 后重启。
+
+归档只包含受管系统目录。`/opt`（含 `/opt/docker`）、`/root`、`/home`、
+`/mnt`、`/srv` 保留；“保留配置”恢复可信备份到新 `/etc`，
+取消该选项使用镜像默认配置，但仍保留数据目录。
+失败事务留下恢复记录，不能盲目删除旧根或重启。
+流程及普通磁盘根重启已实测，见[升级报告](../../verification/native-web-upgrade-board-20261015.md)。
+
+## 紧凑网页首刷
+
+`make openwrt-first-install` 从已准备的新根和精确 disk-root 内核生成私有首刷包。
+输入位于其他目录时设置 `NATIVE_SOURCE`、`UPGRADED_ROOT`、`DISK_ROOT` 和 `OUTPUT`。
+匹配的 `ty1208z-first-install` APK 只用于专用临时 RAM 安装环境。
+
+首刷写入 1 GiB ext4 p9，完整验证后激活 p6；
+`ty1208z-firstboot-grow` 在首次磁盘启动扩展到完整 6846 MiB。
+后续升级使用独立文件级 sysupgrade 包，不能再次用首刷包替代日常升级。
+[首刷报告](../../verification/compact-first-install-board-20261014.md)记录完整实测；
+最新全包只复用该流程，未再覆盖首刷，变化的内核由日常升级验证。

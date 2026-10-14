@@ -1,4 +1,6 @@
-# Native ARMv7 Docker QEMU runtime — 2026-10-14
+# ARMv7 Docker 隔离 QEMU 运行（2026-10-14）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Actual native Docker/dockerd 29.6.1, containerd 2.2.5 and runc 1.3.6 pass
 container storage, isolation, resource enforcement, DNS, forwarding/NAT,

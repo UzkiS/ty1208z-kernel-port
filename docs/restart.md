@@ -1,108 +1,49 @@
-# TY1208Z SP805 system restart experiment
+# 系统重启与控制器关闭
 
-The native router now has a physically accepted, explicitly RAM-loaded restart
-module: a graceful `reboot` reaches the CA loader, the UART tool stops and inspects
-that fresh boot, and the exact router is transferred/CRC-checked and restored
-without another power cycle. See [physical acceptance](../verification/native-restart-board-20261013.md).
-Independent diagnostic profiles require matching restart and peripheral shutdown
-integration before unattended image switching.
-The later independent SD metadata profile now also carries the same measured
-MV100 helper and passes explicit command reboot, read-back-checked SD shutdown
-and automatic return to the native router; [SD board report](../verification/sd-ident-board-20261013.md).
-The distinct `sd-ro1` block/filesystem profile now also passes that return after
-actual read-only VFAT file access. Its UART guard additionally requires no card
-mounts and a read-only block state; [read-only report](../verification/sd-ro-board-20261013.md).
-`make restart` retains the original isolated SP805-ID candidate described below.
-The separate `emmc-ro1` RAM candidate builds with DW-host shutdown readback
-and an independent controller-quiescence guard before the measured MV100
-reset helper. Its UART profile checks exact board/binding, user-area RO,
-unmounted/cleaned state, actual shutdown and fresh loader return. Offline
-actual-function and PTY checks pass; physical eMMC restart is untested.
-See [RAM candidate report](../verification/emmc-ro-ram-offline-20261014.md).
+当前持久系统已通过普通命令重启并沿原有 eMMC p6 路径自动启动。
+磁盘根的 MMC shutdown修复及实际记录见
+[网页升级与重启报告](../verification/native-web-upgrade-board-20261015.md)。
+这里同时保留早期独立 RAM 重启流程，不能将其“未验收”结论套用到当前系统。
 
-## Native router module and measured MV100 identity
+## 实测 MV100 路径
 
-Physical WDG0 ID cells return zero on this board. The original Hinas/SDK DT
-uses `arm,primecell-periphid` to supply the SP805 ID; successful old-driver
-registration is not a measurement of those ID cells. The original strict-ID
-candidate remains hardware unaccepted and its guard is unchanged.
+本板 WDG0位于 `0xf8a2c000`。实际 AMBA ID cells读零；
+原Hinas/SDK用 DT覆盖ID注册 SP805，不能当作真实ID测量。
+可用的窄范围 helper同时核对 SYSID0 `0x37980100`、
+零ID、CONTROL禁用、LOAD/VALUE `0xffffffff`、RIS/MIS/LOCK零。
+probe只读，显式 restart回调再次检查后才执行 unlock、禁用control、
+短load和reset control四次写及flush。不提供watchdog服务或安全状态写入。
 
-The module variant additionally maps only the already measured SYSID0 at
-`0xf8000ee0`. It requires SYSID0 `0x37980100`, zero ID cells, disabled CONTROL,
-LOAD/VALUE `0xffffffff`, and RIS/MIS/LOCK zero, exactly as observed physically.
-Probe makes no control writes. The callback checks these conditions again before
-the same four unlock/control/load/reset writes and flush. No clock, card or
-security-state writes are needed. This variant is explicitly restricted to the
-native RAM-router board identity; it does not broaden the ordinary diagnostic.
+原生RAM模块由 `tools/build_openwrt_restart_module.py` 对精确
+config/zImage/符号/编译器/libc检查后构建，验证ARM ELF/vermagic，
+不会自行加载。临时模块只适用于对应内核，不能带到其他profile。
 
-`tools/build_openwrt_restart_module.py` accepts the completed native router source,
-native taskbase and delivered router artifacts. It checks the actual config,
-zImage, symbols, native compiler/libc identity, ARM module ELF and vermagic before
-export. It never loads the module. Build with the actual compiler; the separate
-userspace wrapper's libc include flags are unsuitable for kernel modules.
+## RAM 切换流程
 
-`tools/board_restart_cli.py --port COM9 --profile router` owns the UART throughout
-graceful OpenWrt shutdown and the next loader inspection. It checks the exact
-kernel, official source revision, live DT, bound module and measured registration
-first. Physical failure is never inferred as success or retried automatically.
-The module is temporary and must be loaded after a fresh RAM boot. Persistent
-installation and integration with other peripheral shutdown paths remain pending.
+`board_restart_cli.py` 独占串口，先核对内核、源码revision、
+live DT、实际绑定与注册，再发一次正常重启。
+新CA引导出现后截停并重新检查，重新传输精确kernel/initrd、核对双CRC和恢复配置。
+不能因命令已发出推断成功，不自动重试reset。
+[早期原生实测](../verification/native-restart-board-20261013.md)已经通过自动返回。
 
-The Hinas runtime FDT identifies an SP805 at `0xf8a2c000`, size `0x1000`, and
-its boot log reports successful `sp805-wdt` registration. Pinned SDK
-`arch/arm/mach-hi3798mx/core.c` binds `hi3798mv100-series` and restarts through
-WDG0 unlock/load/control; the pinned `platform.h` gives the same address.
-These sources are recorded in `reference/reference-manifest.json`. The
-mainline Linux 6.12 SP805 restart handler confirms the register protocol.
-The candidate does not copy the SDK watchdog code or its unrelated MMC quirk.
+SD识别/只读、eMMC只读和系统profile必须分别确认请求停止、
+IRQ屏蔽和PIO时钟关闭，才允许重启。
+磁盘根仍挂载时保留gendisk，避免 `del_gendisk` 等待阻塞；
+host空闲后停止控制器。SD/eMMC实际返回证据分别在
+[SD报告](../verification/sd-ro-board-20261013.md)和
+[eMMC报告](../verification/emmc-ro-board-20261014.md)。
 
-## Operation and boundaries
+## 保留的严格 SP805-ID 实验
 
-The dedicated platform driver reads the real AMBA peripheral/cell IDs and
-CONTROL, requiring SP805 peripheral ID `0x00141805` under the upstream
-24-bit mask, cell ID `0xb105f00d` and disabled CONTROL `0`. It does not rely on
-a DT ID override. Probe and handler registration have no control writes.
-An unexpected identity or active watchdog prevents registration.
+`make restart` 仍生成原始 `restart1` 独立候选，
+要求真实peripheral ID `0x00141805`（24位mask）、cell ID `0xb105f00d`
+和CONTROL零。这个严格身份不符合本板实际零ID，因此没有实机重启验收，
+不因后来MV100 helper可用而放宽它。
 
-Only an explicit kernel restart invokes the callback. The callback checks
-the identity/control again before four writes: unlock, disabled control,
-short load `0x100`, then interrupt/reset control `3`, followed by a posted-write
-flush. A failed check performs no writes. Failure to reset is reported after
-a bounded wait; hardware reboot is not inferred from issuing the command.
-
-This is restart support only, not a watchdog service. WATCHDOG, storage, USB,
-network, modules, SMP and debugfs are disabled. The exact DT contains only
-the base UART/timer/memory and one restart controller. ARCH_HISI still
-selects its generic reset driver; this profile contains no node it can bind.
-The profile rejects additional reset drivers and controller resources.
-
-## Validation and UART workflow
-
-[Offline acceptance](../verification/restart-offline-20261012.md) records
-the actual candidate identity, build, helper sanitizer, DT/config/layout,
-serial PTY and generic QEMU results. No physical reboot has been tested.
-
-After a separately validated RAM boot, capture registration without reset:
-
-```text
-python tools/board_diag_cli.py --port COM9 --profile restart1
-```
-
-For the authorized physical restart experiment, use the exclusive-port CLI:
-
-```text
-python tools/board_restart_cli.py --port COM9
-```
-
-It requires the exact `restart1` kernel and actual registration output,
-issues one fixed `reboot -f` because PID 1 is the RAM diagnostic shell, then
-identifies and interrupts the fresh CA boot and performs only fixed read-only
-bootloader queries. It records TX/RX and a digest, rejects foreign systems,
-missing/echoed acceptance markers and failed reset, and never retries reset.
-No storage or persistent environment command is sent. Do not open a separate
-boot listener or HiTool while this tool owns the port.
-
-Successful physical restart would permit subsequent experiments to switch
-images without a power cycle. Full storage/network/Wi-Fi integration still
-needs appropriate driver shutdown and renewed restart acceptance; this
-storage-disabled result cannot establish those future behaviors.
+其[离线报告](../verification/restart-offline-20261012.md)只证明构建、
+实际helper sanitizer、DT/config/layout、PTY及通用QEMU。
+串口采集/重启工具必须使用匹配profile和实际串口：
+`board_diag_cli.py --port SERIAL_PORT --profile restart1`、
+`board_restart_cli.py --port SERIAL_PORT`。
+诊断PID1是RAM shell，因此该独立工具使用固定 `reboot -f`；
+正常OpenWrt系统应走正常服务关闭流程。

@@ -1,87 +1,47 @@
-# Native OpenWrt applications and Ethernet RAM integration
+# 原生应用与网口 RAM 集成
 
-`make openwrt-router TASKBASE=/absolute/linux/build-root` builds a separate
-`TASKBASE/router/` source/output tree using the same pinned compiler, feeds,
-Passwall patches and kernel patch as the application target. It reuses the
-`apps` package subtarget with an explicit variant marker and merges the measured
-FEMAC/MDIO/FESTAv220 configuration. The standalone diagnostic, native Ethernet
-and plain application trees retain their own configurations and outputs.
+这里说明独立 `router` 开发 profile；当前完整系统的持久安装与无线状态见
+[STATUS](../STATUS.md)。
 
-New candidates include Chinese LuCI, Passwall with Xray and sing-box, unzip,
-fw4, dnsmasq-full, ip-full, ethtool and iperf3. Their modules match the exact
-native kernel. The rootfs uses the
-reviewed DHCP-client-only `probe` interface on eth0 and no DHCP-server interface.
-DHCP-supplied DNS is enabled for the installed resolver and NTP service.
-Kernel storage, USB, Wi-Fi, SMP, debugfs and restart experiments are excluded.
-Physical RAM boot now establishes Ethernet, DHCP, local authenticated LuCI/
-Passwall UI, Xray startup before time synchronization and automatic normal
-DNS/NTP from the delivered peer-DNS default; see the
-[board report](../verification/openwrt-router-board-20261013.md). The corrected
-TX image also passes physical TCP in both directions with zero additional
-error/drop/FIFO counts and repeated local-namespace Passwall TCP/UDP TPROXY.
-Management access and routing policy need configuration before normal use.
-There is no flash/install recipe.
+`make openwrt-router TASKBASE=/absolute/linux/build-root` 使用独立
+`TASKBASE/router/`，复用固定原生编译器、应用 feeds 和板级补丁，
+加入 FEMAC/MDIO/FESTAv220。输出中文 LuCI、Passwall 双核心、unzip、fw4、
+dnsmasq-full、ip-full、ethtool 与 iperf3；模块匹配本次内核。
 
-`make openwrt-router-sdro` is a separate measured low-768-MiB/read-only SD
-variant. It uses its own board/configuration/output identity, keeps the SD
-request-level write filter, and requires fresh preceding loader allocations
-before every higher-memory boot. Its SD/VFAT, memory/PFN, real TCP and dual-core
-application tests pass physically; first-trial autonomous shutdown/return also
-passes. Final second-trial return awaits host serial recovery;
-[native SD report](../verification/openwrt-sdro-board-20261014.md).
-The ordinary router's storage permissions remain separate.
+默认 `probe` 仅在 eth0 上作 DHCP 客户端，无 DHCP 服务接口；
+接收 DHCP DNS，供解析器和 NTP 使用。root 默认空密码，恢复已有配置时保留已设置密码。
+普通 router profile 关闭存储、USB、Wi-Fi 和 SMP，不能当作完整安装包。
 
-The user's default is Simplified Chinese with username `root` and an empty
-password. Both current plain and router rootfs builds already have an empty
-root shadow field; the build checker now requires it. Physical RAM management
-setup must not add an automatically generated password. Restore a password
-only if the user explicitly configured it.
+## 已验收边界
 
-## Application and forwarding acceptance
+[实机报告](../verification/openwrt-router-board-20261013.md)记录 RAM 启动、
+有线 DHCP、中文 LuCI/Passwall、正常 DNS/NTP、双向 TCP 和代理测试；
+TX 修复版本的新增错误/drop/FIFO 计数为零。
+这些有限流量测试不代表路由或代理的最大吞吐。
 
-The actual matched kernel/initrd first passes installed NTP-client correction
-across 2036/2038 and from 2026 to 2040, then the existing isolated 2040
-DNS/TLS/LuCI/rpcd/Passwall SOCKS and VLESS TLS fixture. Network namespaces then
-create a client and origin through veth pairs; netifd configures router-side
-links/routes and fw4 generates forwarding rules. Actual HTTPS traffic and
-forward counters must pass.
+QEMU fixture 在实际内核与根上运行 NTP/time64、DNS/TLS、认证和两种代理核心。
+veth/network namespace 构成 client、router、origin，真实 netifd 建立路由，
+fw4 产生转发规则。HTTPS 和 UDP 必须经过预期路径：
+关闭直连转发时 HTTPS/UDP 控制连接失败；Passwall 启动 VLESS TLS、
+TCP/UDP TPROXY 后成功，双向 UDP 各超过4096字节和10包，检查 nft 计数及表999；
+停止代理后再次失败。512 MiB和240 MiB两次试验绑定同一套来源身份，
+不向 guest 暴露磁盘或主机网络。
 
-The fixture also verifies bounded UDP delivery through a real namespace-origin
-iperf3 server. It removes forwarding and requires direct HTTPS and the UDP
-test's TCP control connection to fail. It starts the installed Passwall service
-with its real VLESS TLS node, TCP/UDP
-TPROXY mode and generated nft/policy-routing/Xray setup. Client HTTPS must
-succeed without a SOCKS option. Forward and reverse UDP transfers must each
-report more than 4096 received bytes and ten packets. Actual UDP TPROXY counters
-and routing table 999 must be populated. After stopping Passwall, HTTPS and the
-UDP test's control connection must fail again.
-No host networking or disks are exposed to QEMU.
+## RAM 输出与其他变体
 
-Both 512-MiB and `mem=240M` trials pass the same fixture. Provenance binds exact
-kernel/config/rootfs/packages/console hashes and variant. These are emulated
-forwarding/TCP/UDP TPROXY checks; they do not measure physical Ethernet,
-routing speed, cable recovery, physical clock/NTP operation, Wi-Fi or
-whole-system Y2038 behavior. The loopback NTP fixture and its limits are
-recorded in the [NTP report](../verification/openwrt-ntp-time64-20261013.md).
+`artifacts/openwrt-router1/` 含附加 DTB 的 uImage 和 `0x04000000` 独立 initrd。
+打包器检查实际驱动 sanitizer、精确 board/clock/PHY 来源、应用证据与低16解压范围。
+双设备 CRC、身份、资源或配置差异都会阻止启动。
+`openwrt_ethernet_board_cli.py --profile router` 只采集精确 router 身份，
+默认 `--profile net` 保持独立网口采集。
 
-## Checked RAM output
+`openwrt-router768`、`openwrt-router-sdro`、
+`openwrt-router-emmcro` 分别使用独立身份和构建树，
+不改变普通 router 的权限。低768变体每次 RAM 启动需要新引导的完整 allocation。
+只读 SD 第二轮最终关闭和返回已通过，见
+[SD 报告](../verification/openwrt-sdro-board-20261014.md)；
+eMMC 只读块、完整备份、关闭/返回见
+[eMMC 报告](../verification/openwrt-emmcro-board-20261014.md)。
 
-`artifacts/openwrt-router1/` contains an ordinary uImage with appended DTB and
-separate bounded gzip/newc initrd at `0x04000000`. It uses the same measured
-Ethernet nodes as the native Ethernet experiment. The wrapper checks complete
-application provenance, exact board/clock/PHY/helper sources, actual built
-FEMAC datapath sanitizer and low-16-MiB decompression footprint. Both device
-CRCs gate the measured boot command through the common external-initrd tooling.
-
-Only the distinct application Ethernet identity permits network, modules,
-netfilter and IPv6 together. Existing diagnostic/Ethernet restrictions remain
-unchanged. Per-resource/config/provenance mutations and either CRC failure
-stop the flow. The UART network/iperf collector supports `--profile router`,
-requiring the exact router kernel and apps rootfs identity before experiments;
-default `--profile net` retains the independent Ethernet workflow.
-
-Application CI has separate matrix jobs for plain and integrated RAM builds.
-Each uses a fresh native compiler/build, locked serial dependency, both memory
-trials, packaging and PTY checks. Artifacts are HARDWARE-UNTESTED. See the
-[local result](../verification/openwrt-router-offline-20261013.md) for exact
-identity and limits; a queued CI job is not acceptance.
+应用 CI 各矩阵任务从干净工具链构建；产物 `HARDWARE-UNTESTED` 标签不能由历史实测解除。
+完整系统的构建、无线及安装后端见[系统说明](../openwrt/system/README.md)。

@@ -1,43 +1,39 @@
-# 离线验证记录
+# 验证方法与证据边界
 
-日期：2026-10-11。主机 WSL Ubuntu 24.04.4，ARM GCC 13.3、binutils 2.42，
-交叉 glibc 2.39，QEMU 8.2.2。实际构建配置和哈希随产物保存。
+当前实机结果见[状态页](../STATUS.md)，逐次试验见[验证索引](../verification/README.md)。
+验证分为源码/构建、模拟、实机和应用四层；同一报告中的“未完成”只描述该次profile与版本。
 
-云端干净环境的完整构建和回归也已通过：代码提交 `7b99fe6`，
-[Actions run 38141542884](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38141542884)。
-首轮发现产物检查目录未提前创建，修复后重跑通过。此后状态文档的修改不改变二进制。
+## 构建与模拟
 
-## 已通过
+`make verify` 对独立最小Linux诊断运行lint、构建和测试。
+检查固定源码SHA-256、真实Kconfig、ARM ELF、uImage头/数据CRC、DTB结构、
+加载/解压范围和产物manifest。最小profile关闭存储/网络，
+完整系统另用对应构建入口和选择检查。
 
-- 固定 Linux 6.12.112 与 BusyBox 1.37.0 的压缩包 SHA-256。
-- 单核配置和必需的 ARM、串口、GIC、板级定时器、initramfs、系统调用选项。
-- 无 block、MMC、MTD、网络、USB 驱动；不能由这个诊断内核访问盒子的存储。
-- uImage 的头/数据 CRC、ARM 类型、原始 zImage 头与长度、DTB 结构与拼接位置。
-- BusyBox 与 probe 是 ARM32 静态 ELF，QEMU user 能执行。
-- 同一个 raw zImage 在 QEMU virt 上进入自带 initramfs，挂载 proc/sys/dev/tmp，
-  shell 可执行。虚拟设备树与真实 MV100 设备树不同。
-- 2040 年 `clock_settime` / `clock_gettime` 读回、日期转换、单调时钟与睡眠。
-- RAM 文件 `utimensat` / `stat` 读回 2208988800；BusyBox `date`、`touch` 和
-  `stat` 的 access/modify/change 输出没有截断。
+QEMU virt运行实际raw zImage与initramfs，验证ARM shell、libc/time64、
+RAM文件时间及服务；不模拟MV100 UART/定时器、网口、MMC、USB或CA加载。
+2036/2038/2040未来墙钟只设置在隔离guest，物理设备保持正常时间。
+原生应用fixture还测真实DNS、证书、LuCI、Passwall双核心、NTP与unzip，
+见[应用说明](openwrt-applications.md)；容器组合见[Docker说明](containers.md)。
 
-## 测试发现并修复
+早期发现BusyBox `stat -c %Y` 把64位 `time_t` 强转为ARM32 `long`，
+使2040年的2208988800显示为负数。修复为宽整数输出，并保留回归。
+这证明用户空间格式化也必须验证，不能只检查内核系统调用。
 
-BusyBox 原版 `stat -c %Y` 将 time64 的 `st_mtime` 强转成 ARM32 的 `long`，
-使 2040 年的 2208988800 显示为 -2085978496。内核与 libc probe 同时读回正确，
-所以问题定位于用户空间格式化输出。补丁改为宽整数输出，并保留未来时间回归。
+## 实机与集成
 
-构建初期的精简配置还缺少 BusyBox installer、部分 applet 子选项和旧时间接口。
-已补齐。启用兼容 32 位时间 syscall 允许 glibc 在较小时间值时使用兼容路径，
-并不禁用 time64。glibc 的 2040 年测试实际需要宽时间路径。
+实际硬件证据绑定精确内核、DT、配置、rootfs及设备身份。
+RAM启动核对新引导器检查、内存分配、镜像布局和设备CRC；
+较大内存另测全页PFN。存储只读、可写、关闭、重启和恢复分别记录，
+首次安装和后续升级也使用不同包及验收路径。
 
-## 仍需实机或后续系统验收
+修改后按变化的依赖选择检查，复用未改变组件已经通过的证据，
+不把推断覆盖写为新增实测。文档修改不触发无关完整内核重建。
+CI必须记录真实运行结果，配置了工作流或排队不等于通过。
 
-当前 QEMU 使用 `arch_sys_counter`，没有执行 MV100 板级计时器初始化。
-本机 UART 时钟、GIC 和 timer 中断、RAM/安全保留区域、高安验签、SMP、eMMC、
-PHY/DMA、USB 和无线均未因此得到验证。
+## 报告规则
 
-现有 Hinas、OpenWrt/Kwrt 的 libc 和服务、Passwall、代理核心、DNS、NTP、证书、
-持久文件系统时间及重启恢复均未验收。不能由这份报告宣称整机 2038 问题已解决。
-
-复现入口：`make verify`。Actions 每次构建运行相同检查，日志位于其
-`HARDWARE-UNTESTED` 产物；在主机或真实 Hinas 上不设置未来墙上时间。
+报告保留日期、profile、包大小/哈希、实际行为、失败与修复、复用范围和未测项。
+公开版本不附带网络身份、个人路径、凭据、固件/备份或原始串口日志。
+源码与包可验证身份保留；私有证据由本地清单关联。
+不能由选定应用的time64测试宣称整机所有Y2038场景通过。

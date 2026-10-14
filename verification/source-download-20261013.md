@@ -1,4 +1,6 @@
-# Pinned source download recovery, 2026-10-13
+# 固定来源下载恢复（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Diagnostic CI for `57a77c7` failed before compiling the kernel: the BusyBox
 HTTPS connection was refused during `urlretrieve`. The Linux archive had

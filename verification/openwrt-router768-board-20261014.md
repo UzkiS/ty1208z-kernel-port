@@ -1,4 +1,6 @@
-# Native OpenWrt bounded 768-MiB physical acceptance
+# 低768原生路由内存与应用实测（2026-10-14）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 The independent router768 variant passed physical RAM, Ethernet/application
 and command-restart acceptance on TY1208Z CA / Hi3798MV100 on 2026-10-14.

@@ -1,4 +1,6 @@
-# eMMC user-area read-only groundwork — offline only
+# eMMC 只读块源码与对象验证（2026-10-14）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 2026-10-14. The explicit `HI3798MV100_EMMC_READ_ONLY` configuration compiles
 real ARM objects and passes actual-function request/block-core checks. It has

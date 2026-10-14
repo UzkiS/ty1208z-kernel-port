@@ -1,4 +1,6 @@
-# Xray startup before clock synchronization
+# 时间同步前 Xray 启动检查（2026-10-13）
+
+> 历史阶段记录：以下结论仅适用于所列日期、profile 和镜像；文中的“未完成”描述当时边界。当前能力与使用方法见 [STATUS](../STATUS.md)，阶段导航见[验证索引](README.md)。
 
 Date: 2026-10-13. Physical router RAM boot revealed that the installed Xray
 26.10.10 panicked during package initialization while the board clock was in
