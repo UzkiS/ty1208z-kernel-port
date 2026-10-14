@@ -30,6 +30,7 @@ static bool ro_mode;
 #define CONFIG_HI3798MV100_EMMC_READ_ONLY ro_mode
 static bool native_mode;
 #define CONFIG_TY1208Z_ROUTER_EMMC_RO native_mode
+#define CONFIG_TY1208Z_OPENWRT_SYSTEM 0
 #define IS_ENABLED(option) (option)
 struct device { void *of_node; };
 struct platform_device { struct device dev; };

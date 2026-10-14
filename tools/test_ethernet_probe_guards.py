@@ -30,6 +30,7 @@ typedef uint64_t resource_size_t;
 #define CONFIG_TY1208Z_ROUTER_EMMC_RO 0
 #endif
 #define IS_ENABLED(x) (x)
+#define CONFIG_TY1208Z_OPENWRT_SYSTEM 0
 #define ARRAY_SIZE(values) (sizeof(values) / sizeof((values)[0]))
 #define IORESOURCE_MEM 1
 #define GFP_KERNEL 0

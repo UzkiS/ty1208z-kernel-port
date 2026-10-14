@@ -156,6 +156,7 @@ static bool integrator, cintegrator;
 #define CONFIG_TY1208Z_ROUTER_EMMC_RO 0
 #endif
 #define IS_ENABLED(x) (x)
+#define CONFIG_TY1208Z_OPENWRT_SYSTEM 0
 static unsigned fixed, poisoned, freed, retained;
 static char init_area[16];
 #define __init_begin init_area

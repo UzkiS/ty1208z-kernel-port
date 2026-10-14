@@ -14,6 +14,14 @@ historical boundaries below describe earlier artifacts.
 No flashing, persistent boot changes or OTP writes were performed by this project. Offline
 implementation and repository push are authorized.
 
+A separate private installation candidate now builds offline: p6/p9-only
+one-sector write policy, a full 6846-MiB ext4 p9 with real APK metadata, a
+disk-root kernel and original p6 recovery payload. Policy/ordinary-boot refusal
+and filesystem/content/ownership checks pass. It has not run on the board and
+no storage-write authorization exists. The next proposed action is a single
+p9-sector write/readback followed by immediate original-sector restoration;
+see the [specific preparation and hashes](docs/installation-plan.md).
+
 Target: modern Linux, official native OpenWrt, Passwall, board Wi-Fi and verified
 time64 behavior. The current milestone is single-core RAM-only native network/
 application acceptance, with USB and Wi-Fi validated separately.

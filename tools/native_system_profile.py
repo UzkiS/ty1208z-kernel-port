@@ -21,7 +21,7 @@ BASE = {'/', '/aliases', '/chosen', '/memory@0', '/cpus', '/cpus/cpu@0',
         '/soc/timer@f8a29000', '/soc/serial@f8b00000'}
 
 
-def native_system_profile(tree, config):
+def native_system_profile(tree, config, *, allow_install_candidate=False):
     props = {n['path']: n['properties'] for n in tree['nodes']}
     if props['/'].get('compatible', {}).get('strings') != [COMPATIBLE, 'hi3798mv100-series']:
         return False
@@ -35,11 +35,16 @@ def native_system_profile(tree, config):
                 'ARM_APPENDED_DTB', 'BLK_DEV_INITRD', 'RD_GZIP', 'MODULES',
                 'TY1208Z_USB_HOST0_EXPERIMENT', 'CFG80211', 'FW_LOADER', 'CRYPTO_MD5'} | USB_OPTIONS
     forbidden = {'USB_STORAGE', 'USB_UAS', 'SMP', 'HIGHMEM', 'WATCHDOG', 'DEBUG_FS', 'PM', 'MTD', 'MMC_TEST',
+                 'TY1208Z_EMMC_INSTALL_CANDIDATE',
                  'OF_PARTITION', 'BLK_DEV_WRITE_MOUNTED', 'TY1208Z_ROUTER_RAM768',
                  'TY1208Z_ROUTER_SD_RO', 'TY1208Z_ROUTER_EMMC_RO', 'POWER_RESET_TY1208Z_MV100_EMMC_RO',
                  'POWER_RESET_TY1208Z_MV100_SD', 'POWER_RESET_TY1208Z_SP805',
                  'ARM_ATAG_DTB_COMPAT', 'INITRAMFS_FORCE', 'CMDLINE_FORCE'}
     active = dict(re.findall(r'^CONFIG_(\w+)=([ym])$', config, re.MULTILINE))
+    if allow_install_candidate:
+        if active.get('TY1208Z_EMMC_INSTALL_CANDIDATE') != 'y':
+            raise ValueError('Explicit installation mode requires its exact opt-in kernel')
+        forbidden.remove('TY1208Z_EMMC_INSTALL_CANDIDATE')
     if not all(active.get(n) == 'y' for n in required) or active.keys() & forbidden:
         raise ValueError('Integrated native configuration differs from the measured composition')
     if ('CONFIG_LOCALVERSION="-ty1208z-openwrt-system"\n' not in config or
@@ -67,9 +72,11 @@ def native_system_profile(tree, config):
     return True
 
 
-def prepare_native_system(artifacts, metadata, allocation_evidence):
+def prepare_native_system(artifacts, metadata, allocation_evidence, *, allow_install_candidate=False):
     artifacts = Path(artifacts)
     manifest = json.loads((artifacts / 'manifest.json').read_bytes())
+    if bool(manifest.get('persistent_candidate')) != allow_install_candidate:
+        raise ValueError('Installation candidate requires an explicit authorized boot mode')
     if (manifest['board'] != COMPATIBLE or manifest['persistent_writes'] is not False or
             manifest['memory_end'] != 0x30000000 or allocation_evidence is None):
         raise ValueError('Native system lacks its fresh allocation evidence or exact manifest')
@@ -83,7 +90,8 @@ def prepare_native_system(artifacts, metadata, allocation_evidence):
         if actual != expected:
             raise ValueError('Native system delivery changed: ' + name)
     tree = parse_fdt((artifacts / 'ty1208z-diagnostic.dtb').read_bytes())
-    if not native_system_profile(tree, (artifacts / 'linux.config').read_text()):
+    if not native_system_profile(tree, (artifacts / 'linux.config').read_text(),
+                                 allow_install_candidate=allow_install_candidate):
         raise ValueError('Native system board profile differs')
     dtb = (artifacts / 'ty1208z-diagnostic.dtb').read_bytes()
     offset = struct.unpack_from('>I', dtb, 16)[0]
@@ -109,6 +117,9 @@ def prepare_native_system(artifacts, metadata, allocation_evidence):
             props['/chosen']['linux,initrd-end'].get('cells') != [end] or end >= 0x8e62000):
         raise ValueError('Native bootstrap DT range differs')
     return {'schema': 1, 'status': 'validated native RAM placement; hardware untested',
+            'installation_candidate': allow_install_candidate,
+            'storage_write_capable': allow_install_candidate,
+            'card_cache_control_allowed': allow_install_candidate,
             'image_bytes': len(image), 'image_sha256': hashlib.sha256(image).hexdigest(),
             'image_crc32': f'{zlib.crc32(image):08x}', 'header_address': 0x1ffffc0,
             'load_address': 0x2000000, 'entry_address': 0x2000000, 'kernel_layout': layout,

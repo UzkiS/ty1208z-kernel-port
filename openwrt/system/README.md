@@ -48,3 +48,13 @@ to disabled and contains no private test credentials. Checked transformations
 in `tools/luci_rda_wireless.py` and `tools/netifd_wireless_eof.py` adapt the pinned
 official UI and terminate handler discovery at EOF. Original vendor firmware
 comes from the user's private backup and must not be redistributed.
+
+The separate `build_native_system.py --persistent-candidate` build uses an
+independent output tree and permits only measured p6/p9 sector writes.
+`prepare_native_disk_root.py` creates the private full ext4 p9 and disk-root
+uImage from those exact kernel/APK files; it never opens a device.
+The ordinary RAM profile rejects this write-capable kernel. Only explicit
+authorized installation mode may load it. The default invocation of
+`probe_native_emmc_write.py` prints a one-sector write/readback/restore plan;
+`--apply` is reserved for specific user storage-write authorization.
+See [installation preparation](../../docs/installation-plan.md).

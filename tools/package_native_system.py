@@ -27,6 +27,8 @@ parser.add_argument('--combined-source', type=Path,
 parser.add_argument('--work', type=Path)
 parser.add_argument('--output', type=Path)
 parser.add_argument('--resume', action='store_true')
+parser.add_argument('--persistent-candidate', action='store_true',
+                    help='Package the explicit offline installation kernel; still not a flash command')
 parser.add_argument('--rda-firmware', type=Path,
                     help='Private backup-reference directory with manifest.json and extracted firmware files')
 args = parser.parse_args()
@@ -46,8 +48,15 @@ if output.exists() or work.exists():
 work.mkdir(parents=True, exist_ok=True)
 output.mkdir(parents=True, exist_ok=True)
 original_kernel = next((source / 'build_dir').glob('target-*/linux-hi3798mv100_apps/linux-6.12.112'))
-for name in TRANSFORMATIONS:
-    assert (kernel / name).read_text() == ensure((original_kernel / name).read_text(), name), name
+assert bool(state.get('persistent_candidate')) == args.persistent_candidate
+if args.persistent_candidate:
+    from native_persistent_patch import CHANGES, ensure as ensure_persistent
+    for name in set(TRANSFORMATIONS) | set(CHANGES):
+        expected = ensure_persistent(ensure((original_kernel / name).read_text(), name), name)
+        assert (kernel / name).read_text() == expected, name
+else:
+    for name in TRANSFORMATIONS:
+        assert (kernel / name).read_text() == ensure((original_kernel / name).read_text(), name), name
 assert state['status'] == 'integrated-native-kernel-built-not-booted' and state['exit_code'] == 0
 
 root = work / 'root'
@@ -213,6 +222,10 @@ receipt = {'schema': 1, 'status': 'integrated native RAM candidate; not booted o
            'prior_userspace_evidence': 'Unchanged cores/runtime and installed Passwall files; actual new-kernel runtime pending',
            'external_initrd': {'address': 0x4000000, 'bytes': compressed, 'uncompressed_bytes': cpio.stat().st_size},
            'persistent_writes': False, 'files': files}
+if args.persistent_candidate:
+    receipt['status'] = 'offline installation-kernel RAM candidate; not hardware accepted or installable'
+    receipt['storage'] = 'SD read-only; eMMC one-sector writes permitted only in p6/p9; no automatic mounts'
+    receipt['persistent_candidate'] = True
 (output / 'manifest.json').write_text(json.dumps(receipt, indent=2) + '\n')
 print(json.dumps({'status': receipt['status'], 'bootstrap_bytes': compressed,
                   'supplement_bytes': network_payload.stat().st_size, 'modules': len(new_modules)}), flush=True)

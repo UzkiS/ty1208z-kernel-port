@@ -1,0 +1,13 @@
+// SPDX-License-Identifier: GPL-2.0-only
+#define TY1208Z_INITRD_START 0
+#define TY1208Z_INITRD_END 0
+#include "../ram-rootfs.dts"
+
+/ {
+	model = "TY1208Z CA native OpenWrt eMMC installation candidate";
+	chosen {
+		/delete-property/ linux,initrd-start;
+		/delete-property/ linux,initrd-end;
+		bootargs = "console=ttyAMA0,115200 earlycon=pl011,mmio32,0xf8b00000 root=/dev/mmcblk0p9 rootfstype=ext4 rootwait rw init=/sbin/init loglevel=7 panic=0 blkdevparts=mmcblk0:1M(boot)ro,1M(bootargs)ro,4M(baseparam)ro,4M(pqparam)ro,4M(logo)ro,20M(kernel)ro,64M(busybox)ro,512M(backup)ro,6846M(ubuntu)";
+	};
+};

@@ -36,7 +36,7 @@ DIAGNOSTIC_END = 0x10000000
 BOOT_ALLOCATIONS_START = 0x3E507000
 
 
-def prepare(artifacts, inspection, allocation_evidence=None):
+def prepare(artifacts, inspection, allocation_evidence=None, *, allow_install_candidate=False):
     metadata = json.loads(inspection.read_text(encoding="utf-8"))
     raw = inspection.parent / metadata["raw_file"]
     response = raw.read_bytes()
@@ -72,7 +72,10 @@ def prepare(artifacts, inspection, allocation_evidence=None):
     config = (artifacts / "linux.config").read_text()
     if properties["/"].get("compatible", {}).get("strings") == ["tianyi,ty1208z-ca-openwrt-system-ram", "hi3798mv100-series"]:
         from native_system_profile import prepare_native_system
-        return prepare_native_system(artifacts, metadata, allocation_evidence)
+        return prepare_native_system(artifacts, metadata, allocation_evidence,
+                                     allow_install_candidate=allow_install_candidate)
+    if allow_install_candidate:
+        raise ValueError('Installation boot flag applies only to its exact native system candidate')
     extended = (ram768_profile(tree, config) or openwrt_router768_ethernet_profile(tree, config) or
                 openwrt_router_sdro_ethernet_profile(tree, config))
     memory_evidence_sha256 = None
@@ -172,8 +175,11 @@ def main():
     parser.add_argument("--inspection", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--allocation-evidence", type=Path)
+    parser.add_argument("--allow-install-candidate", action="store_true",
+                        help="Explicit opt-in for an authorized p6/p9 write-capable RAM kernel")
     args = parser.parse_args()
-    plan = prepare(args.artifacts, args.inspection, args.allocation_evidence)
+    plan = prepare(args.artifacts, args.inspection, args.allocation_evidence,
+                   allow_install_candidate=args.allow_install_candidate)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with args.output.open("x", encoding="utf-8", newline="\n") as stream:
         json.dump(plan, stream, indent=2)

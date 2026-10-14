@@ -18,12 +18,14 @@ parser.add_argument('--taskbase', type=Path, required=True)
 parser.add_argument('--native-source', type=Path)
 parser.add_argument('--work', type=Path)
 parser.add_argument('--resume', action='store_true')
+parser.add_argument('--persistent-candidate', action='store_true',
+                    help='Offline opt-in p6/p9 write kernel; never accesses a physical device')
 args = parser.parse_args()
 project = Path(__file__).resolve().parents[1]
 base = args.taskbase.resolve()
 lock = json.loads((project / 'openwrt/sources.lock.json').read_bytes())
 source = args.native_source or base / 'router-emmc/build' / ('openwrt-ram-' + lock['openwrt']['commit'])
-work = args.work or base / 'build/native-system-kernel'
+work = args.work or base / ('build/native-install-kernel' if args.persistent_candidate else 'build/native-system-kernel')
 state_path = work / 'kernel-build.json'
 original = next((source / 'build_dir').glob('target-*/linux-hi3798mv100_apps/linux-6.12.112'))
 state = {'status': 'starting-isolated-kernel', 'hardware_actions': False,
@@ -45,6 +47,8 @@ kernel = work / 'linux-6.12.112'
 if work.exists():
     assert args.resume, 'Explicit resume required for the inspected isolated build'
     assert kernel.is_dir()
+    previous = json.loads(state_path.read_bytes())
+    assert bool(previous.get('persistent_candidate')) == args.persistent_candidate, 'Kernel build mode changed'
 else:
     work.mkdir(parents=True)
     save('copying-exact-native-kernel')
@@ -60,6 +64,11 @@ for name in ('drivers/power/reset/ty1208z-mv100-system-restart.c',
     if not (kernel / name).exists() or overlay.read_bytes() != (kernel / name).read_bytes():
         shutil.copyfile(overlay, kernel / name)
 
+if args.persistent_candidate:
+    from native_persistent_patch import apply as apply_persistent
+    apply_persistent(kernel, project)
+state['persistent_candidate'] = args.persistent_candidate
+
 state['native_config_sha256'] = digest(original / '.config')
 
 
@@ -74,6 +83,8 @@ def options(text):
 
 config = options((original / '.config').read_text())
 config.update(options((project / 'openwrt/system/kernel.config').read_text()))
+if args.persistent_candidate:
+    config['TY1208Z_EMMC_INSTALL_CANDIDATE'] = 'CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE=y'
 config['LOCALVERSION'] = 'CONFIG_LOCALVERSION="-ty1208z-openwrt-system"'
 config['INITRAMFS_SOURCE'] = 'CONFIG_INITRAMFS_SOURCE=""'
 existing = options((kernel / '.config').read_text())
@@ -103,6 +114,8 @@ with log.open('wb') as handle:
     different = {name: (value, actual.get(name)) for name, value in expected.items()
                  if actual.get(name, '# CONFIG_' + name + ' is not set') != value}
     assert not different, 'System kernel fragment did not resolve: ' + repr(different)
+    if args.persistent_candidate:
+        assert actual.get('TY1208Z_EMMC_INSTALL_CANDIDATE') == 'CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE=y'
     state['config_sha256'] = digest(kernel / '.config')
     save('building-integrated-native-kernel-and-modules')
     result = subprocess.run(make + ['-j4', 'zImage', 'modules'], stdout=handle, stderr=subprocess.STDOUT, env=environment)

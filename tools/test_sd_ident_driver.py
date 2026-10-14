@@ -33,6 +33,7 @@ typedef uint32_t u32;
 static bool ro_mode, native_mode, native_identity;
 #define CONFIG_HI3798MV100_SD_READ_ONLY ro_mode
 #define CONFIG_TY1208Z_ROUTER_SD_RO native_mode
+#define CONFIG_TY1208Z_OPENWRT_SYSTEM 0
 #define IS_ENABLED(config) (config)
 struct device { void *of_node; };
 struct platform_device { struct device dev; };

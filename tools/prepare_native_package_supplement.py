@@ -27,6 +27,17 @@ BOARD_FILES = {
     "lib/netifd/wireless/rda.sh": "openwrt/system/wireless/rda.sh",
     "etc/uci-defaults/97-ty1208z-wireless": "openwrt/system/wireless/defaults",
 }
+PERSISTENT_BOARD_FILES = {
+    "lib/preinit/79-ty1208z-disk-root": "openwrt/system/persistent/79-ty1208z-disk-root",
+    "etc/ty1208z-disk-root": "openwrt/system/persistent/root-marker",
+}
+
+
+def board_files(kernel_build):
+    files = dict(BOARD_FILES)
+    if "CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE=y\n" in (kernel_build / ".config").read_text():
+        files.update(PERSISTENT_BOARD_FILES)
+    return files
 
 
 def run(command, **kwargs):
@@ -95,7 +106,7 @@ def input_provenance(base, source, baseline_source, board_root, kernel_build):
     modules = board_root / "lib/modules/6.12.112"
     return {
         "preparer_sha256": digest(Path(__file__)),
-        "board_files": {name: digest(PROJECT / path) for name, path in BOARD_FILES.items()},
+        "board_files": {name: digest(PROJECT / path) for name, path in board_files(kernel_build).items()},
         "base_rootfs_sha256": digest(base / "rootfs.cpio.gz"),
         "native_config_sha256": digest(source / ".config"),
         "baseline_config_sha256": digest(baseline_source / ".config"),
@@ -116,11 +127,11 @@ def make_kernel_packages(apk, candidates, board_root, kernel_build, repository, 
     packages, omitted = {}, {}
     kernel_root = work / "kernel"
     kernel_root.mkdir()
-    for name, path in BOARD_FILES.items():
+    for name, path in board_files(kernel_build).items():
         destination = kernel_root / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(PROJECT / path, destination)
-        destination.chmod(0o755)
+        destination.chmod(0o644 if name == "etc/ty1208z-disk-root" else 0o755)
     target = kernel_root / "lib/modules/6.12.112"
     target.mkdir(parents=True)
     for name in ("modules.builtin", "modules.builtin.modinfo", "modules.dep", "modules.alias",

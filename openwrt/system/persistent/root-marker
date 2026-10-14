@@ -1,0 +1,2 @@
+TY1208Z_EMMC_INSTALL_CANDIDATE=y
+Private single-board disk-root installation candidate; physical writes require authorization.

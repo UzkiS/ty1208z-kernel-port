@@ -1,0 +1,11 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# The full ext4 partition is the writable root; do not add a tmpfs overlay.
+# shellcheck disable=SC2317
+mount_root() {
+	[ "$1" = start ] || { /sbin/mount_root "$@"; return $?; }
+	grep -q 'root=/dev/mmcblk0p9' /proc/cmdline || return 1
+	grep -q 'TY1208Z_EMMC_INSTALL_CANDIDATE=y' /etc/ty1208z-disk-root || return 1
+	awk '$2 == "/" && $3 == "ext4" { found=1 } END { exit !found }' /proc/mounts || return 1
+	/bin/mount -o remount,rw / || return 1
+}
