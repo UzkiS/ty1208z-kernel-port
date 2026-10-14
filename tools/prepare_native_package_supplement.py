@@ -104,7 +104,7 @@ def input_provenance(base, source, baseline_source, board_root, kernel_build):
             return hashlib.file_digest(handle, "sha256").hexdigest()
 
     modules = board_root / "lib/modules/6.12.112"
-    return {
+    provenance = {
         "preparer_sha256": digest(Path(__file__)),
         "board_files": {name: digest(PROJECT / path) for name, path in board_files(kernel_build).items()},
         "base_rootfs_sha256": digest(base / "rootfs.cpio.gz"),
@@ -116,6 +116,10 @@ def input_provenance(base, source, baseline_source, board_root, kernel_build):
                         for name, p in sorted(candidates_from_sources(baseline_source, source).items())},
         "board_modules": {p.name: digest(p) for p in sorted(modules.glob("*")) if p.is_file()},
     }
+    if "CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE=y\n" in (kernel_build / ".config").read_text():
+        from native_upgrade import source_identity
+        provenance["web_upgrade_sources"] = source_identity()
+    return provenance
 
 
 def make_kernel_packages(apk, candidates, board_root, kernel_build, repository, work):
@@ -211,6 +215,17 @@ def prepare(base, source, baseline_source, board_root, kernel_build, output):
     try:
         kernel_packages, omitted, kernel_identity = make_kernel_packages(
             apk, candidates, board_root, kernel_build, repository, work)
+        if "CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE=y\n" in (kernel_build / ".config").read_text():
+            from native_upgrade import make_package
+            compilers = list((baseline_source / "staging_dir").glob(
+                "toolchain-arm*/bin/arm-openwrt-linux-muslgnueabi-gcc"))
+            if len(compilers) != 1:
+                raise ValueError("Exact native upgrade helper compiler missing")
+            version = "6.12.112~" + kernel_identity[:32] + "-r1"
+            package = make_package(compilers[0], apk, version, work / "upgrade-package")
+            destination = repository / package.name
+            shutil.copyfile(package, destination)
+            kernel_packages["ty1208z-upgrade"] = destination
     finally:
         if previous is None:
             os.environ.pop("SOURCE_DATE_EPOCH", None)
@@ -232,7 +247,8 @@ def prepare(base, source, baseline_source, board_root, kernel_build, output):
         if path.exists():
             shutil.rmtree(path)
     (root / "etc/apk/world").unlink()
-    selection = sorted(names | set(REQUIRED) | {"kmod-nft-nat"})
+    selection = sorted(names | set(REQUIRED) | {"kmod-nft-nat"} |
+                       ({"ty1208z-upgrade"} if "ty1208z-upgrade" in kernel_packages else set()))
     log = output / "apk-install.log"
     with log.open("wb") as handle:
         subprocess.run([str(apk), "add", "--root", str(root), "--initdb", "--usermode",

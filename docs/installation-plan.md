@@ -77,3 +77,9 @@ ext4 `e2fsck -fn`、关键文件内容/UID/GID、APK 必需包、空密码和 RA
 完整安装将替换 Hinas/Ubuntu 的 p6 内核和 p9 根文件系统。其他用户区分区、CA fastboot、
 SD、boot0/boot1/RPMB 和安全状态保持原样。完整写入及读回的耗时取决于单扇区 PIO 速度，
 尚无实测工期。
+
+## 后续网页升级
+
+首次安装完成后，升级入口采用官方 LuCI“系统 → 备份与更新”页面和 `/sbin/sysupgrade`。板级包提供 `/lib/upgrade/platform.sh`、校验器和 p6/p9 写入后端；上传的 `sysupgrade.bin` 会先检查设备身份、分区布局、uImage CRC、根文件系统清单和可用空间。官方 stage2 切换到 RAM 后才更新 p9 文件和 p6 内核，并做读回校验。
+
+升级包只覆盖受管系统目录，`/opt/docker`、`/root`、`/home`、`/mnt` 和 `/srv` 保留。LuCI 的“保留配置”负责恢复 `/etc` 配置；取消后恢复镜像默认配置，但仍保留 Docker 和用户数据。当前网页升级候选已完成离线构建、ARM 解析器和异常上传回归，尚未在真实持久系统执行升级验收。

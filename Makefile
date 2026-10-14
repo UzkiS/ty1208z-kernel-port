@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 .DEFAULT_GOAL := help
 
-.PHONY: help lint test-serial build test verify references references-wifi wifi-usb-audit wifi-port emmc-audit emmc-ident emmc-read ethernet-audit ethernet-clock-id openwrt-config openwrt-toolchain openwrt-ram openwrt-app-config openwrt-applications
+.PHONY: help lint test-serial build test verify references references-wifi wifi-usb-audit wifi-port emmc-audit emmc-ident emmc-read ethernet-audit ethernet-clock-id openwrt-config openwrt-toolchain openwrt-ram openwrt-app-config openwrt-applications openwrt-web-upgrade test-web-upgrade
 help:
 	@echo 'make lint       - Python/shell/config repository checks'
 	@echo 'make build      - download pinned sources and build RAM-only ARM candidate'
@@ -44,11 +44,24 @@ help:
 	@echo 'make openwrt-container-qemu - test actual ARMv7 Docker in isolated QEMU; no board acceptance'
 	@echo 'make openwrt-container-applications - build/test/export native Docker + fw4 + dual-core Passwall in QEMU'
 	@echo 'make openwrt-system - compose the measured board kernel and native userspace for RAM delivery'
+	@echo 'make openwrt-web-upgrade - prepare the official sysupgrade image and board upgrade APK offline'
+	@echo 'make test-web-upgrade - run parser and unsafe-upload regression checks'
 
 .PHONY: openwrt-system
 openwrt-system:
 	python3 tools/build_native_system.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" --resume
 	python3 tools/package_native_system.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" --resume
+
+.PHONY: openwrt-web-upgrade
+openwrt-web-upgrade:
+	python3 tools/prepare_native_upgrade.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" \
+		--disk-root "$(if $(DISK_ROOT),$(DISK_ROOT),$(CURDIR)/.work/native-disk-root-page)" \
+		--source "$(if $(NATIVE_SOURCE),$(NATIVE_SOURCE),$(CURDIR)/.work/openwrt-ram-58efa9917d4cc53fceed173529a286187649e827)" \
+		--output "$(if $(OUTPUT),$(OUTPUT),$(CURDIR)/build/native-web-upgrade)"
+
+.PHONY: test-web-upgrade
+test-web-upgrade:
+	python3 tools/test_native_upgrade.py --delivery "$(if $(DELIVERY),$(DELIVERY),$(CURDIR)/build/native-web-upgrade)"
 
 lint:
 	python3 tools/check_repository.py

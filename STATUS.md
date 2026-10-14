@@ -26,6 +26,14 @@ cache-cleared p9 readback matches. No persistent boot-environment or OTP writes
 are performed.
 Offline implementation and repository push are authorized.
 
+Official web upgrade support is now implemented as a board APK and
+`/lib/upgrade/platform.sh`, using the standard LuCI Backup / Flash Firmware
+page and official sysupgrade/stage2. The private file-level image preserves
+Docker/user data and stages/verifies a new root before p6 activation. Actual
+ARM/ASan parser and official ARM sysupgrade validation checks pass offline;
+physical web upgrade/pivot/reboot/data preservation remain pending until the
+current installation completes. See the [offline report](verification/native-web-upgrade-offline-20261014.md).
+
 A separate private installation candidate now builds offline: p6/p9-only
 one-sector write policy, a full 6846-MiB ext4 p9 with real APK metadata, a
 disk-root kernel and original p6 recovery payload. Policy/ordinary-boot refusal

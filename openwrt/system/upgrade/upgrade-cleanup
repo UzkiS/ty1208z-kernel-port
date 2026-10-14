@@ -1,0 +1,19 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# OpenWrt rc.common consumes START and runs functions in ash.
+# shellcheck disable=SC2034,SC3043
+START=98
+start() {
+	local state=/.ty1208z-upgrade
+	[ -f "$state/status" ] || return 0
+	[ "$(cat "$state/status")" = complete ] || {
+		logger -t ty1208z-upgrade 'Incomplete upgrade receipt retained for recovery'
+		return 1
+	}
+	grep -q 'root=/dev/mmcblk0p9' /proc/cmdline || return 1
+	[ -x /sbin/procd ] && [ -f /etc/ty1208z-upgrade-abi ] || return 1
+	# Retain a small receipt; reclaim the old firmware only after normal startup.
+	cp "$state/status" /etc/ty1208z-last-upgrade
+	rm -rf "$state"
+	logger -t ty1208z-upgrade 'Firmware upgrade completed; Docker data retained'
+}

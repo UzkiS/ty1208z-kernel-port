@@ -68,3 +68,9 @@ a verified offline plan, writes only fixed p9 then p6 under separately authorize
 `--apply`, clears the block cache for SHA-256 readback and relocks each partition.
 Its `--mode restore` streams only the original backed-up p9 range and p6 payload.
 Full installation, recovery writes and disk-root boot remain unaccepted.
+
+## Official web sysupgrade
+
+The persistent candidate installs `ty1208z-upgrade` as a real APK. It supplies the board's `/lib/upgrade/platform.sh`, so the standard LuCI **System → Backup / Flash Firmware** page and `/sbin/sysupgrade` validation path are used. Uploads are metadata checked, bound to the measured p6/p9 layout, and rejected before any write when the board, uImage CRC, root archive or free-space check differs. Stage2 pivots to RAM, verifies that no process, namespace, loop device or swap still references p9, then stages the new root on p9 and updates p6 with exact readback before the official reboot.
+
+The firmware archive contains only managed system paths. `/opt` (including Docker's `/opt/docker`), `/root`, `/home`, `/mnt` and `/srv` remain on p9 and are never replaced by the archive. LuCI's **Keep settings** choice restores the trusted configuration backup into the staged `/etc`; cancelling it resets configuration to image defaults while keeping data directories. An incomplete transaction leaves a receipt for recovery instead of silently deleting the old root.

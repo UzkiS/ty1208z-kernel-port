@@ -1,0 +1,175 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Run through official sysupgrade. No raw writes to the ext4 root filesystem.
+# OpenWrt ash implements pipefail; jshn assigns manifest variables dynamically.
+# shellcheck disable=SC3040,SC1091,SC2154,SC2015
+set -e
+set -o pipefail
+CHECK=/sbin/ty1208z-image-check
+P9=/dev/mmcblk0p9
+P6=/dev/mmcblk0p6
+WORK=
+MOUNT=
+ACTIVATING=0
+MANAGED='bin etc init lib sbin usr var www'
+
+die() { echo "TY1208Z: $*" >&2; exit 1; }
+cleanup() {
+	status=$?
+	set +e
+	trap - EXIT
+	if [ -n "$MOUNT" ]; then
+		[ "$status" = 0 ] || echo "stopped activating=$ACTIVATING" > "$MOUNT/.ty1208z-upgrade/status"
+		sync
+		umount "$MOUNT" || status=1
+	fi
+	/sbin/emmc-p9-control p6 lock >/dev/null 2>&1 || status=1
+	[ -z "$WORK" ] || rm -rf "$WORK"
+	exit "$status"
+}
+
+hardware() {
+	[ "$(tr '\000' '\n' < /sys/firmware/devicetree/base/compatible | head -n 1)" = 'tianyi,ty1208z-ca-openwrt-system-ram' ] || die 'board differs'
+	[ "$(cat /sys/class/block/mmcblk0/device/type)" = MMC ] || die 'not eMMC'
+	[ "$(cat /sys/class/block/mmcblk0/device/name)" = 008G30 ] || die 'eMMC identity differs'
+	[ "$(cat /sys/class/block/mmcblk0/size)" = 15269888 ] || die 'eMMC capacity differs'
+	[ "$(cat /sys/class/block/mmcblk0p6/start)" = 28672 ] || die 'p6 start differs'
+	[ "$(cat /sys/class/block/mmcblk0p6/size)" = 40960 ] || die 'p6 capacity differs'
+	[ "$(cat /sys/class/block/mmcblk0p9/start)" = 1249280 ] || die 'p9 start differs'
+	[ "$(cat /sys/class/block/mmcblk0p9/size)" = 14020608 ] || die 'p9 capacity differs'
+	[ -f /etc/ty1208z-disk-root ] || [ "${1:-}" = ramfs ] || die 'disk-root installation required'
+	for device in mmcblk0 mmcblk0p6 mmcblk0p9; do
+		[ -z "$(ls -A "/sys/class/block/$device/holders")" ] || die 'block holder active'
+	done
+	for backing in /sys/class/block/loop*/loop/backing_file; do
+		[ ! -f "$backing" ] || [ -z "$(cat "$backing")" ] || die 'loop backing file is active'
+	done
+}
+
+member() { "$CHECK" member "$IMAGE" "$1"; }
+number() {
+	case "$1" in ''|*[!0-9]*) die 'invalid manifest number';; esac
+	[ "${#1}" -lt 11 ] || die 'manifest number too long'
+}
+hash() {
+	[ "${#1}" = 64 ] || die 'invalid manifest hash'
+	case "$1" in *[!a-f0-9]*) die 'invalid manifest hash';; esac
+}
+validate() {
+	"$CHECK" outer "$IMAGE"
+	. /usr/share/libubox/jshn.sh
+	json_load "$(member manifest)" || die 'invalid manifest JSON'
+	json_get_var schema schema
+	json_get_var board board
+	json_get_var layout layout
+	json_get_var kernel_bytes kernel_bytes
+	json_get_var kernel_sha256 kernel_sha256
+	json_get_var root_bytes root_bytes
+	json_get_var root_sha256 root_sha256
+	json_get_var root_space root_space
+	json_get_var kernel_abi kernel_abi
+	[ "$schema" = ty1208z-file-upgrade-v1 ] || die 'unsupported firmware format'
+	[ "$board" = tianyi,ty1208z-ca ] || die 'firmware is for another board'
+	[ "$layout" = p6-28672-40960_p9-1249280-14020608 ] || die 'firmware layout differs'
+	number "$kernel_bytes"; number "$root_bytes"; number "$root_space"
+	hash "$kernel_sha256"; hash "$root_sha256"
+	case "$kernel_abi" in ''|*[!a-zA-Z0-9.~_-]*) die 'invalid kernel ABI';; esac
+	[ "$(member kernel | wc -c)" = "$kernel_bytes" ] || die 'kernel length differs'
+	[ "$(member kernel | sha256sum | cut -d ' ' -f 1)" = "$kernel_sha256" ] || die 'kernel checksum differs'
+	[ "$(member rootfs.tar.gz | wc -c)" = "$root_bytes" ] || die 'root archive length differs'
+	[ "$(member rootfs.tar.gz | sha256sum | cut -d ' ' -f 1)" = "$root_sha256" ] || die 'root archive checksum differs'
+	member kernel > "$WORK/kernel"
+	"$CHECK" kernel "$WORK/kernel"
+	actual_space=$(member rootfs.tar.gz | gzip -dc | "$CHECK" root)
+	[ "$actual_space" = "$root_space" ] || die 'root archive content/space differs'
+}
+
+[ "$#" -ge 2 ] || die 'usage: ty1208z-upgrade validate|apply IMAGE [CONFIG]'
+ACTION=$1
+IMAGE=$(readlink -f "$2")
+[ -f "$IMAGE" ] || die 'firmware not found'
+case "$IMAGE" in /tmp/*) ;; *) die 'upload must be staged in RAM /tmp';; esac
+case "$ACTION" in validate|apply) ;; *) die 'unsupported operation';; esac
+WORK=$(mktemp -d /tmp/ty1208z-check.XXXXXX)
+if [ "$ACTION" = validate ]; then
+	# A validation never changes storage flags or writes a partition.
+	trap 'rm -rf "$WORK"' EXIT
+	hardware
+	awk '$2 == "/" && $3 == "ext4" { ok=1 } END { exit !ok }' /proc/mounts || die 'persistent ext4 root required'
+	awk '$3 == "179:9" && $5 == "/" { ok=1 } END { exit !ok }' /proc/self/mountinfo || die 'root is not measured eMMC p9'
+	[ ! -e /.ty1208z-upgrade ] || die 'previous upgrade receipt requires review/removal'
+	validate
+	free_kb=$(df -k / | awk 'END { print $4 }')
+	[ "$free_kb" -gt "$((root_space / 1024 + 196608))" ] || die 'insufficient eMMC free space; free space without deleting Docker data'
+	echo 'TY1208Z firmware valid; Docker and user data directories will be retained.' >&2
+	exit 0
+fi
+
+# Services have stopped and official stage2 has pivoted into RAM.
+exec >> /tmp/ty1208z-upgrade.log 2>&1
+trap cleanup EXIT
+hardware ramfs
+"$CHECK" released
+validate
+target=/tmp/ty1208z-target
+mkdir "$target"
+mount -t ext4 -o rw "$P9" "$target"
+MOUNT=$target
+[ ! -e "$MOUNT/.ty1208z-upgrade" ] || die 'previous upgrade transaction exists'
+mkdir "$MOUNT/.ty1208z-upgrade"
+STATE=$MOUNT/.ty1208z-upgrade
+echo staging > "$STATE/status"
+free_kb=$(df -k "$MOUNT" | awk 'END { print $4 }')
+[ "$free_kb" -gt "$((root_space / 1024 + 196608))" ] || die 'insufficient staging space'
+mkdir "$STATE/new" "$STATE/old"
+member rootfs.tar.gz | tar -xzf - -C "$STATE/new"
+sync
+/sbin/emmc-p9-control p9 flush
+echo 3 > /proc/sys/vm/drop_caches
+member rootfs.tar.gz | gzip -dc | "$CHECK" verify-root "$STATE/new"
+[ "$(cat "$STATE/new/etc/ty1208z-upgrade-abi")" = "$kernel_abi" ] || die 'root kernel ABI differs'
+grep -qx "V:$kernel_abi" "$STATE/new/lib/apk/db/installed" || die 'APK kernel ABI absent'
+for name in $MANAGED; do
+	[ -e "$STATE/new/$name" ] || [ -L "$STATE/new/$name" ] || die 'managed root entry absent'
+done
+[ -x "$STATE/new/bin/busybox" ] && [ -x "$STATE/new/sbin/procd" ] || die 'root executables absent'
+CONFIG=${3:-}
+if [ -n "$CONFIG" ]; then
+	[ -f "$CONFIG" ] || die 'configuration backup missing'
+	# Official sysupgrade creates a local trusted archive. Extract separately,
+	# then copy etc over the staged root; data directories are never replaced.
+	mkdir "$STATE/config"
+	tar -xzf "$CONFIG" -C "$STATE/config"
+	[ ! -d "$STATE/config/etc" ] || cp -a "$STATE/config/etc/." "$STATE/new/etc/"
+fi
+# Keep a recovery copy of the previous kernel, but never touch CA/other partitions.
+dd if="$P6" of="$STATE/kernel.previous" bs=65536
+sync
+echo prepared > "$STATE/status"
+sync
+ACTIVATING=1
+echo activating > "$STATE/status"
+sync
+for name in $MANAGED; do
+	if [ -e "$MOUNT/$name" ] || [ -L "$MOUNT/$name" ]; then
+		mv "$MOUNT/$name" "$STATE/old/$name"
+	fi
+	mv "$STATE/new/$name" "$MOUNT/$name"
+done
+sync
+echo root-activated > "$STATE/status"
+# Pad only to the final sector, with exact readback before declaring success.
+sectors=$(((kernel_bytes + 511) / 512))
+dd if=/dev/zero of="$WORK/kernel.padded" bs=512 count="$sectors"
+dd if="$WORK/kernel" of="$WORK/kernel.padded" bs=65536 conv=notrunc
+expected=$(sha256sum "$WORK/kernel.padded" | cut -d ' ' -f 1)
+/sbin/emmc-p9-control p6 unlock
+dd if="$WORK/kernel.padded" of="$P6" bs=65536 conv=fsync
+/sbin/emmc-p9-control p6 flush
+actual=$(dd if="$P6" bs=512 count="$sectors" | sha256sum | cut -d ' ' -f 1)
+[ "$actual" = "$expected" ] || die 'kernel readback failed; do not reboot blindly'
+/sbin/emmc-p9-control p6 lock
+echo complete > "$STATE/status"
+sync
+# Old root and receipt remain until first successful userspace startup.
+echo 'TY1208Z root activated and kernel verified; ready for official reboot.'
