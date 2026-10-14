@@ -1,5 +1,15 @@
 # 临时 OpenWrt 网页安装方案
 
+2026-10-14 后续实施：用户已要求中止原全 p9 写入并改走这条路线。原 writer 和
+自动 continuation 已停止，p9 部分写入后已 flush/锁回只读，p6 未写入。
+无需 SD：沿用已验收的 TTL 发命令、网线 TFTP 载入 RAM，再打开官方 LuCI 上传入口。
+`tools/prepare_native_first_install.py` 现已生成 1 GiB ext4、约 126 MiB 的私有首刷包和
+RAM 专用升级 APK；root 内包含后续原生升级后端及首次在线扩容 APK。文件系统检查、
+ARM uImage/外层包/ext4 几何检查及 ARM 离线扩容均通过。实际中文 LuCI 上传、确认、
+官方 sysupgrade 校验和 RAM 切换现已通过，正在写入 1 GiB p9。读回、磁盘启动与在线
+扩容仍待验收，见[实机检查点](../verification/compact-first-install-board-20261014.md)。
+下面保留初期研究记录，其中“正在写入”和“未实现”描述均是历史状态。
+
 2026-10-14 研究结论：这台 TY1208Z CA 可以沿用已验收的 RAM 启动，在临时
 OpenWrt 的中文 LuCI 中上传安装包并写入 p9/p6。当前固件尚未实现这个安装入口；
 下面是基于实际运行文件和固定官方源码的方案，不是网页刷写验收报告。

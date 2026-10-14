@@ -10,7 +10,12 @@ platform_check_image() {
 
 platform_do_upgrade() {
 	/sbin/ty1208z-upgrade apply "$1" "${UPGRADE_BACKUP:-}" || {
-		echo 'TY1208Z upgrade stopped; inspect /tmp/ty1208z-upgrade.log before recovery.' >&2
-		exit 1
+		echo 'TY1208Z upgrade stopped; keeping RAM alive for serial recovery.' > /dev/console
+		tail -n 30 /tmp/ty1208z-upgrade.log > /dev/console
+		# upgraded reboots after any stage2 exit, including an unsuccessful one.
+		while :; do
+			/bin/ash -i < /dev/console > /dev/console 2>&1
+			sleep 1
+		done
 	}
 }

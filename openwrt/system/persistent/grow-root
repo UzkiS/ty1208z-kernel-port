@@ -1,0 +1,15 @@
+#!/bin/sh /etc/rc.common
+# SPDX-License-Identifier: GPL-2.0-only
+# shellcheck disable=SC2034
+START=12
+
+start() {
+	[ -f /etc/ty1208z-grow-p9 ] || return 0
+	[ "$(cat /sys/class/block/mmcblk0p9/start)" = 1249280 ] || return 1
+	[ "$(cat /sys/class/block/mmcblk0p9/size)" = 14020608 ] || return 1
+	awk '$3 == "179:9" && $5 == "/" { ok=1 } END { exit !ok }' /proc/self/mountinfo || return 1
+	[ "$(cat /sys/class/block/mmcblk0p9/ro)" = 0 ] || return 1
+	/sbin/resize2fs /dev/mmcblk0p9 1752576 || return 1
+	rm /etc/ty1208z-grow-p9
+	sync
+}

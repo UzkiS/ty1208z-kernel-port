@@ -45,6 +45,7 @@ help:
 	@echo 'make openwrt-container-applications - build/test/export native Docker + fw4 + dual-core Passwall in QEMU'
 	@echo 'make openwrt-system - compose the measured board kernel and native userspace for RAM delivery'
 	@echo 'make openwrt-web-upgrade - prepare the official sysupgrade image and board upgrade APK offline'
+	@echo 'make openwrt-first-install - prepare compact RAM/web first-install image and addon offline'
 	@echo 'make test-web-upgrade - run parser and unsafe-upload regression checks'
 
 .PHONY: openwrt-system
@@ -62,6 +63,14 @@ openwrt-web-upgrade:
 .PHONY: test-web-upgrade
 test-web-upgrade:
 	python3 tools/test_native_upgrade.py --delivery "$(if $(DELIVERY),$(DELIVERY),$(CURDIR)/build/native-web-upgrade)"
+
+.PHONY: openwrt-first-install
+openwrt-first-install:
+	python3 tools/prepare_native_first_install.py \
+		--source "$(if $(NATIVE_SOURCE),$(NATIVE_SOURCE),$(CURDIR)/.work/openwrt-ram-58efa9917d4cc53fceed173529a286187649e827)" \
+		--upgraded-root "$(if $(UPGRADED_ROOT),$(UPGRADED_ROOT),$(CURDIR)/build/native-web-upgrade/root)" \
+		--disk "$(if $(DISK_ROOT),$(DISK_ROOT),$(CURDIR)/.work/native-disk-root-page)" \
+		--output "$(if $(OUTPUT),$(OUTPUT),$(CURDIR)/build/first-install)"
 
 lint:
 	python3 tools/check_repository.py

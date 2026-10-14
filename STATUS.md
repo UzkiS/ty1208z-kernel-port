@@ -1,10 +1,13 @@
 # TY1208Z kernel port status
 
-Updated: 2026-10-14. The user authorized the explained full p6/p9 installation
-and necessary recovery scope. After current-config backup, fresh guarded reboot,
-both RAM CRCs and whole-original-backup revalidation, p9 writing is in progress
-under the exact accepted installation RAM kernel. Full installation and disk-root
-persistence are not yet accepted. SD remains read-only; UART monitoring is active.
+Updated: 2026-10-14. The user requested interruption of the full p9 write to
+switch to a compact RAM/web first installer. The writer and automatic continuation
+have stopped. p9 is partially written, flushed and locked read-only; p6 has not
+been written. The accepted RAM system remains online. Do not boot the partial
+eMMC installation. The corrected compact installer has now passed the real
+Chinese LuCI upload, official sysupgrade validation and RAM pivot, and is writing
+its 1-GiB p9 root. Full installation and disk-root persistence remain unaccepted.
+SD remains read-only; CA fastboot and persistent boot settings are unchanged.
 Latest milestone: RDA5995 WPA2 STA, phone AP handshake/DHCP/page access and
 netifd AP/STA switching pass on the integrated RAM system. The final module fixes
 attach ownership, association IE reporting, AP GTK state and USB TX padding.
@@ -21,9 +24,12 @@ Full installation and disk-root persistence remain unfinished.
 See the [current progress report](verification/progress-20261014.md) and
 [wireless report](verification/rda-wireless-board-20261014.md);
 historical boundaries below describe earlier artifacts.
-The authorized full p9 write is now in progress; p6 follows only after complete
-cache-cleared p9 readback matches. No persistent boot-environment or OTP writes
-are performed.
+The previous full-p9 operation was interrupted after approximately 5.15 GB of
+writes, before any p6 write. Private receipts distinguish partial writing from a
+verified installation. A separate 1-GiB compact first-install candidate now builds
+with a 126-MiB upload, exact p9/p6 checks and a first-boot growth APK. Actual
+first-install writing is in progress; readback, online growth and persistent boot
+remain pending. See the [first-install checkpoint](verification/compact-first-install-board-20261014.md).
 Offline implementation and repository push are authorized.
 
 Official web upgrade support is now implemented as a board APK and

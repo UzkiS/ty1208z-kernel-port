@@ -1,0 +1,139 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# First installation only; invoked by official LuCI/sysupgrade from RAM.
+# ash supports pipefail; jshn creates the manifest variables at runtime.
+# shellcheck disable=SC3040,SC1091,SC2154
+set -e
+set -o pipefail
+CHECK=/sbin/ty1208z-first-check
+CONTROL=/sbin/emmc-p9-control
+WORK=
+TARGET=
+PROGRESS=
+die() { echo "TY1208Z first install: $*" >&2; exit 1; }
+report() { echo "$*"; echo "$*" > /dev/console; }
+cleanup() {
+	status=$?
+	trap - EXIT
+	set +e
+	[ -z "$PROGRESS" ] || kill "$PROGRESS" 2>/dev/null
+	[ -z "$TARGET" ] || { sync; umount "$TARGET"; } || status=1
+	"$CONTROL" p6 lock || status=1
+	"$CONTROL" p9 lock || status=1
+	[ -z "$WORK" ] || rm -rf "$WORK"
+	exit "$status"
+}
+hardware() {
+	[ -f /etc/ty1208z-first-installer ] || die 'RAM installer marker missing'
+	[ "$(tr '\000' '\n' < /sys/firmware/devicetree/base/compatible | head -n 1)" = tianyi,ty1208z-ca-openwrt-system-ram ] || die 'board differs'
+	[ "$(cat /sys/class/block/mmcblk0/device/type)" = MMC ] || die 'not eMMC'
+	[ "$(cat /sys/class/block/mmcblk0/device/name)" = 008G30 ] || die 'eMMC identity differs'
+	[ "$(cat /sys/class/block/mmcblk0/size)" = 15269888 ] || die 'eMMC capacity differs'
+	[ "$(cat /sys/class/block/mmcblk0p6/start)" = 28672 ] || die 'p6 start differs'
+	[ "$(cat /sys/class/block/mmcblk0p6/size)" = 40960 ] || die 'p6 capacity differs'
+	[ "$(cat /sys/class/block/mmcblk0p9/start)" = 1249280 ] || die 'p9 start differs'
+	[ "$(cat /sys/class/block/mmcblk0p9/size)" = 14020608 ] || die 'p9 capacity differs'
+	[ "$(cat /sys/class/block/mmcblk1/ro)" = 1 ] || die 'SD must stay read-only'
+	for device in /sys/class/block/mmcblk0p*; do
+		[ "$(cat "$device/ro")" = 1 ] || die 'partition not locked read-only'
+		[ -z "$(ls -A "$device/holders")" ] || die 'partition holder active'
+	done
+	[ -z "$(ls -A /sys/class/block/mmcblk0/holders)" ] || die 'eMMC holder active'
+	"$CHECK" released
+}
+member() { "$CHECK" member "$IMAGE" "$1"; }
+hash() {
+	[ "${#1}" = 64 ] || die 'invalid hash'
+	case "$1" in *[!a-f0-9]*) die 'invalid hash';; esac
+}
+validate() {
+	"$CHECK" outer "$IMAGE"
+	. /usr/share/libubox/jshn.sh
+	json_load "$(member manifest)" || die 'invalid manifest'
+	for key in schema board layout root_bytes root_sha256 root_expanded_sha256 kernel_bytes kernel_sha256 kernel_abi; do
+		json_get_var "$key" "$key"
+	done
+	[ "$schema" = ty1208z-first-install-v1 ] || die 'not a first-install image'
+	[ "$board" = tianyi,ty1208z-ca ] || die 'wrong board'
+	[ "$layout" = p6-28672-40960_p9-1249280-14020608 ] || die 'wrong layout'
+	[ "$kernel_abi" = "$(cat /etc/ty1208z-first-installer)" ] || die 'kernel ABI differs'
+	hash "$root_sha256"; hash "$root_expanded_sha256"; hash "$kernel_sha256"
+	[ "$(member kernel | wc -c)" = "$kernel_bytes" ] || die 'kernel length differs'
+	[ "$(member kernel | sha256sum | cut -d ' ' -f 1)" = "$kernel_sha256" ] || die 'kernel checksum differs'
+	[ "$(member rootfs.ext4.gz | wc -c)" = "$root_bytes" ] || die 'root length differs'
+	[ "$(member rootfs.ext4.gz | sha256sum | cut -d ' ' -f 1)" = "$root_sha256" ] || die 'root checksum differs'
+	member kernel > "$WORK/kernel"
+	"$CHECK" kernel "$WORK/kernel"
+}
+expanded_validate() {
+	# Keep LuCI's preflight within its RPC timeout. The compressed payload is
+	# fully hashed above; expand and check it before unlocking either partition.
+	member rootfs.ext4.gz | gzip -dc | "$CHECK" ext4
+	[ "$(member rootfs.ext4.gz | gzip -dc | sha256sum | cut -d ' ' -f 1)" = "$root_expanded_sha256" ] || die 'expanded root checksum differs'
+}
+[ "$#" -ge 2 ] || die 'usage: validate|apply IMAGE [CONFIG]'
+ACTION=$1
+IMAGE=$(readlink -f "$2")
+[ -f "$IMAGE" ] || die 'image missing'
+case "$IMAGE" in /tmp/*) ;; *) die 'upload must be in RAM /tmp';; esac
+case "$ACTION" in validate|apply) ;; *) die 'unsupported operation';; esac
+WORK=$(mktemp -d /tmp/ty1208z-first.XXXXXX)
+if [ "$ACTION" = validate ]; then
+	trap 'rm -rf "$WORK"' EXIT
+	hardware
+	validate
+	echo 'Validated 1-GiB first-install root; only p9/p6 will be written.' >&2
+	exit 0
+fi
+exec >> /tmp/ty1208z-first-install.log 2>&1
+trap cleanup EXIT
+hardware
+validate
+report 'Checking expanded first-install root before storage writes'
+expanded_validate
+report 'Writing 1-GiB p9 root'
+"$CONTROL" p9 unlock
+before=$(awk '{print $7}' /sys/class/block/mmcblk0p9/stat)
+(
+	while sleep 60; do
+		sectors=$(awk '{print $7}' /sys/class/block/mmcblk0p9/stat)
+		echo "FIRST_INSTALL_P9_PROGRESS $(((sectors - before) * 512)) / 1073741824 bytes" > /dev/console
+	done
+) &
+PROGRESS=$!
+member rootfs.ext4.gz | gzip -dc | dd of=/dev/mmcblk0p9 bs=1048576 conv=fsync
+kill "$PROGRESS" 2>/dev/null || true
+wait "$PROGRESS" 2>/dev/null || true
+PROGRESS=
+"$CONTROL" p9 flush
+report 'Verifying p9 readback'
+actual=$(dd if=/dev/mmcblk0p9 bs=1048576 count=1024 | sha256sum | cut -d ' ' -f 1)
+[ "$actual" = "$root_expanded_sha256" ] || die 'p9 readback differs; no kernel write or reboot'
+target=/tmp/ty1208z-first-target
+mkdir "$target"
+mount -t ext4 /dev/mmcblk0p9 "$target"
+TARGET=$target
+[ -f "$target/etc/ty1208z-grow-p9" ] || die 'root growth marker absent'
+[ -x "$target/sbin/resize2fs" ] || die 'root growth tool absent'
+[ -x "$target/sbin/ty1208z-upgrade" ] || die 'native future upgrade backend absent'
+CONFIG=${3:-}
+if [ -n "$CONFIG" ]; then
+	[ -f "$CONFIG" ] || die 'configuration backup absent'
+	tar -xzf "$CONFIG" -C "$target"
+fi
+sync
+umount "$target"
+TARGET=
+"$CONTROL" p9 lock
+report 'p9 verified; writing p6 kernel'
+sectors=$(((kernel_bytes + 511) / 512))
+dd if=/dev/zero of="$WORK/kernel.padded" bs=512 count="$sectors"
+dd if="$WORK/kernel" of="$WORK/kernel.padded" bs=65536 conv=notrunc
+expected=$(sha256sum "$WORK/kernel.padded" | cut -d ' ' -f 1)
+"$CONTROL" p6 unlock
+dd if="$WORK/kernel.padded" of=/dev/mmcblk0p6 bs=65536 conv=fsync
+"$CONTROL" p6 flush
+actual=$(dd if=/dev/mmcblk0p6 bs=512 count="$sectors" | sha256sum | cut -d ' ' -f 1)
+[ "$actual" = "$expected" ] || die 'p6 readback differs; no reboot'
+"$CONTROL" p6 lock
+report 'FIRST_INSTALL_P9_P6_VERIFIED; ready for official reboot'

@@ -80,6 +80,10 @@ validate() {
 	[ "$(member rootfs.tar.gz | sha256sum | cut -d ' ' -f 1)" = "$root_sha256" ] || die 'root archive checksum differs'
 	member kernel > "$WORK/kernel"
 	"$CHECK" kernel "$WORK/kernel"
+}
+expanded_validate() {
+	# LuCI preflight checks the entire compressed payload. Inspect its full
+	# expansion after stage2, before mounting p9 or starting a transaction.
 	actual_space=$(member rootfs.tar.gz | gzip -dc | "$CHECK" root)
 	[ "$actual_space" = "$root_space" ] || die 'root archive content/space differs'
 }
@@ -111,6 +115,7 @@ trap cleanup EXIT
 hardware ramfs
 "$CHECK" released
 validate
+expanded_validate
 target=/tmp/ty1208z-target
 mkdir "$target"
 mount -t ext4 -o rw "$P9" "$target"
