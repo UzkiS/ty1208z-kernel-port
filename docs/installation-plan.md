@@ -13,7 +13,7 @@ CA fastboot；SD/TF 不作为此次安装目标。
 | 用户区备份 | 全部 7,818,182,656 字节已备份并独立哈希校验：`471a3b80e55c44823c601e4918504fa2977665021d8e36fcda7b79d185dc0695`。备份私有，不含 boot0/boot1/RPMB；方案不修改这些区域。 |
 | 分区事实 | 9 分区已按 sysfs 扇区核对；实施时重新核对容量、起点、长度和未挂载状态，不能只依赖设备名。 |
 | 恢复入口 | 保留 CA fastboot、TTL 和已接受的 RAM 启动／命令重启路径。原中文 RAM router 及配置恢复已实测。 |
-| 存储写入 | 独立可写候选已编译。请求层仅允许 p6/p9 单扇区写入，拒绝分区切换、擦除和其他区域；允许主线 volatile-cache 0/1 控制及 flush，支持 fsync。SD 仍只读。真实写入尚未实测，盒子仍运行原只读 RAM 内核。 |
+| 存储写入 | 独立可写候选已编译。请求层仅允许 p6/p9 单扇区写入，拒绝分区切换、擦除和其他区域。初始化明确关闭 eMMC 运行时缓存；注册后仅允许该缓存的 0/1 控制和 flush，支持 fsync。实际主线 CMD6 组包也已用于策略检查。SD 仍只读，真实写入尚未实测。 |
 | 正式镜像 | 完整 p9 ext4 与磁盘根内核已生成并通过离线文件系统检查；包含真实 APK 数据库、中文/Docker/Passwall/无线。磁盘启动无 initrd，直接 `/sbin/init`，preinit 保持 ext4 根可写，避免 tmpfs overlay。仍为实机未验收候选。 |
 | 正常开机 | RAM `bootm` 接受 unsigned uImage，不能据此宣称 eMMC 自动启动也通过。需验证持久加载方式与内存保留，并保留进入 loader 的恢复入口。 |
 | 原系统恢复 | p6 的 20 MiB 恢复镜像已提取，SHA-256 `4b98ee5a8dd7b3a466b02d52ac37d145e6130ff0ff9d874bbcf080414415c85d`。p9 恢复数据沿用完整备份的 610 MiB 起、6846 MiB 范围，不重复复制整盘。恢复写回本身尚未实测。 |
@@ -23,9 +23,9 @@ CA fastboot；SD/TF 不作为此次安装目标。
 
 | 文件 | 大小 | SHA-256 |
 |---|---:|---|
-| `kernel-p6-INSTALL-UNTESTED.bin` | 4,471,796 B | `f51b4589d64c3b67f860e855492afe815a485f35a04008356abec7d2f052cfec` |
-| `rootfs-p9.ext4` | 7,178,551,296 B | `83a70951a51f1a5d2d38b732a7600fb41e33cbe3d284d442af02214d45f0851a` |
-| `rootfs-p9.ext4.gz` | 170,137,875 B | `d49e23d833b53c524adfce43e339967ef95642e8aeed0e861f1540fadc5ff008` |
+| `kernel-p6-INSTALL-UNTESTED.bin` | 4,471,652 B | `57df676ad6acf5ed2b58050d7387533c6ed518fa7d856ecf2493b84dcc070fbb` |
+| `rootfs-p9.ext4` | 7,178,551,296 B | `1f755e98b6e890b3a0b9ed9e2d6e6c6600568ce02ba6c9bb399ccd25c9e82f25` |
+| `rootfs-p9.ext4.gz` | 170,137,896 B | `5ece0c136dcc74148ce37bcecb32e1e8301c80bd2ad0dd46c3410397f50d9ad1` |
 
 原厂 RDA 固件包含在此私有候选中，不上传 GitHub。压缩镜像、内核、可写 RAM
 bootstrap 和控制工具已同步电脑端并核对哈希；完整 sparse ext4 保留在 WSL。
@@ -40,6 +40,7 @@ ext4 `e2fsck -fn`、关键文件内容/UID/GID、APK 必需包、空密码和 RA
 写一个不同模式、fsync、清缓存读回，再立即写回原 512 字节并读回比较，重新锁为只读。
 失败时保留原扇区与记录，不继续写入或自动重启。脚本的 EXIT/signal trap 也尝试恢复。
 这是实际 eMMC 写入，掉电仍可能中断恢复，因此需要明确授权；它不改变持久 boot。
+加载可写 RAM 内核时会按主线 CMD6 关闭 eMMC 的运行时缓存，这也属于本次待授权范围。
 
 验证通过后再给出完整安装写入步骤与单独授权请求，覆盖范围仅限 p6/p9。
 首次磁盘根启动通过后，只检查配置、Docker 数据保留和正常命令重启。

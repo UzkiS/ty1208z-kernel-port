@@ -16,25 +16,32 @@ static inline int hi3798mv100_emmc_install_request(struct mmc_request *mrq,
 	u32 write_flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
 	u32 flush_flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
 	u32 flush_arg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) |
-			(EXT_CSD_FLUSH_CACHE << 16) | (1 << 8);
+			(EXT_CSD_FLUSH_CACHE << 16) | (1 << 8) | EXT_CSD_CMD_SET_NORMAL;
 	u32 cache_arg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) |
-			(EXT_CSD_CACHE_CTRL << 16);
+			(EXT_CSD_CACHE_CTRL << 16) | EXT_CSD_CMD_SET_NORMAL;
 	int ret = hi3798mv100_emmc_ro_request(mrq, user_area, sectors);
 
 	if (!ret || !mrq || !mrq->cmd)
 		return ret;
 	cmd = mrq->cmd;
 	data = mrq->data;
+	/* Card registration follows cache setup. Allow only cache disable at
+	 * that stage; the dedicated core patch asks for value 0, never 1.
+	 */
+	if (!user_area && !sectors && !mrq->sbc && !mrq->stop && !data &&
+	    !cmd->data && cmd->opcode == MMC_SWITCH && cmd->arg == cache_arg &&
+	    (cmd->flags == flush_flags || cmd->flags == (MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC)))
+		return 0;
 	if (!user_area || sectors != 15269888 || mrq->sbc || mrq->stop ||
 	    cmd->data != data)
-		return -EPERM;
+		return ret;
 	/* Mainline may enable its volatile cache; permit only that byte's 0/1
 	 * values and the flush operation needed for fsync/shutdown durability.
 	 */
 	if (cmd->opcode == MMC_SWITCH && !data &&
 	    (cmd->arg == flush_arg || cmd->arg == cache_arg ||
 	     cmd->arg == (cache_arg | (1 << 8))) &&
-	    cmd->flags == flush_flags)
+	    (cmd->flags == flush_flags || cmd->flags == (MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC)))
 		return 0;
 	if (cmd->opcode != MMC_WRITE_BLOCK || cmd->flags != write_flags ||
 	    !data || data->flags != MMC_DATA_WRITE || data->blksz != 512 ||

@@ -18,6 +18,7 @@ struct mmc_card { bool mmc, ro; struct { unsigned cmdclass; } csd; };
 #define mmc_card_mmc(card) ((card)->mmc)
 #define mmc_card_readonly(card) ((card)->ro)
 /* READONLY */
+/* SWITCH_PREP */
 int main(void) {
     struct mmc_card card = {.mmc = true, .csd.cmdclass = CCC_BLOCK_WRITE};
     assert(!!mmc_blk_readonly(&card) == !CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE);
@@ -48,11 +49,15 @@ int main(void) {
     assert(hi3798mv100_emmc_install_request(&mrq, true, 15269888) == -EPERM);
     mrq.stop = NULL; cmd.flags |= MMC_RSP_BUSY;
     assert(hi3798mv100_emmc_install_request(&mrq, true, 15269888) == -EPERM);
-    cmd.data = mrq.data = NULL; cmd.opcode = MMC_SWITCH;
-    cmd.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
-    cmd.arg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) | (EXT_CSD_FLUSH_CACHE << 16) | (1 << 8);
+    cmd.data = mrq.data = NULL;
+    cmd = prepare_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_FLUSH_CACHE, 1);
     assert(hi3798mv100_emmc_install_request(&mrq, true, 15269888) == 0);
-    cmd.arg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) | (EXT_CSD_CACHE_CTRL << 16) | (1 << 8);
+    cmd = prepare_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_CACHE_CTRL, 0);
+    assert(hi3798mv100_emmc_install_request(&mrq, false, 0) == 0);
+    cmd = prepare_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_CACHE_CTRL, 1);
+    assert(hi3798mv100_emmc_install_request(&mrq, true, 15269888) == 0);
+    assert(hi3798mv100_emmc_install_request(&mrq, false, 0) != 0);
+    cmd.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
     assert(hi3798mv100_emmc_install_request(&mrq, true, 15269888) == 0);
     cmd.arg += (1 << 8);
     assert(hi3798mv100_emmc_install_request(&mrq, true, 15269888) != 0);
@@ -73,6 +78,13 @@ def main():
     parser.add_argument("--ram-artifacts", type=Path)
     args = parser.parse_args()
     source = args.linuxsrc
+    ops = (source / "drivers/mmc/core/mmc_ops.c").read_text()
+    switch = ops[ops.index("int __mmc_switch("):]
+    start = switch.index("\tcmd.opcode = MMC_SWITCH;")
+    end = switch.index("\tuse_r1b_resp =", start)
+    switch_prep = ('static struct mmc_command prepare_switch(u8 set, u8 index, u8 value) {\n'
+                   'struct mmc_command cmd = {0};\n' + switch[start:end] +
+                   'cmd.flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC; return cmd; }\n')
     if args.ram_artifacts:
         from inspect_images import parse_fdt
         from native_system_profile import native_system_profile
@@ -106,7 +118,7 @@ def main():
                                           'typedef uint64_t u64; typedef int32_t s32;\n#define BIT(n) (1U << (n))\n')
         (temp / "linux/completion.h").write_text('struct completion { int unused; };\n')
         harness = temp / "test.c"
-        harness.write_text(HARNESS.replace("/* READONLY */", readonly))
+        harness.write_text(HARNESS.replace("/* READONLY */", readonly).replace("/* SWITCH_PREP */", switch_prep))
         for enabled in (0, 1):
             binary = temp / f"test-{enabled}"
             subprocess.run(["cc", "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror",

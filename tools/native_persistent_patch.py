@@ -3,6 +3,14 @@
 from pathlib import Path
 
 CHANGES = {
+    "drivers/mmc/core/mmc.c": [(
+        '\t\t\t\tEXT_CSD_CACHE_CTRL, 1, timeout_ms);',
+        '\t\t\t\tEXT_CSD_CACHE_CTRL,\n'
+        '\t\t\t\tIS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE) ? 0 : 1,\n'
+        '\t\t\t\ttimeout_ms);'), (
+        '\t\t\tcard->ext_csd.cache_ctrl = 1;',
+        '\t\t\tcard->ext_csd.cache_ctrl =\n'
+        '\t\t\t\t!IS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE);')],
     "arch/arm/mach-hisi/Kconfig": [(
         "config TY1208Z_OPENWRT_SYSTEM\n",
         'config TY1208Z_EMMC_INSTALL_CANDIDATE\n'
