@@ -326,7 +326,10 @@ def test(linuxsrc):
     policy = HARNESS.replace('/* HOST_CAPS */', caps).replace('/* SLOT */', slot)
     policy = policy.replace('/* VALIDATE */', validate).replace('/* QUEUE */', request)
     core = BLOCK_HARNESS.replace('/* PARTS */', parts).replace('/* PROBE */', probe)
-    readonly = block[block.index('static inline int mmc_blk_readonly('):block.index('static struct mmc_blk_data *mmc_blk_alloc_req(')]
+    # OpenWrt inserts its DT-partition helper before alloc_req. Extract only
+    # the actual readonly function so unrelated downstream helpers stay out.
+    start = block.index('static inline int mmc_blk_readonly(')
+    readonly = block[start:block.index('\n}\n', start) + 3]
     force_ro = block[block.index('static ssize_t force_ro_store('):block.index('static DEVICE_ATTR(force_ro,')]
     assert '\tmd->read_only = mmc_blk_readonly(card);\n' in block
     assert 'set_disk_ro(md->disk, md->read_only || default_ro);' in block

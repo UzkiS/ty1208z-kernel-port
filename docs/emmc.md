@@ -2,15 +2,29 @@
 
 当前 Hinas 实测控制器为 `himciv200`，MMIO `0xf9830000`、GIC SPI 35；
 运行 FDT 的 clock specifier 为 160（0xa0），时钟控制器基址 `0xf8a22000`。
-eMMC 型号 `008G30`，容量 7818182656 字节。分区布局已记录，尚无完整备份。
+eMMC 型号 `008G30`，容量 7818182656 字节。分区布局及完整用户区备份已核对。
 
 `make emmc-ro` 已构建独立低256 RAM-root 只读候选，包含精确用户区分区、
 ext4 `ro,noload`、控制器 shutdown 和受限命令重启。实际函数、ARM shell、
 镜像/配置/布局、串口 PTY 与通用 QEMU 已通过。修正 eMMC 核心磁盘只读标志后，
 实机已完成 9 个分区核对、块读取、ext4 只读文件读取/卸载、命令重启及中文系统恢复。
-完整备份、可写存储和 Docker 存储仍待验证。
+完整用户区备份现已完成；可写存储和 Docker 存储仍待验证。
 详见 [实机报告](../verification/emmc-ro-board-20261014.md)及
 [原离线候选报告](../verification/emmc-ro-ram-offline-20261014.md)。
+
+独立 `make openwrt-router-emmcro` 入口已整合相同只读请求策略、已测网口、
+低256 RAM-root、中文应用及内置 eMMC shutdown/restart。它使用单独板级身份和构建树，
+普通 router 与独立诊断的配置门禁继续保持。该原生镜像已通过实机启动、只读块/ext4
+读取、网口、完整用户区备份、控制器 shutdown、命令重启及原中文系统/配置恢复。
+不包含自动挂载、日志回放或修复工具；以后只读挂载仍必须使用 `ro,noload`。
+
+`tools/backup_emmc_readonly.py` 在实机启动这个精确原生镜像后，核对运行 FDT、
+只读标志、全部9分区及未挂载状态，再通过 SSH 将完整7818182656字节用户区读到电脑。
+电脑端长度、传输退出码和独立文件哈希全部通过后才生成验收记录；中断或损坏保留为
+未验收的 partial 文件。它不读取 boot0/boot1/RPMB，也不向卡写入。实机备份已通过上述
+检查，完整用户区 SHA-256 为
+`471a3b80e55c44823c601e4918504fa2977665021d8e36fcda7b79d185dc0695`；
+详见[原生 eMMC 报告](../verification/openwrt-emmcro-board-20261014.md)。
 
 固定 SDK 中 `himciv200_def.h` 的寄存器布局对应 DesignWare MSHC：
 CTRL/PWREN/CLKDIV/CMD/RESP、VERID/HCON 和 IDMAC 地址均有对应主线定义。
@@ -135,4 +149,7 @@ CMD17/CMD18 读取一起检查；仍拒绝所有数据写入、擦除、CMD6 分
 见 [RAM 候选报告](../verification/emmc-ro-ram-offline-20261014.md)。修正后的独立候选
 已实机完成块读取、ext4 `ro,noload` 文件读取/卸载、控制器关闭、命令重启及原中文系统恢复，
 见 [实机报告](../verification/emmc-ro-board-20261014.md)。完整备份、文件系统完整性、
-原生 eMMC 整合、可写存储和 Docker 存储仍未验收；不修复、不回放日志。
+可写存储和 Docker 存储仍未验收；不修复、不回放日志。
+独立原生 eMMC/网口版现已通过 RAM 启动、只读块/ext4 文件读取和双向网口数据，
+完整电脑端用户区备份进行中，备份后的内置关闭/重启及返回待完成，
+见 [原生记录](../verification/openwrt-emmcro-board-20261014.md)。

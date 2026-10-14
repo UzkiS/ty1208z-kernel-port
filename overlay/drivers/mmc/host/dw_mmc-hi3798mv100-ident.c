@@ -117,7 +117,9 @@ static int mv100_ident_probe(struct platform_device *pdev)
 	int irq;
 
 	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
-	    !of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram"))
+	    !of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram") &&
+	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram")))
 		return -ENODEV;
 
 	controller = platform_get_resource(pdev, IORESOURCE_MEM, 0);

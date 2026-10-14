@@ -75,6 +75,14 @@ The newer diagnostic run on `76009fb` also passes: 18 downloaded manifests,
 178 declared files and 16 uImage CRCs were independently verified, including
 actual eMMC RO object/guest/probe/shutdown/reset/profile checks and exact
 committed source identities; [eMMC CI report](verification/emmc-ro-ci-20261014.md).
+The later `bca9065` diagnostic artifact independently passes the same counts
+and committed-source checks, plus both actual MMC readonly/force_ro profile
+states and the ARM buffered-UART-report regression. Native eMMC OpenWrt now
+physically passes RAM boot, read-only block/ext4 file reads and Ethernet.
+A full private 7818182656-byte user-area backup passes exact length, successful
+SSH exit and host readback SHA-256. Native controller shutdown, one guarded
+command restart and exact Chinese-router/configuration return also pass;
+[native eMMC report](verification/openwrt-emmcro-board-20261014.md).
 The user removed Kwrt customization and requires both Xray and sing-box in
 Passwall, plus unzip. Both cores and InfoZIP now build in the plain/router
 variants and pass both QEMU budgets, including actual Passwall SOCKS/TLS,
@@ -89,7 +97,7 @@ reads, two-partition discovery, an actual VFAT mount/file-read/unmount and
 automatic return; [read-only report](verification/sd-ro-board-20261013.md).
 The second partition's filesystem, hotplug and native-router integration
 remain pending; see [SD/TF](docs/sd.md).
-On 2026-10-13 live GitHub branch/compare checks confirmed
+On 2026-10-13 live GitHub branch/compare checks, repeated on 2026-10-14, confirmed
 the pinned `58efa991` still equals the latest `openwrt-25.12` head; master is
 a separate, newer development branch. Additional package/runtime work remains.
 

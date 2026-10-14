@@ -1,0 +1,6 @@
+# Separate native low256 eMMC read-only/network experiment; no automount.
+# CONFIG_PACKAGE_block-mount is not set
+# CONFIG_PACKAGE_blockd is not set
+# CONFIG_PACKAGE_e2fsprogs is not set
+# CONFIG_KERNEL_BLK_CGROUP is not set
+# CONFIG_KERNEL_BLK_DEV_THROTTLING is not set

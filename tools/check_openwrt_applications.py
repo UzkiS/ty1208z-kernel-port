@@ -13,7 +13,7 @@ from prepare_openwrt_applications import application_variant
 
 def check(source, built=False):
     variant = application_variant(source)
-    ethernet = variant in ("ethernet", "ethernet-ram768", "ethernet-sdro")
+    ethernet = variant in ("ethernet", "ethernet-ram768", "ethernet-sdro", "ethernet-emmcro")
     config = (source / ".config").read_text()
     if variant == "container-qemu":
         for package in ("docker", "dockerd", "containerd", "runc", "tini", "kmod-nft-nat", "ip-full", "iperf3"):
@@ -23,6 +23,11 @@ def check(source, built=False):
             raise ValueError("Combined QEMU applications must use firewall4, without legacy firewall")
     if variant in ("ethernet-ram768", "ethernet-sdro") and "CONFIG_KERNEL_PROC_PAGE_MONITOR=y\n" not in config:
         raise ValueError("Higher-memory native configuration lacks the OpenWrt pagemap selection")
+    if variant == "ethernet-emmcro":
+        for option in ("KERNEL_BLK_CGROUP", "KERNEL_BLK_DEV_THROTTLING", "PACKAGE_block-mount",
+                       "PACKAGE_blockd", "PACKAGE_e2fsprogs"):
+            if re.search(rf"^CONFIG_{option}=[ym]$", config, re.MULTILINE):
+                raise ValueError("Native eMMC unexpectedly enables block policy/automount/repair: " + option)
     for option in (
             "TARGET_hi3798mv100_apps", "TARGET_hi3798mv100_apps_DEVICE_ty1208z_apps",
             "TARGET_ROOTFS_INITRAMFS_SEPARATE", "USE_MUSL", "PACKAGE_luci-app-passwall",
@@ -88,9 +93,14 @@ def check(source, built=False):
         if variant == "ethernet-sdro":
             from native_sd_profile import native_sd_configuration
             native_sd_configuration(kernel_config)
+        if variant == "ethernet-emmcro":
+            from native_emmc_profile import native_emmc_configuration
+            native_emmc_configuration(kernel_config)
         for option in ("BLOCK", "MMC", "MTD", "USB_SUPPORT", "SMP",
                        "HI3798MV100_EMMC_AUDIT", "MMC_DW_HI3798MV100_IDENT"):
             if variant == "ethernet-sdro" and option in ("BLOCK", "MMC"):
+                continue
+            if variant == "ethernet-emmcro" and option in ("BLOCK", "MMC", "MMC_DW_HI3798MV100_IDENT"):
                 continue
             if variant == "container-qemu" and option == "BLOCK":
                 continue
@@ -101,7 +111,7 @@ def check(source, built=False):
                            "FESTA_TY1208Z_PHY", "PHYLIB", "NET_NS"):
                 if f"CONFIG_{option}=y\n" not in kernel_config:
                     raise ValueError(f"Missing built-in integrated Ethernet option: {option}")
-            release = ("-ty1208z-openwrt-sdro" if variant == "ethernet-sdro" else
+            release = ("-ty1208z-openwrt-emmcro" if variant == "ethernet-emmcro" else "-ty1208z-openwrt-sdro" if variant == "ethernet-sdro" else
                        "-ty1208z-openwrt-router768" if variant == "ethernet-ram768" else "-ty1208z-openwrt-router")
             if f'CONFIG_LOCALVERSION="{release}"\n' not in kernel_config:
                 raise ValueError("Integrated application kernel release differs")
@@ -110,6 +120,8 @@ def check(source, built=False):
                     raise ValueError(f"Unexpected integrated Ethernet subsystem: {option}")
         elif re.search(r"^CONFIG_HISI_FEMAC=[ym]$", kernel_config, re.MULTILINE):
             raise ValueError("Plain application kernel unexpectedly enables board Ethernet")
+        if ("CONFIG_TY1208Z_ROUTER_EMMC_RO=y\n" in kernel_config) != (variant == "ethernet-emmcro"):
+            raise ValueError("Native eMMC kernel selection differs from its native variant")
         extended = variant == "ethernet-ram768"
         if ("CONFIG_TY1208Z_ROUTER_RAM768=y\n" in kernel_config) != extended:
             raise ValueError("Higher-memory kernel selection differs from its native variant")

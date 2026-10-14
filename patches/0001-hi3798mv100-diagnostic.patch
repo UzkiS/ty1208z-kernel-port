@@ -1,6 +1,6 @@
 --- a/arch/arm/mach-hisi/Kconfig
 +++ b/arch/arm/mach-hisi/Kconfig
-@@ -12,6 +12,33 @@
+@@ -12,6 +12,42 @@
  if ARCH_HISI
  
  menu "Hisilicon platform type"
@@ -31,6 +31,15 @@
 +	help
 +	  Dedicated native SD/768-MiB board identity. Retain low init
 +	  pages and reject all card writes before the hardware queue.
++
++config TY1208Z_ROUTER_EMMC_RO
++	bool "TY1208Z native low256 router with enforced read-only eMMC"
++	depends on ARCH_HI3798MV100 && NET && HISI_FEMAC && BLOCK && MMC
++	depends on !HIGHMEM && !MTD && !USB_SUPPORT && !SMP
++	depends on !DEBUG_FS && !WATCHDOG && !PM
++	help
++	  Dedicated native eMMC/network board identity. Retain low init
++	  pages; the separate eMMC policy still denies all card writes.
  
  config ARCH_HI3xxx
  	bool "Hisilicon Hi36xx family"
@@ -223,11 +232,11 @@
  #include <linux/of_fdt.h>
  #include <linux/highmem.h>
  #include <linux/gfp.h>
-@@ -471,6 +472,20 @@
+@@ -471,6 +472,22 @@
  	fix_kernmem_perms();
  
  	poison_init_mem(__init_begin, __init_end - __init_begin);
-+#if IS_ENABLED(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) || IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) || IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO)
++#if IS_ENABLED(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) || IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) || IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) || IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO)
 +	/* Keep low 16 MiB reserved in the dedicated memory experiments.
 +	 * ARM normally recycles its own init pages inside that reservation.
 +	 */
@@ -236,7 +245,9 @@
 +	    (IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) &&
 +	     of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router768-ram")) ||
 +	    (IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) &&
-+	     of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram"))) {
++	     of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")) ||
++	    (IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
++	     of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram"))) {
 +		pr_info("RAM768_INIT_MEMORY_RETAINED low-16MiB-reservation\n");
 +		return;
 +	}
@@ -297,7 +308,7 @@
  				   sdio.o sdio_ops.o sdio_bus.o \
 --- a/drivers/mmc/host/Kconfig
 +++ b/drivers/mmc/host/Kconfig
-@@ -802,6 +802,47 @@
+@@ -802,6 +802,48 @@
  	  Synopsys DesignWare Memory Card Interface driver. Select this option
  	  for platforms based on Exynos4 and Exynos5 SoC's.
  
@@ -336,7 +347,8 @@
 +config HI3798MV100_EMMC_READ_ONLY
 +	bool "TY1208Z enforced read-only eMMC user-area block experiment"
 +	depends on ARCH_HI3798MV100 && MMC_DW && MMC_BLOCK && BLOCK
-+	depends on !NET && !MODULES && !SMP && !USB_SUPPORT && !MTD
++	depends on (!NET && !MODULES) || TY1208Z_ROUTER_EMMC_RO
++	depends on !SMP && !USB_SUPPORT && !MTD
 +	depends on !DEBUG_FS && !PM
 +	help
 +	  Dedicated user-area-only RAM experiment, not a production driver.
@@ -494,7 +506,7 @@
 +config TY1208Z_ETHERNET_INHERITED
 +	bool "TY1208Z inherited-PHY Ethernet RAM experiment"
 +	depends on ARCH_HI3798MV100 && HISI_FEMAC
-+	depends on (!BLOCK && !MMC) || TY1208Z_ROUTER_SD_RO
++	depends on (!BLOCK && !MMC) || TY1208Z_ROUTER_SD_RO || TY1208Z_ROUTER_EMMC_RO
 +	depends on !HI3798MV100_ETHERNET_AUDIT && !HI3798MV100_ETHERNET_CLOCK_ID
 +	help
 +	  Enable the measured MAC clock bit, preserving PHY controls.
@@ -759,7 +771,7 @@
  		netif_stop_queue(dev);
  		return NETDEV_TX_BUSY;
  	}
-@@ -757,12 +809,66 @@
+@@ -757,12 +809,68 @@
  	val |= MAX_FRAME_SIZE;
  	writel(val, priv->port_base + MAC_SET);
  
@@ -813,7 +825,9 @@
 +	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) &&
 +	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router768-ram")) &&
 +	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) &&
-+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")))
++	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")) &&
++	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
++	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram")))
 +		return -ENODEV;
 +	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
 +		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
@@ -829,7 +843,7 @@
  }
  
  static int hisi_femac_drv_probe(struct platform_device *pdev)
-@@ -784,6 +890,19 @@
+@@ -784,6 +892,19 @@
  	priv = netdev_priv(ndev);
  	priv->dev = dev;
  	priv->ndev = ndev;
@@ -849,7 +863,7 @@
  
  	priv->port_base = devm_platform_ioremap_resource(pdev, 0);
  	if (IS_ERR(priv->port_base)) {
-@@ -810,12 +929,19 @@
+@@ -810,12 +931,19 @@
  		goto out_free_netdev;
  	}
  
@@ -875,7 +889,7 @@
  
  	priv->phy_rst = devm_reset_control_get(dev, "phy");
  	if (IS_ERR(priv->phy_rst)) {
-@@ -945,6 +1071,7 @@
+@@ -945,6 +1073,7 @@
  #endif
  
  static const struct of_device_id hisi_femac_match[] = {
@@ -1314,7 +1328,7 @@
 +MACHINE_END
 --- /dev/null
 +++ b/drivers/clk/hisilicon/clk-ty1208z-ethernet.c
-@@ -0,0 +1,104 @@
+@@ -0,0 +1,106 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Measured TY1208Z inherited PHY state; no PHY reset or frequency claim. */
 +#include <linux/clk-provider.h>
@@ -1379,7 +1393,9 @@
 +	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) &&
 +	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router768-ram")) &&
 +	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) &&
-+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")))
++	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")) &&
++	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
++	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram")))
 +		return -ENODEV;
 +	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
 +		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
@@ -1992,7 +2008,7 @@
 +#endif
 --- /dev/null
 +++ b/drivers/mmc/host/dw_mmc-hi3798mv100-ident.c
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,206 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Restricted RAM diagnostic, not the production MV100 storage driver. */
 +#include <linux/io.h>
@@ -2112,7 +2128,9 @@
 +	int irq;
 +
 +	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
-+	    !of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram"))
++	    !of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram") &&
++	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
++	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram")))
 +		return -ENODEV;
 +
 +	controller = platform_get_resource(pdev, IORESOURCE_MEM, 0);
@@ -2681,7 +2699,7 @@
 +#endif
 --- /dev/null
 +++ b/drivers/net/phy/festa-ty1208z.c
-@@ -0,0 +1,51 @@
+@@ -0,0 +1,53 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Inherited-state experiment. No PHY firmware/reset/expanded-register writes. */
 +#include <linux/module.h>
@@ -2698,7 +2716,9 @@
 +	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) &&
 +	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router768-ram")) &&
 +	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) &&
-+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram"))) ||
++	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")) &&
++	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
++	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram"))) ||
 +	    phy->mdio.addr != 1 || phy->phy_id != 0x20669823)
 +		return -ENODEV;
 +	high = phy_read(phy, MII_PHYSID1);
@@ -2735,7 +2755,7 @@
 +MODULE_DEVICE_TABLE(mdio, ty1208z_festa_ids);
 --- /dev/null
 +++ b/drivers/power/reset/ty1208z-mv100-emmc-ro-restart.c
-@@ -0,0 +1,115 @@
+@@ -0,0 +1,117 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/* Explicit measured reset only after the independent eMMC host is stopped. */
 +#include <linux/delay.h>
@@ -2797,7 +2817,9 @@
 +	unsigned int i;
 +	int ret;
 +
-+	if (!of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram"))
++	if (!of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram") &&
++	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
++	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram")))
 +		return -ENODEV;
 +	for (i = 0; i < ARRAY_SIZE(starts); i++) {
 +		res = platform_get_resource(pdev, IORESOURCE_MEM, i);

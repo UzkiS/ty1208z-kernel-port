@@ -101,3 +101,11 @@ ARM64-only images cannot run natively on this CPU.
 One GiB permits modest workloads; the current single-core experiment, storage
 I/O, proxy load and actual free memory must determine the eventual service
 budget. Physical Docker and full storage/final-router acceptance remain pending.
+
+`tools/prepare_native_userspace.py` now prepares a RAM network-delivery
+supplement from the accepted native archives without rebuilding or rerunning
+applications. Fourteen application/runtime files are byte-identical between
+the native eMMC and combined deliveries. The prepared 75-file supplement is
+91123638 bytes compressed and excludes kernel modules and APK database state.
+It is not installed or board-tested; the integrated board kernel must supply
+its own modules, and final package registration remains to be integrated.

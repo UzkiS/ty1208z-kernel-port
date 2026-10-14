@@ -26,6 +26,9 @@ typedef uint64_t resource_size_t;
 #ifndef CONFIG_TY1208Z_ROUTER_SD_RO
 #define CONFIG_TY1208Z_ROUTER_SD_RO 0
 #endif
+#ifndef CONFIG_TY1208Z_ROUTER_EMMC_RO
+#define CONFIG_TY1208Z_ROUTER_EMMC_RO 0
+#endif
 #define IS_ENABLED(x) (x)
 #define ARRAY_SIZE(values) (sizeof(values) / sizeof((values)[0]))
 #define IORESOURCE_MEM 1
@@ -107,6 +110,9 @@ int main(void) {
 #if CONFIG_TY1208Z_ROUTER_SD_RO
                              "tianyi,ty1208z-ca-openwrt-sdro-ram",
 #endif
+#if CONFIG_TY1208Z_ROUTER_EMMC_RO
+                             "tianyi,ty1208z-ca-openwrt-emmcro-ram",
+#endif
                              };
     const char *rejected[] = {"", "linux,dummy-virt", "tianyi,ty1208z-ca-openwrt-ram",
                              "tianyi,ty1208z-ca-usb-host-experiment", "tianyi,ty1208z-ca-openwrt-router",
@@ -115,6 +121,9 @@ int main(void) {
 #endif
 #if !CONFIG_TY1208Z_ROUTER_SD_RO
                              "tianyi,ty1208z-ca-openwrt-sdro-ram",
+#endif
+#if !CONFIG_TY1208Z_ROUTER_EMMC_RO
+                             "tianyi,ty1208z-ca-openwrt-emmcro-ram",
 #endif
                              };
     for (unsigned i = 0; i < ARRAY_SIZE(rejected); i++) {
@@ -197,13 +206,15 @@ def run(linux=None):
         build = Path(directory)
         (build / "test.c").write_text(source)
         binary = build / "test"
-        for selected in range(4):
+        for selected in range(8):
             arguments = ["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                          "-fsanitize=address,undefined", "-fno-pie", "-no-pie"]
             if selected & 1:
                 arguments.append("-DCONFIG_TY1208Z_ROUTER_RAM768=1")
             if selected & 2:
                 arguments.append("-DCONFIG_TY1208Z_ROUTER_SD_RO=1")
+            if selected & 4:
+                arguments.append("-DCONFIG_TY1208Z_ROUTER_EMMC_RO=1")
             subprocess.run(arguments + [str(build / "test.c"), "-o", str(binary)], check=True)
             subprocess.run([binary], check=True, timeout=10)
 

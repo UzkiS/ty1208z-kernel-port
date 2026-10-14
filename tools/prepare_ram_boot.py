@@ -114,7 +114,7 @@ def prepare(artifacts, inspection, allocation_evidence=None):
     application_initrd = applications_ram_profile(tree, config, artifacts)
     board = properties["/"]["compatible"].get("strings", [None])[0]
     if board in ("tianyi,ty1208z-ca-openwrt-router-ram", "tianyi,ty1208z-ca-openwrt-router768-ram",
-                 "tianyi,ty1208z-ca-openwrt-sdro-ram"):
+                 "tianyi,ty1208z-ca-openwrt-sdro-ram", "tianyi,ty1208z-ca-openwrt-emmcro-ram"):
         network = openwrt_router_ethernet_profile(tree, config)
         if application_initrd is None or not network:
             raise ValueError("Integrated Ethernet lacks its exact external-rootfs application acceptance")

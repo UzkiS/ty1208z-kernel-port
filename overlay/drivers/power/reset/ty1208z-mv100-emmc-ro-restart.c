@@ -59,7 +59,9 @@ static int ty1208z_emmc_ro_restart_probe(struct platform_device *pdev)
 	unsigned int i;
 	int ret;
 
-	if (!of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram"))
+	if (!of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram") &&
+	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram")))
 		return -ENODEV;
 	for (i = 0; i < ARRAY_SIZE(starts); i++) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);

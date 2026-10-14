@@ -14,7 +14,9 @@ static int ty1208z_festa_probe(struct phy_device *phy)
 	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) &&
 	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router768-ram")) &&
 	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) &&
-	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram"))) ||
+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")) &&
+	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram"))) ||
 	    phy->mdio.addr != 1 || phy->phy_id != 0x20669823)
 		return -ENODEV;
 	high = phy_read(phy, MII_PHYSID1);

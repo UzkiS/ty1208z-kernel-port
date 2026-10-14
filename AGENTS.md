@@ -32,6 +32,15 @@ board support. Keep assumptions separate from measured facts.
   request-level write denial; native-router integration and hotplug are pending.
   Other RAM profiles still
   need separate restart/shutdown support and acceptance.
+- On 2026-10-14 the user explicitly requested a practical single-device workflow
+  and lower token use. This preference overrides the general test requirements
+  below: keep backup, boot and recovery checks; reuse accepted memory/application
+  evidence, and test only the changed functionality. Do not repeat full suites,
+  add variants, broaden tests or download/reverify CI without a concrete need.
+  Keep progress reports short and focused on usable results.
+  Select checks by changed dependencies: reuse passing evidence for unchanged
+  components and check only the new integration boundary. Make this judgment
+  autonomously; inferred coverage must not be reported as a new measured pass.
 - The independent `ram768` profile requires the immediately preceding guarded
   reboot's complete, hash-verified eleven-allocation table and fresh inspection.
   It preserves low 16 MiB and excludes upper 256 MiB. Never extend the ordinary

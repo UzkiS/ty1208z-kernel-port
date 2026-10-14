@@ -30,11 +30,11 @@ def make(source, output):
         raise ValueError("Compile-only container packages must not become a board RAM image")
     check(source, built=True)
     variant = application_variant(source)
-    ethernet = variant in ("ethernet", "ethernet-ram768", "ethernet-sdro")
-    layer = ("router-sd" if variant == "ethernet-sdro" else
+    ethernet = variant in ("ethernet", "ethernet-ram768", "ethernet-sdro", "ethernet-emmcro")
+    layer = ("router-emmc" if variant == "ethernet-emmcro" else "router-sd" if variant == "ethernet-sdro" else
              "router768" if variant == "ethernet-ram768" else "router" if ethernet else "applications")
     if output is None:
-        output = PROJECT / ("artifacts/openwrt-router-sdro" if variant == "ethernet-sdro" else
+        output = PROJECT / ("artifacts/openwrt-router-emmcro" if variant == "ethernet-emmcro" else "artifacts/openwrt-router-sdro" if variant == "ethernet-sdro" else
                             "artifacts/openwrt-router768" if variant == "ethernet-ram768" else
                             "artifacts/openwrt-router1" if ethernet else "artifacts/openwrt-apps-ram1")
     kernel = unique((source / "build_dir").glob("target-*/linux-hi3798mv100_apps/linux-6.12.112"), "application kernel")
@@ -67,7 +67,7 @@ def make(source, output):
                         "--linux", str(kernel)], check=True)
         subprocess.run([sys.executable, str(PROJECT / "tools/test_femac_datapath.py"),
                         "--linux", str(kernel)], check=True)
-    if variant in ("ethernet-ram768", "ethernet-sdro"):
+    if variant in ("ethernet-ram768", "ethernet-sdro", "ethernet-emmcro"):
         from test_ram768 import actual_init_memory
         actual_init_memory(kernel)
     if variant == "ethernet-sdro":
@@ -86,6 +86,22 @@ def make(source, output):
                 raise ValueError("Actual native SD driver/policy differs from reviewed source")
         for test in ("test_sd_ident.py", "test_sd_ident_driver.py", "test_sd_ro.py"):
             subprocess.run([sys.executable, str(PROJECT / "tools" / test), "--linuxsrc", str(kernel)], check=True)
+    if variant == "ethernet-emmcro":
+        for name in ("drivers/mmc/host/dw_mmc-hi3798mv100-ident.c",
+                     "drivers/mmc/host/hi3798mv100-ident-policy.h",
+                     "drivers/mmc/host/hi3798mv100-emmc-ro-policy.h",
+                     "drivers/power/reset/ty1208z-mv100-emmc-ro-restart.c"):
+            if (kernel / name).read_bytes() != (PROJECT / "overlay" / name).read_bytes():
+                raise ValueError("Actual native eMMC driver/policy/reset differs from reviewed source")
+        toolchain = json.loads(next(line.split("=", 1)[1] for line in
+            (source / ".config").read_text().splitlines() if line.startswith("CONFIG_TOOLCHAIN_ROOT=")))
+        cross = Path(toolchain) / "bin/arm-openwrt-linux-muslgnueabi-"
+        subprocess.run([sys.executable, str(PROJECT / "tools/test_native_emmc_kconfig.py"),
+                        "--linuxsrc", str(kernel), "--config", str(kernel / ".config"),
+                        "--cross-compile", str(cross)], check=True)
+        for test in ("test_emmc_ident.py", "test_emmc_handoff.py", "test_emmc_ro.py", "test_emmc_ro_driver.py"):
+            subprocess.run([sys.executable, str(PROJECT / "tools" / test), "--linuxsrc", str(kernel)], check=True)
+        subprocess.run([sys.executable, str(PROJECT / "tools/test_emmc_ro_restart.py")], check=True)
     subprocess.run([sys.executable, str(PROJECT / "tools/inspect_kernel_layout.py"),
                     "--build", str(kernel), "--output", str(checks / "kernel-layout.json")], check=True)
     cpp = subprocess.run([

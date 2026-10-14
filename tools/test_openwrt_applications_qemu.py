@@ -39,7 +39,7 @@ def required_markers(variant):
         b"LUCI_EMPTY_ROOT_LOGIN_PASS", b"NFT_EXPRESSIONS_AND_COUNTER_PASS",
         b"OPENWRT_APPLICATIONS_QEMU_PASS",
     )
-    if variant in ("ethernet", "ethernet-ram768", "ethernet-sdro", "container-qemu"):
+    if variant in ("ethernet", "ethernet-ram768", "ethernet-sdro", "ethernet-emmcro", "container-qemu"):
         markers += (b"OPENWRT_ROUTER_FORWARDING_TIME64_PASS", b"PASSWALL_TPROXY_TCP_TIME64_PASS",
                     b"PASSWALL_TPROXY_UDP_TIME64_PASS")
     if variant == "container-qemu":
@@ -65,7 +65,7 @@ def test(source, memory_mib=512, taskbase=None):
         raise ValueError("Compile-only container packages have no application rootfs acceptance")
     variant = application_variant(source)
     combined = variant == "container-qemu"
-    ethernet = variant in ("ethernet", "ethernet-ram768", "ethernet-sdro")
+    ethernet = variant in ("ethernet", "ethernet-ram768", "ethernet-sdro", "ethernet-emmcro")
     networking = ethernet or combined
     if (combined and memory_mib != 768) or (not combined and memory_mib not in (256, 512)):
         raise ValueError("Application QEMU memory must match its profile: 256/512 MiB, or combined 768 MiB")

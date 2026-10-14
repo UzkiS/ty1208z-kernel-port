@@ -3,6 +3,10 @@ import re
 
 from native_sd_profile import COMPATIBLE as SD_COMPATIBLE, RELEASE as SD_RELEASE, native_sd_profile
 from sd_ident_profile import NODE as SD_NODE
+from native_emmc_profile import (
+    COMPATIBLE as EMMC_COMPATIBLE, RELEASE as EMMC_RELEASE,
+    NODE as EMMC_NODE, RESTART as EMMC_RESTART, native_emmc_profile,
+)
 
 NETWORK_NODES = {
     "/soc/clock-controller@f8a220cc",
@@ -29,6 +33,10 @@ def openwrt_ethernet_profile(tree, config):
 
 
 def openwrt_router_ethernet_profile(tree, config):
+    if "CONFIG_TY1208Z_ROUTER_EMMC_RO=y\n" in config:
+        if not native_emmc_profile(tree, config):
+            return False
+        return _ethernet_profile(tree, config, EMMC_COMPATIBLE, EMMC_RELEASE, applications=True, emmcro=True)
     if "CONFIG_TY1208Z_ROUTER_SD_RO=y\n" in config:
         return openwrt_router_sdro_ethernet_profile(tree, config)
     if "CONFIG_TY1208Z_ROUTER_RAM768=y\n" in config:
@@ -61,7 +69,7 @@ def openwrt_router_sdro_ethernet_profile(tree, config):
     return _ethernet_profile(tree, config, SD_COMPATIBLE, SD_RELEASE, applications=True, sdro=True)
 
 
-def _ethernet_profile(tree, config, board, release, applications=False, sdro=False):
+def _ethernet_profile(tree, config, board, release, applications=False, sdro=False, emmcro=False):
     props = {node["path"]: node["properties"] for node in tree["nodes"]}
     enabled = "CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" in config
     nodes = props.keys() & NETWORK_NODES
@@ -118,6 +126,8 @@ def _ethernet_profile(tree, config, board, release, applications=False, sdro=Fal
         raise ValueError("Higher-memory configuration outside its native router identity")
     if "TY1208Z_ROUTER_SD_RO" in active and board != SD_COMPATIBLE:
         raise ValueError("Native SD configuration outside its dedicated router identity")
+    if "TY1208Z_ROUTER_EMMC_RO" in active and board != EMMC_COMPATIBLE:
+        raise ValueError("Native eMMC configuration outside its dedicated router identity")
     required = {"NET", "INET", "PACKET", "NETDEVICES", "HISI_FEMAC",
                 "MDIO_HISI_FEMAC", "PHYLIB", "FESTA_TY1208Z_PHY"}
     if any(active.get(name) != "y" for name in required):
@@ -136,6 +146,10 @@ def _ethernet_profile(tree, config, board, release, applications=False, sdro=Fal
         if not applications or not native_sd_profile(tree, config):
             raise ValueError("SD hardware exception lacks its exact native profile")
         prohibited -= {"BLOCK", "MMC"}
+    if emmcro:
+        if not applications or not native_emmc_profile(tree, config):
+            raise ValueError("eMMC hardware exception lacks its exact native profile")
+        prohibited -= {"BLOCK", "MMC", "MMC_DW_HI3798MV100_IDENT"}
     if active.keys() & prohibited:
         raise ValueError("Prohibited subsystem in Ethernet network profile: " +
                          ", ".join(sorted(active.keys() & prohibited)))
@@ -143,6 +157,7 @@ def _ethernet_profile(tree, config, board, release, applications=False, sdro=Fal
     base_nodes = {"/", "/aliases", "/chosen", "/memory@0", "/cpus", "/cpus/cpu@0",
                   "/clock-24m", "/clock-83m3", "/interrupt-controller@f8a01000", "/soc",
                   "/soc/timer@f8a29000", "/soc/serial@f8b00000"}
-    if props.keys() != base_nodes | NETWORK_NODES | ({SD_NODE} if sdro else set()):
+    storage_nodes = {EMMC_NODE, EMMC_RESTART} if emmcro else {SD_NODE} if sdro else set()
+    if props.keys() != base_nodes | NETWORK_NODES | storage_nodes:
         raise ValueError("Unreviewed node in Ethernet network profile")
     return True

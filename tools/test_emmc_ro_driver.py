@@ -28,6 +28,8 @@ typedef uint32_t u32;
 #define SDMMC_CTRL_USE_IDMAC (1U << 25)
 static bool ro_mode;
 #define CONFIG_HI3798MV100_EMMC_READ_ONLY ro_mode
+static bool native_mode;
+#define CONFIG_TY1208Z_ROUTER_EMMC_RO native_mode
 #define IS_ENABLED(option) (option)
 struct device { void *of_node; };
 struct platform_device { struct device dev; };
@@ -41,11 +43,12 @@ static struct resource resources[3];
 static u32 crg, controller[1024];
 static struct irq_data irq;
 static bool board, extra;
+static const char *board_name;
 static int missing, map_failure, irq_error;
 static const char *property;
 static unsigned maps, reads, registered, removed, completion, errors;
 static bool of_machine_is_compatible(const char *name)
-{ assert(!strcmp(name, "tianyi,ty1208z-ca-emmc-ro-ram")); return board; }
+{ return board && !strcmp(name, board_name); }
 static struct resource *platform_get_resource(struct platform_device *p, int type, unsigned i)
 { assert(p && type == IORESOURCE_MEM && i < 3); return (int)i == missing || (i == 2 && !extra) ? NULL : &resources[i]; }
 static uint64_t resource_size(struct resource *r) { return r->end - r->start + 1; }
@@ -78,12 +81,26 @@ static void initialize(void)
     crg = 0x40103; irq.hwirq = 67;
     controller[SDMMC_VERID / 4] = 0x5342270a; controller[SDMMC_HCON / 4] = 0x00e44c81;
     board = true; extra = false; missing = map_failure = -1; irq_error = 0; property = NULL;
+    board_name = "tianyi,ty1208z-ca-emmc-ro-ram";
     maps = reads = registered = removed = completion = errors = 0;
 }
 /* ACTUAL */
 int main(void)
 {
     struct platform_device p = {.dev.of_node = &p};
+    const char *identities[] = {"tianyi,ty1208z-ca-emmc-ro-ram", "tianyi,ty1208z-ca-openwrt-emmcro-ram", "foreign"};
+    ro_mode = true;
+    for (unsigned selected = 0; selected < 2; selected++) {
+        native_mode = selected;
+        for (unsigned i = 0; i < 3; i++) {
+            initialize(); board_name = identities[i];
+            bool accepted = i == 0 || (i == 1 && selected);
+            assert(mv100_ident_probe(&p) == (accepted ? 0 : -ENODEV));
+            assert(registered == (unsigned)accepted);
+            if (!accepted) assert(!maps && !reads);
+        }
+    }
+    native_mode = false;
     ro_mode = true; initialize(); board = false;
     assert(mv100_ident_probe(&p) == -ENODEV && !maps && !reads && !registered);
     ro_mode = false; assert(mv100_ident_probe(&p) == 0 && registered == 1);

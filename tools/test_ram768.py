@@ -152,6 +152,9 @@ static bool integrator, cintegrator;
 #ifndef CONFIG_TY1208Z_ROUTER_SD_RO
 #define CONFIG_TY1208Z_ROUTER_SD_RO 0
 #endif
+#ifndef CONFIG_TY1208Z_ROUTER_EMMC_RO
+#define CONFIG_TY1208Z_ROUTER_EMMC_RO 0
+#endif
 #define IS_ENABLED(x) (x)
 static unsigned fixed, poisoned, freed, retained;
 static char init_area[16];
@@ -162,7 +165,8 @@ static char init_area[16];
 static bool __attribute__((unused)) of_machine_is_compatible(const char *name) {
     if (!strcmp(name, "tianyi,ty1208z-ca-ram768")) return board == 1;
     if (!strcmp(name, "tianyi,ty1208z-ca-openwrt-router768-ram")) return board == 2;
-    assert(!strcmp(name, "tianyi,ty1208z-ca-openwrt-sdro-ram")); return board == 3;
+    if (!strcmp(name, "tianyi,ty1208z-ca-openwrt-sdro-ram")) return board == 3;
+    assert(!strcmp(name, "tianyi,ty1208z-ca-openwrt-emmcro-ram")); return board == 4;
 }
 #define pr_info(...) retained++
 static void fix_kernmem_perms(void) { fixed++; }
@@ -178,7 +182,8 @@ int main(void) {
         assert(fixed == 1 && poisoned == 1);
         bool keep = (CONFIG_POWER_RESET_TY1208Z_MV100_RAM && board == 1) ||
                     (CONFIG_TY1208Z_ROUTER_RAM768 && board == 2) ||
-                    (CONFIG_TY1208Z_ROUTER_SD_RO && board == 3);
+                    (CONFIG_TY1208Z_ROUTER_SD_RO && board == 3) ||
+                    (CONFIG_TY1208Z_ROUTER_EMMC_RO && board == 4);
         assert(retained == (unsigned)keep);
         assert(freed == (unsigned)(!keep && !integrator && !cintegrator));
     }
@@ -189,7 +194,7 @@ int main(void) {
         path = Path(directory)
         file = path / "test.c"
         file.write_text(harness + function + main)
-        for selected in range(8):
+        for selected in range(16):
             binary = path / str(selected)
             arguments = ["cc", "-std=gnu11", "-O1", "-g", "-Wall", "-Wextra", "-Werror",
                          "-fsanitize=address,undefined", "-fno-pie", "-no-pie"]
@@ -199,6 +204,8 @@ int main(void) {
                 arguments.append("-DCONFIG_TY1208Z_ROUTER_RAM768=1")
             if selected & 4:
                 arguments.append("-DCONFIG_TY1208Z_ROUTER_SD_RO=1")
+            if selected & 8:
+                arguments.append("-DCONFIG_TY1208Z_ROUTER_EMMC_RO=1")
             subprocess.run(arguments + [str(file), "-o", str(binary)], check=True)
             subprocess.run([binary], check=True)
 

@@ -8,6 +8,10 @@ from pathlib import Path
 from ethernet_net_profile import NETWORK_NODES, openwrt_router_ethernet_profile
 from native_sd_profile import COMPATIBLE as SD_COMPATIBLE, RELEASE as SD_RELEASE, native_sd_configuration
 from sd_ident_profile import NODE as SD_NODE
+from native_emmc_profile import (
+    COMPATIBLE as EMMC_COMPATIBLE, RELEASE as EMMC_RELEASE, BOOTARGS as EMMC_BOOTARGS,
+    NODE as EMMC_NODE, RESTART as EMMC_RESTART, native_emmc_configuration,
+)
 
 # Keep the complete compressed archive below the unexplained bootloader
 # Bound Addr (0x08e62000), clear of the measured kernel load/workspace.
@@ -46,7 +50,7 @@ def validate_pair(artifacts):
         ("packages", "packages.manifest"), ("console", "checks/qemu-applications-256.log"))}
     report = json.loads((Path(artifacts) / "checks/applications-qemu-256.json").read_text())
     variant = report.get("application_variant", "qemu")
-    markers = MARKERS | (ROUTER_MARKERS if variant in ("ethernet", "ethernet-ram768", "ethernet-sdro") else set())
+    markers = MARKERS | (ROUTER_MARKERS if variant in ("ethernet", "ethernet-ram768", "ethernet-sdro", "ethernet-emmcro") else set())
     # Preserve acceptance of earlier measured images. New builds record the
     # extra language check and must supply its actual console evidence too.
     if LANGUAGE_MARKER in report.get("passed_markers", []):
@@ -54,7 +58,7 @@ def validate_pair(artifacts):
     if DUAL_CORE_MARKERS & set(report.get("passed_markers", [])):
         markers |= DUAL_CORE_MARKERS
     if (report.get("result") != "OPENWRT_APPLICATIONS_QEMU_PASS" or
-            variant not in {"qemu", "ethernet", "ethernet-ram768", "ethernet-sdro"} or
+            variant not in {"qemu", "ethernet", "ethernet-ram768", "ethernet-sdro", "ethernet-emmcro"} or
             report.get("machine") != "virt,cortex-a7,single-core" or
             report.get("memory_mib") != 256 or report.get("memory_limit_mib") != 240 or
             report.get("clock_year") != 2040 or report.get("disks") is not False or
@@ -63,7 +67,7 @@ def validate_pair(artifacts):
     for name, path in paths.items():
         if digest(path.read_bytes()) != report.get("artifacts", {}).get(name):
             raise ValueError(f"Application kernel/rootfs/provenance identity differs: {name}")
-    if ("CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" in paths["config"].read_text()) != (variant in ("ethernet", "ethernet-ram768", "ethernet-sdro")):
+    if ("CONFIG_TY1208Z_ETHERNET_INHERITED=y\n" in paths["config"].read_text()) != (variant in ("ethernet", "ethernet-ram768", "ethernet-sdro", "ethernet-emmcro")):
         raise ValueError("Application memory/runtime acceptance variant differs from the actual kernel")
     if ("CONFIG_TY1208Z_ROUTER_RAM768=y\n" in paths["config"].read_text()) != (variant == "ethernet-ram768"):
         raise ValueError("Native higher-memory runtime acceptance differs from its actual kernel")
@@ -71,6 +75,10 @@ def validate_pair(artifacts):
         raise ValueError("Native SD runtime acceptance differs from its actual kernel")
     if variant == "ethernet-sdro":
         native_sd_configuration(paths["config"].read_text())
+    if ("CONFIG_TY1208Z_ROUTER_EMMC_RO=y\n" in paths["config"].read_text()) != (variant == "ethernet-emmcro"):
+        raise ValueError("Native eMMC runtime acceptance differs from its actual kernel")
+    if variant == "ethernet-emmcro":
+        native_emmc_configuration(paths["config"].read_text())
     transcript = paths["console"].read_bytes().replace(b"\r", b"")
     if any(b"\n" + marker.encode() + b"\n" not in transcript for marker in markers):
         raise ValueError("Recorded application markers are absent from the actual console")
@@ -102,14 +110,16 @@ def applications_ram_profile(tree, config, artifacts):
     chosen = props.get("/chosen", {})
     ram768 = compatible == [ROUTER768_COMPATIBLE, "hi3798mv100-series"]
     sdro = compatible == [SD_COMPATIBLE, "hi3798mv100-series"]
+    emmcro = compatible == [EMMC_COMPATIBLE, "hi3798mv100-series"]
     extended = ram768 or sdro
-    router = extended or compatible == [ROUTER_COMPATIBLE, "hi3798mv100-series"]
+    router = extended or emmcro or compatible == [ROUTER_COMPATIBLE, "hi3798mv100-series"]
     if compatible != [COMPATIBLE, "hi3798mv100-series"] and not router:
-        if ({COMPATIBLE, ROUTER_COMPATIBLE, ROUTER768_COMPATIBLE, SD_COMPATIBLE} & set(compatible) or
+        if ({COMPATIBLE, ROUTER_COMPATIBLE, ROUTER768_COMPATIBLE, SD_COMPATIBLE, EMMC_COMPATIBLE} & set(compatible) or
                 any(name.startswith("linux,initrd-") for name in chosen)):
             raise ValueError("External initrd outside the explicit application RAM profile")
         return None
-    if set(props) != BASE_PATHS | (NETWORK_NODES if router else set()) | ({SD_NODE} if sdro else set()):
+    storage_nodes = {EMMC_NODE, EMMC_RESTART} if emmcro else {SD_NODE} if sdro else set()
+    if set(props) != BASE_PATHS | (NETWORK_NODES if router else set()) | storage_nodes:
         raise ValueError("Unreviewed peripheral in application RAM profile")
     if router and not openwrt_router_ethernet_profile(tree, config):
         raise ValueError("Integrated application profile lacks its measured Ethernet drivers")
@@ -128,7 +138,7 @@ def applications_ram_profile(tree, config, artifacts):
         ("/soc/serial@f8b00000", "interrupts", "cells", [0, 49, 4]),
         ("/soc/serial@f8b00000", "compatible", "strings", ["arm,pl011", "arm,primecell"]),
         ("/soc/serial@f8b00000", "clock-names", "strings", ["uartclk", "apb_pclk"]),
-        ("/chosen", "bootargs", "strings", [BOOTARGS]),
+        ("/chosen", "bootargs", "strings", [EMMC_BOOTARGS if emmcro else BOOTARGS]),
         ("/chosen", "stdout-path", "strings", ["serial0:115200n8"]),
         ("/aliases", "serial0", "strings", ["/soc/serial@f8b00000"]),
     )
@@ -155,13 +165,16 @@ def applications_ram_profile(tree, config, artifacts):
                   "MMC_DW_HI3798MV100_IDENT", "HI3798MV100_ETHERNET_AUDIT",
                   "HI3798MV100_ETHERNET_CLOCK_ID", "TY1208Z_ETHERNET_INHERITED",
                   "POWER_RESET_TY1208Z_SP805"}
-    release = (SD_RELEASE if sdro else "-ty1208z-openwrt-router768" if ram768 else
+    release = (EMMC_RELEASE if emmcro else SD_RELEASE if sdro else "-ty1208z-openwrt-router768" if ram768 else
                "-ty1208z-openwrt-router" if router else "-ty1208z-openwrt-ram")
     if router:
         prohibited -= {"HISI_FEMAC", "TY1208Z_ETHERNET_INHERITED"}
     if sdro:
         native_sd_configuration(config)
         prohibited -= {"BLOCK", "MMC"}
+    if emmcro:
+        native_emmc_configuration(config)
+        prohibited -= {"BLOCK", "MMC", "MMC_DW_HI3798MV100_IDENT"}
     if (not required <= active or active & prohibited or
             f'CONFIG_LOCALVERSION="{release}"\n' not in config or
             'CONFIG_INITRAMFS_SOURCE=""\n' not in config):
@@ -170,6 +183,8 @@ def applications_ram_profile(tree, config, artifacts):
         raise ValueError("Native memory extension outside its dedicated application profile")
     if ("CONFIG_TY1208Z_ROUTER_SD_RO=y\n" in config) != sdro:
         raise ValueError("Native SD outside its dedicated application profile")
+    if ("CONFIG_TY1208Z_ROUTER_EMMC_RO=y\n" in config) != emmcro:
+        raise ValueError("Native eMMC outside its dedicated application profile")
     data, unpacked_bytes = validate_pair(artifacts)
     end = INITRD_ADDRESS + len(data)
     if (chosen.get("linux,initrd-start", {}).get("cells") != [INITRD_ADDRESS] or

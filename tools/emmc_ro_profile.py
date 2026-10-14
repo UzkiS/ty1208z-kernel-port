@@ -24,6 +24,9 @@ OPTIONS = {'MMC', 'MMC_DW', 'MMC_DW_PLTFM', 'MMC_DW_HI3798MV100_IDENT',
 
 
 def emmc_ro_profile(tree, config):
+    if 'CONFIG_TY1208Z_ROUTER_EMMC_RO=y\n' in config:
+        from native_emmc_profile import native_emmc_profile
+        return native_emmc_profile(tree, config)
     props = {n['path']: n['properties'] for n in tree['nodes']}
     identity = props.get('/', {}).get('compatible', {}).get('strings', [])
     enabled = 'CONFIG_HI3798MV100_EMMC_READ_ONLY=y\n' in config

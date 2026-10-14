@@ -37,6 +37,7 @@ help:
 	@echo 'make openwrt-router - build isolated applications plus measured Ethernet for RAM validation'
 	@echo 'make openwrt-router768 - build independent measured higher-memory router; fresh loader evidence required'
 	@echo 'make openwrt-router-sdro - build independent higher-memory router with enforced read-only SD'
+	@echo 'make openwrt-router-emmcro - build independent low256 router with enforced read-only eMMC'
 	@echo 'make usb-host-compile - compile optional host0 clock/PHY plus generic EHCI/OHCI, no boot image'
 	@echo 'make usb-host - build isolated host0 enumeration RAM candidate after physical capability acceptance'
 	@echo 'make openwrt-container-packages - compile/check separate native Docker APKs; no boot/runtime acceptance'
@@ -68,6 +69,7 @@ lint:
 	python3 tools/test_emmc_ro_profile.py
 	python3 tools/test_emmc_ro_restart.py
 	python3 tools/test_emmc_ro_probe.py
+	python3 tools/test_emmc_backup.py
 	python3 tools/test_ram768.py
 
 test-serial:
@@ -84,6 +86,7 @@ build:
 
 test:
 	bash tools/test-qemu.sh
+	python3 tools/test_emmc_backup.py --busybox artifacts/diag1/busybox.armhf
 	python3 tools/test_ram_boot_cli.py
 	python3 tools/test_ram_boot_tftp.py
 
@@ -223,3 +226,7 @@ openwrt-router768:
 .PHONY: openwrt-router-sdro
 openwrt-router-sdro:
 	bash tools/build-openwrt-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" network-sdro
+
+.PHONY: openwrt-router-emmcro
+openwrt-router-emmcro:
+	bash tools/build-openwrt-applications.sh "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" network-emmcro

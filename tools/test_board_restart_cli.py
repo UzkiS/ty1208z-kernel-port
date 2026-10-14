@@ -26,11 +26,11 @@ class RestartSerialTests(unittest.TestCase):
             master, slave = pty.openpty()
             errors = []
             sent = []
-            native = profile in ("router", "router768", "router-sdro")
+            native = profile in ("router", "router768", "router-sdro", "router-emmcro")
             sd_ident = profile in ("sd-ident1", "sd-ro1")
             sd_shutdown = sd_ident or profile == "router-sdro"
             memory = profile == "ram768"
-            emmc_ro = profile == "emmc-ro1"
+            emmc_ro = profile in ("emmc-ro1", "router-emmcro")
             prompt = b"root@OpenWrt:~# " if native else b"# "
 
             def read_command():
@@ -65,17 +65,19 @@ class RestartSerialTests(unittest.TestCase):
                             return
                         self.assertEqual(read_command(), DT_IDENTITY + b"\r")
                         dt = (b"other,board" if mode == "dt" else
+                              b"tianyi,ty1208z-ca-openwrt-emmcro-ram" if profile == "router-emmcro" else
                               b"tianyi,ty1208z-ca-openwrt-sdro-ram" if profile == "router-sdro" else
                               b"tianyi,ty1208z-ca-openwrt-router768-ram" if profile == "router768" else
                               b"tianyi,ty1208z-ca-openwrt-router-ram")
                         os.write(master, dt + b"\r\n" + prompt)
                         if mode == "dt":
                             return
-                        binding = read_command()
-                        self.assertIn(b"readlink /sys/bus/platform/devices/", binding)
-                        os.write(master, (b"unbound" if mode == "unbound" else b"../../../bus/platform/drivers/ty1208z-sp805-restart") + b"\r\n" + prompt)
-                        if mode == "unbound":
-                            return
+                        if profile != "router-emmcro":
+                            binding = read_command()
+                            self.assertIn(b"readlink /sys/bus/platform/devices/", binding)
+                            os.write(master, (b"unbound" if mode == "unbound" else b"../../../bus/platform/drivers/ty1208z-sp805-restart") + b"\r\n" + prompt)
+                            if mode == "unbound":
+                                return
                         if profile == "router-sdro":
                             self.assertEqual(read_command(), SD_RO_RESTART_GUARD + b"\r")
                             state = b"SD_RO_MOUNT_ACTIVE" if mode == "mounted" else b"SD_RO_RESTART_GUARD"
@@ -108,7 +110,8 @@ class RestartSerialTests(unittest.TestCase):
                                 return
                     if emmc_ro:
                         self.assertEqual(read_command(), SD_DT_IDENTITY + b"\r")
-                        identity = b"foreign" if mode == "dt" else b"tianyi,ty1208z-ca-emmc-ro-ram\x00hi3798mv100-series\x00"
+                        board = b"tianyi,ty1208z-ca-openwrt-emmcro-ram" if native else b"tianyi,ty1208z-ca-emmc-ro-ram"
+                        identity = b"foreign" if mode == "dt" else board + b"\x00hi3798mv100-series\x00"
                         os.write(master, identity + b"\r\n" + prompt)
                         if mode == "dt":
                             return
@@ -220,7 +223,7 @@ class RestartSerialTests(unittest.TestCase):
         self.exercise("success")
 
     def test_native_router_requires_source_dt_bound_module_and_measured_guard(self):
-        for profile in ("router", "router768", "router-sdro"):
+        for profile in ("router", "router768", "router-sdro", "router-emmcro"):
             for mode in ("source", "dt", "unbound", "missing-mv100"):
                 with self.subTest(mode=mode, profile=profile):
                     self.exercise(mode, profile)
@@ -254,6 +257,12 @@ class RestartSerialTests(unittest.TestCase):
                      "missing-shutdown", "failed-shutdown", "restart-refused", "failed", "success"):
             with self.subTest(mode=mode):
                 self.exercise(mode, "emmc-ro1")
+
+    def test_native_emmc_requires_embedded_binding_unmounted_state_and_shutdown(self):
+        for mode in ("mounted", "cleanup", "writable", "capacity", "missing-shutdown",
+                     "failed-shutdown", "restart-refused", "failed", "success"):
+            with self.subTest(mode=mode):
+                self.exercise(mode, "router-emmcro")
 
 
 if __name__ == "__main__":

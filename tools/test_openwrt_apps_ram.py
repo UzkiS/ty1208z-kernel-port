@@ -30,6 +30,8 @@ from tftp_readonly import ReadOnlyTftp
 from ymodem_sender import TransferError
 from native_sd_profile import REQUIRED as SD_REQUIRED
 from sd_ident_profile import NODE as SD_NODE, PROPERTIES as SD_PROPERTIES
+from native_emmc_profile import REQUIRED as EMMC_REQUIRED
+from emmc_ro_profile import NODE as EMMC_NODE, PROPERTIES as EMMC_PROPERTIES, RESTART, RESTART_PROPERTIES
 
 ROOT = Path(__file__).resolve().parents[1]
 ARTIFACTS = ROOT / "artifacts/openwrt-apps-ram1"
@@ -139,6 +141,8 @@ class ApplicationProfileTests(unittest.TestCase):
         options = {"BLOCK", "MMC", "USB_SUPPORT", "SMP", "INITRAMFS_FORCE"}
         if "CONFIG_TY1208Z_ROUTER_SD_RO=y\n" in self.config:
             options -= {"BLOCK", "MMC"}
+        if "CONFIG_TY1208Z_ROUTER_EMMC_RO=y\n" in self.config:
+            options -= {"BLOCK", "MMC"}
         if not router:
             options.add("HISI_FEMAC")
         for option in options:
@@ -163,6 +167,36 @@ class ApplicationProfileTests(unittest.TestCase):
                 applications_ram_profile(self.tree, self.config.replace("CONFIG_HISI_FEMAC=y\n", ""), ARTIFACTS)
         tree = copy.deepcopy(self.tree)
         next(node for node in tree["nodes"] if node["path"] == "/")["properties"]["compatible"]["strings"][0] = "other,board"
+        with self.assertRaises(ValueError):
+            applications_ram_profile(tree, self.config, ARTIFACTS)
+
+    def test_native_emmc_read_only_resources_and_configuration(self):
+        if "CONFIG_TY1208Z_ROUTER_EMMC_RO=y\n" not in self.config:
+            with self.assertRaises(ValueError):
+                applications_ram_profile(self.tree, self.config + "CONFIG_TY1208Z_ROUTER_EMMC_RO=y\n", ARTIFACTS)
+            return
+        for option in EMMC_REQUIRED:
+            for replacement in ("", f"CONFIG_{option}=m\n"):
+                with self.subTest(option=option, replacement=replacement), self.assertRaises(ValueError):
+                    applications_ram_profile(self.tree, self.config.replace(f"CONFIG_{option}=y\n", replacement), ARTIFACTS)
+        for node_path, properties in ((EMMC_NODE, EMMC_PROPERTIES), (RESTART, RESTART_PROPERTIES)):
+            for key, expected in properties.items():
+                tree = copy.deepcopy(self.tree)
+                node = next(node for node in tree["nodes"] if node["path"] == node_path)
+                if expected:
+                    kind = next(iter(expected))
+                    node["properties"][key][kind] = ["changed"] if kind == "strings" else [0xdeadbeef]
+                else:
+                    del node["properties"][key]
+                with self.subTest(node=node_path, property=key), self.assertRaises(ValueError):
+                    applications_ram_profile(tree, self.config, ARTIFACTS)
+        for option in ("MMC_TEST", "MMC_DW_HI3798MV100_SD_IDENT", "BLK_DEV_WRITE_MOUNTED",
+                       "BLK_DEV_THROTTLING", "TY1208Z_ROUTER_RAM768", "TY1208Z_ROUTER_SD_RO", "EXT2_FS"):
+            with self.subTest(option=option), self.assertRaises(ValueError):
+                applications_ram_profile(self.tree, self.config + f"CONFIG_{option}=y\n", ARTIFACTS)
+        tree = copy.deepcopy(self.tree)
+        chosen = next(node["properties"] for node in tree["nodes"] if node["path"] == "/chosen")
+        chosen["bootargs"]["strings"][0] = chosen["bootargs"]["strings"][0].replace("6846M(ubuntu)ro", "6846M(ubuntu)")
         with self.assertRaises(ValueError):
             applications_ram_profile(tree, self.config, ARTIFACTS)
 

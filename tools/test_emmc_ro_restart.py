@@ -26,6 +26,9 @@ HARNESS = r'''
 #define pr_err(...) ((void)0)
 #define BIT(n) (1U << (n))
 #define ARRAY_SIZE(a) (sizeof(a) / sizeof((a)[0]))
+static bool native_mode;
+#define CONFIG_TY1208Z_ROUTER_EMMC_RO native_mode
+#define IS_ENABLED(x) (x)
 typedef uint64_t resource_size_t;
 struct device { int unused; };
 struct platform_device { struct device dev; };
@@ -37,6 +40,7 @@ static struct ty1208z_emmc_ro_restart_context context;
 static unsigned maps, registrations, restart_calls, delays;
 static int missing, map_failure, allocation, registration_error;
 static bool board, extra, ready;
+static const char *board_name;
 static char sysid, watchdog;
 static uint32_t crg, controller[1024];
 static uint32_t readl(void *address) { return *(uint32_t *)address; }
@@ -44,7 +48,7 @@ static void mdelay(unsigned ms) { assert(ms == 1000); delays++; }
 static bool ty1208z_mv100_restart(void *base, void *id)
 { assert(base == &watchdog && id == &sysid); restart_calls++; return ready; }
 static bool of_machine_is_compatible(const char *name)
-{ assert(!strcmp(name, "tianyi,ty1208z-ca-emmc-ro-ram")); return board; }
+{ return board && !strcmp(name, board_name); }
 static struct resource *platform_get_resource(struct platform_device *p, int type, unsigned i)
 { assert(p && type == IORESOURCE_MEM && i < 5); return (int)i == missing || (i == 4 && !extra) ? NULL : &resources[i]; }
 static uint64_t resource_size(struct resource *r) { return r->end - r->start + 1; }
@@ -78,6 +82,7 @@ static void initialize(void)
     resources[3] = (struct resource){0xf8a220a0, 0xf8a220a3};
     maps = registrations = restart_calls = delays = 0; missing = map_failure = -1;
     allocation = registration_error = 0; board = ready = true; extra = false;
+    board_name = "tianyi,ty1208z-ca-emmc-ro-ram";
     crg = 0x40103; memset(controller, 0, sizeof(controller));
     controller[0x6c / 4] = 0x5342270a; controller[0x70 / 4] = 0x00e44c81;
 }
@@ -85,6 +90,19 @@ static void initialize(void)
 int main(void)
 {
     struct platform_device p = {0};
+    const char *identities[] = {"tianyi,ty1208z-ca-emmc-ro-ram", "tianyi,ty1208z-ca-openwrt-emmcro-ram", "foreign"};
+    for (unsigned selected = 0; selected < 2; selected++) {
+        native_mode = selected;
+        for (unsigned i = 0; i < 3; i++) {
+            initialize(); board_name = identities[i];
+            bool accepted = i == 0 || (i == 1 && selected);
+            assert(ty1208z_emmc_ro_restart_probe(&p) == (accepted ? 0 : -ENODEV));
+            assert(registrations == (unsigned)accepted);
+            if (!accepted) assert(!maps);
+            assert(!restart_calls);
+        }
+    }
+    native_mode = false;
     initialize(); board = false;
     assert(ty1208z_emmc_ro_restart_probe(&p) == -ENODEV && !maps && !registrations);
     for (int i = 0; i < 4; i++) {

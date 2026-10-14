@@ -82,7 +82,7 @@ def application_variant(source):
         return "qemu"
     record = json.loads(marker.read_text())
     if record not in tuple({"schema": 1, "variant": variant}
-                           for variant in ("qemu", "ethernet", "ethernet-ram768", "ethernet-sdro", "container-qemu")):
+                           for variant in ("qemu", "ethernet", "ethernet-ram768", "ethernet-sdro", "ethernet-emmcro", "container-qemu")):
         raise ValueError("Unrecognized application source variant")
     return record["variant"]
 
@@ -99,9 +99,11 @@ def merge_kernel_fragment(original, extra):
 
 
 def prepare_applications(project, taskbase, ethernet=False, container_packages=False, ram768=False, sdro=False,
-                         container_applications=False):
-    if container_applications and (ethernet or container_packages or ram768 or sdro):
+                         container_applications=False, emmcro=False):
+    if container_applications and (ethernet or container_packages or ram768 or sdro or emmcro):
         raise ValueError("Combined container applications require their independent QEMU-only source")
+    if emmcro and (not ethernet or container_packages or ram768 or sdro):
+        raise ValueError("Native read-only eMMC requires its independent low256 Ethernet variant")
     if sdro and (not ethernet or container_packages or ram768):
         raise ValueError("Native read-only SD requires its independent Ethernet variant")
     if ram768 and (not ethernet or container_packages):
@@ -111,7 +113,7 @@ def prepare_applications(project, taskbase, ethernet=False, container_packages=F
     toolchain, identity = toolchain_from_native(project, taskbase)
     feeds_config, lock = pinned_feeds(project, taskbase)
     appbase = taskbase / ("container-applications" if container_applications else "container-packages" if container_packages else
-                          "router-sd" if sdro else "router768" if ram768 else "router" if ethernet else "applications")
+                          "router-emmc" if emmcro else "router-sd" if sdro else "router768" if ram768 else "router" if ethernet else "applications")
     appbase.mkdir(parents=True, exist_ok=True)
     downloads = appbase / "downloads"
     if not downloads.exists():
@@ -141,6 +143,9 @@ def prepare_applications(project, taskbase, ethernet=False, container_packages=F
         if sdro:
             path.write_text(merge_kernel_fragment(
                 path.read_text(), (project / "openwrt/router-sd/kernel.config").read_text()))
+        if emmcro:
+            path.write_text(merge_kernel_fragment(
+                path.read_text(), (project / "openwrt/router-emmc/kernel.config").read_text()))
         manifest[relative] = sha256(path)
         # The application candidate is a DHCP client only, with peer DNS for
         # normal name resolution and the installed NTP service.
@@ -186,7 +191,7 @@ def prepare_applications(project, taskbase, ethernet=False, container_packages=F
     (source / ".ty1208z-application-lock.json").write_text(json.dumps(lock, indent=2) + "\n")
     (source / ".ty1208z-toolchain.json").write_text(json.dumps(identity, indent=2) + "\n")
     (source / ".ty1208z-application-variant.json").write_text(json.dumps(
-        {"schema": 1, "variant": "container-qemu" if container_applications else "ethernet-sdro" if sdro else "ethernet-ram768" if ram768 else "ethernet" if ethernet else "qemu"}, indent=2) + "\n")
+        {"schema": 1, "variant": "container-qemu" if container_applications else "ethernet-emmcro" if emmcro else "ethernet-sdro" if sdro else "ethernet-ram768" if ram768 else "ethernet" if ethernet else "qemu"}, indent=2) + "\n")
     config = (project / "openwrt/config/ram.config").read_text()
     config += (project / ("openwrt/containers/config" if container_packages else
                          "openwrt/applications/config")).read_text()
@@ -198,6 +203,8 @@ def prepare_applications(project, taskbase, ethernet=False, container_packages=F
         config += (project / "openwrt/router768/config").read_text()
     if sdro:
         config += (project / "openwrt/router-sd/config").read_text()
+    if emmcro:
+        config += (project / "openwrt/router-emmc/config").read_text()
     config += (
         "CONFIG_EXTERNAL_TOOLCHAIN=y\n"
         f"CONFIG_TOOLCHAIN_ROOT={json.dumps(str(toolchain))}\n"
@@ -229,9 +236,10 @@ def main():
     parser.add_argument("--container-applications", action="store_true", help="Combined native applications/Docker; QEMU only")
     parser.add_argument("--ram768", action="store_true", help="Independent bounded higher-memory router")
     parser.add_argument("--sd-read-only", action="store_true", help="Independent native read-only SD router")
+    parser.add_argument("--emmc-read-only", action="store_true", help="Independent low256 native read-only eMMC router")
     args = parser.parse_args()
     prepare_applications(Path(__file__).resolve().parents[1], args.taskbase.resolve(),
-                         args.ethernet, args.container_packages, args.ram768, args.sd_read_only, args.container_applications)
+                         args.ethernet, args.container_packages, args.ram768, args.sd_read_only, args.container_applications, args.emmc_read_only)
 
 
 if __name__ == "__main__":

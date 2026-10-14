@@ -47,6 +47,10 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 SD 策略，并在独立构建树中整合中文应用和网卡。实际配置依赖、镜像校验及
 新引导器分配证据单独检查，普通 router 仍关闭存储；
 [实机边界](../verification/openwrt-sdro-board-20261014.md)。
+`make openwrt-router-emmcro` 在独立低256构建树中整合已测 eMMC 用户区只读策略、
+网口和中文应用；它有内置控制器关闭/重启，完整电脑端备份工具另行核对实际 FDT、
+分区、只读标志和未挂载状态。原生块/ext4 读取、网口、完整用户区备份、
+内置关闭/命令重启及原中文系统/配置恢复均已实测，见 [eMMC](emmc.md)。
 `make wifi-usb-audit` 使用单独的内核输出目录和配置，不改变诊断镜像；目前只编译
 `wland_usb.o`，不链接模块、不加载固件。来源锁与适配范围见 [Wi-Fi 说明](wifi.md)。
 `make wifi-port` 另行编译完整模块并执行制造入口/密钥回归；同样不改变诊断镜像，

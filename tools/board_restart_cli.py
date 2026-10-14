@@ -21,6 +21,7 @@ SD_RO_RESTART_GUARD = (b"if grep -q '^/dev/mmcblk0' /proc/mounts; then echo SD_R
 RAM768_RESTART_GUARD = (b"if grep -q ' /tmp/ram768-area ' /proc/mounts; then echo RAM768_MOUNT_ACTIVE; "
                        b"else test ! -e /tmp/ram768-area/memory-test && echo RAM768_RESTART_GUARD; fi")
 EMMC_RO_RESTART_GUARD = (b"if grep -q '^/dev/mmcblk0' /proc/mounts || "
+                         b"grep -Eq '^[^ ]+ [^ ]+ 179:' /proc/self/mountinfo || "
                          b"test -e /tmp/emmc-ro-mount; then echo EMMC_RO_MOUNT_ACTIVE; "
                          b"else test -e /sys/class/block/mmcblk0 && "
                          b'test "$(cat /sys/class/block/mmcblk0/ro)" = 1 && '
@@ -40,11 +41,11 @@ def run(args, serial_module):
               "status": "starting", "kernel_verified": False, "restart_sent": False,
               "persistent_writes": False}
     profile = getattr(args, "profile", "diagnostic")
-    native = profile in ("router", "router768", "router-sdro")
+    native = profile in ("router", "router768", "router-sdro", "router-emmcro")
     sd_ident = profile in ("sd-ident1", "sd-ro1")
     sd_shutdown = sd_ident or profile == "router-sdro"
     memory = profile == "ram768"
-    emmc_ro = profile == "emmc-ro1"
+    emmc_ro = profile in ("emmc-ro1", "router-emmcro")
     result["profile"] = profile
     command = native_command if native else shell_command
     probe = BootloaderProbe()
@@ -60,7 +61,8 @@ def run(args, serial_module):
                     raise TransferError("Not the SP805 RAM experiment; no restart sent")
                 if native:
                     system = command(exchange, b"cat /etc/openwrt_release")
-                    board = (b"tianyi,ty1208z-ca-openwrt-sdro-ram" if profile == "router-sdro" else
+                    board = (b"tianyi,ty1208z-ca-openwrt-emmcro-ram" if profile == "router-emmcro" else
+                             b"tianyi,ty1208z-ca-openwrt-sdro-ram" if profile == "router-sdro" else
                              b"tianyi,ty1208z-ca-openwrt-router768-ram" if profile == "router768" else
                              b"tianyi,ty1208z-ca-openwrt-router-ram")
                     if (b"DISTRIB_TARGET='hi3798mv100/apps'" not in system or
@@ -68,10 +70,11 @@ def run(args, serial_module):
                             not re.search(rb"(?:^|[\r\n])" + re.escape(board) + rb"[\r\n]",
                                           command(exchange, DT_IDENTITY))):
                         raise TransferError("Native router source/DT differs; no restart sent")
-                    binding = command(exchange, b"test -e /sys/module/ty1208z_sp805_restart && "
-                                      b"readlink /sys/bus/platform/devices/ty1208z-sp805-restart/driver")
-                    if b"../../../bus/platform/drivers/ty1208z-sp805-restart" not in binding:
-                        raise TransferError("Actual RAM restart module binding missing")
+                    if profile != "router-emmcro":
+                        binding = command(exchange, b"test -e /sys/module/ty1208z_sp805_restart && "
+                                          b"readlink /sys/bus/platform/devices/ty1208z-sp805-restart/driver")
+                        if b"../../../bus/platform/drivers/ty1208z-sp805-restart" not in binding:
+                            raise TransferError("Actual RAM restart module binding missing")
                     if profile == "router-sdro":
                         state = command(exchange, SD_RO_RESTART_GUARD)
                         if not re.search(rb"(?:^|[\r\n])SD_RO_RESTART_GUARD[\r\n]", state):
@@ -92,7 +95,8 @@ def run(args, serial_module):
                         if not re.search(rb"(?:^|[\r\n])SD_RO_RESTART_GUARD[\r\n]", state):
                             raise TransferError("SD read-only guard or unmounted state missing; no restart sent")
                 if emmc_ro:
-                    if not re.search(rb"(?:^|[\r\n])tianyi,ty1208z-ca-emmc-ro-ram\x00hi3798mv100-series\x00",
+                    board = (b"tianyi,ty1208z-ca-openwrt-emmcro-ram" if native else b"tianyi,ty1208z-ca-emmc-ro-ram")
+                    if not re.search(rb"(?:^|[\r\n])" + re.escape(board) + rb"\x00hi3798mv100-series\x00",
                                      command(exchange, SD_DT_IDENTITY)):
                         raise TransferError("eMMC read-only DT differs; no restart sent")
                     binding = command(exchange, b"readlink /sys/bus/platform/devices/f8a2c000.emmc-ro-restart/driver")
@@ -167,7 +171,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", required=True)
     parser.add_argument("--output", type=Path)
-    parser.add_argument("--profile", choices=("diagnostic", "router", "router768", "router-sdro", "sd-ident1", "sd-ro1", "emmc-ro1", "ram768"), default="diagnostic")
+    parser.add_argument("--profile", choices=("diagnostic", "router", "router768", "router-sdro", "router-emmcro", "sd-ident1", "sd-ro1", "emmc-ro1", "ram768"), default="diagnostic")
     parser.add_argument("--timeout", type=int, default=60)
     args = parser.parse_args()
     if not 5 <= args.timeout <= 120:

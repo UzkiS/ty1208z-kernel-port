@@ -178,7 +178,9 @@ static int hisi_femac_mv100_resources(struct platform_device *pdev)
 	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) &&
 	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-router768-ram")) &&
 	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) &&
-	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")))
+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")) &&
+	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
+	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram")))
 		return -ENODEV;
 	for (i = 0; i < ARRAY_SIZE(addresses); i++) {
 		res = platform_get_resource(pdev, IORESOURCE_MEM, i);
