@@ -63,12 +63,24 @@ on:
       - 'Makefile'
       - '.github/workflows/openwrt-applications.yml'
   workflow_dispatch:
+    inputs:
+      target:
+        description: 'Build all profiles or one selected profile'
+        type: choice
+        default: all
+        options:
+          - all
+          - openwrt-app-ram
+          - openwrt-router
+          - openwrt-router768
+          - openwrt-router-sdro
+          - openwrt-router-emmcro
 
 permissions:
   contents: read
 
 concurrency:
-  group: openwrt-applications-${{ github.ref }}
+  group: openwrt-applications-${{ github.ref }}-${{ inputs.target || 'all' }}
   # Preserve an expensive running native toolchain/application build. A newer
   # pending run still replaces older pending runs for the same branch.
   cancel-in-progress: false
@@ -78,22 +90,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - target: openwrt-app-ram
-            source_dir: applications
-            ram_dir: openwrt-apps-ram1
-          - target: openwrt-router
-            source_dir: router
-            ram_dir: openwrt-router1
-          - target: openwrt-router768
-            source_dir: router768
-            ram_dir: openwrt-router768
-          - target: openwrt-router-sdro
-            source_dir: router-sd
-            ram_dir: openwrt-router-sdro
-          - target: openwrt-router-emmcro
-            source_dir: router-emmc
-            ram_dir: openwrt-router-emmcro
+        include: >-
+          ${{ fromJSON(
+            inputs.target == 'openwrt-app-ram' && '[{"target":"openwrt-app-ram","source_dir":"applications","ram_dir":"openwrt-apps-ram1"}]' ||
+            inputs.target == 'openwrt-router' && '[{"target":"openwrt-router","source_dir":"router","ram_dir":"openwrt-router1"}]' ||
+            inputs.target == 'openwrt-router768' && '[{"target":"openwrt-router768","source_dir":"router768","ram_dir":"openwrt-router768"}]' ||
+            inputs.target == 'openwrt-router-sdro' && '[{"target":"openwrt-router-sdro","source_dir":"router-sd","ram_dir":"openwrt-router-sdro"}]' ||
+            inputs.target == 'openwrt-router-emmcro' && '[{"target":"openwrt-router-emmcro","source_dir":"router-emmc","ram_dir":"openwrt-router-emmcro"}]' ||
+            '[{"target":"openwrt-app-ram","source_dir":"applications","ram_dir":"openwrt-apps-ram1"},{"target":"openwrt-router","source_dir":"router","ram_dir":"openwrt-router1"},{"target":"openwrt-router768","source_dir":"router768","ram_dir":"openwrt-router768"},{"target":"openwrt-router-sdro","source_dir":"router-sd","ram_dir":"openwrt-router-sdro"},{"target":"openwrt-router-emmcro","source_dir":"router-emmc","ram_dir":"openwrt-router-emmcro"}]') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 180
     env:
