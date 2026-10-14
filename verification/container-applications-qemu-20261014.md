@@ -127,7 +127,11 @@ The dedicated pinned, read-only CI workflow builds a fresh toolchain/source and
 executes this same build/test/export command. Fresh combined remote CI is pending
 until its actual result and downloaded evidence are verified.
 
-Physical eMMC read-only blocks/filesystem/shutdown/restart and backups, a verified
+The separate corrected eMMC RAM candidate subsequently passed physical
+read-only blocks/ext4/shutdown/restart and exact router/configuration return;
+see its [board report](emmc-ro-board-20261014.md). It uses a newer 9DE8 board
+patch; the combined QEMU evidence above remains tied to its recorded E848
+patch and is not rehashed. Backups, native storage integration, a verified
 storage-backed Docker board candidate, RDA firmware/STA/AP and final routing
 remain required. After the user reconnected TTL, actual COM9 reception and
 interactive input recovered. The second native SD trial returned to the exact

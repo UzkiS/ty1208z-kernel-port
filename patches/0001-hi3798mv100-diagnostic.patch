@@ -358,7 +358,17 @@
  obj-$(CONFIG_MMC_DW_K3)		+= dw_mmc-k3.o
 --- a/drivers/mmc/core/block.c
 +++ b/drivers/mmc/core/block.c
-@@ -3004,6 +3004,10 @@
+@@ -2521,7 +2521,8 @@
+ 
+ static inline int mmc_blk_readonly(struct mmc_card *card)
+ {
+-	return mmc_card_readonly(card) ||
++	return IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||
++	       mmc_card_readonly(card) ||
+ 	       !(card->csd.cmdclass & CCC_BLOCK_WRITE);
+ }
+ 
+@@ -3004,6 +3005,10 @@
  {
  	int idx, ret;
  
@@ -369,7 +379,7 @@
  	if (!mmc_card_mmc(card))
  		return 0;
  
-@@ -3303,7 +3307,8 @@
+@@ -3303,7 +3308,8 @@
  		pm_runtime_enable(&card->dev);
  	}
  

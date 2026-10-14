@@ -2,8 +2,11 @@
 
 2026-10-14: the separate `emmc-ro1` kernel, RAM userspace, measured partitions,
 ext4 `ro,noload` probe and guarded restart pass local offline checks. This
-candidate has **not booted on the physical board**. It does not establish an
-eMMC backup, writable storage, Hinas startup, Docker storage or installation.
+report records the original E848 offline payload. Its subsequent physical boot
+stopped before block probes because the disk RO flag was missing. The corrected
+payload and later physical results are recorded separately in the
+[board report](emmc-ro-board-20261014.md). This original offline build does not
+establish an eMMC backup, writable storage, Hinas startup, Docker or installation.
 The [object-only milestone](emmc-ro-offline-20261014.md) retains its own
 source/artifact identities; its manifests were not rehashed against this source.
 
@@ -81,5 +84,5 @@ recovered. The second native SD trial completed a guarded command restart,
 verified controller shutdown, fresh CA-loader inspection and the exact
 original low256 router's two device CRCs. Current configuration, Chinese
 authenticated LuCI, empty root login, restart binding and IRQ Err0 pass after
-return. Physical eMMC testing still requires its own fresh loader/CRC gates
-and actual block/filesystem/shutdown/restart observations.
+return. The subsequent eMMC experiment and disk-flag correction have their own
+fresh loader/CRC and physical observations in the [board report](emmc-ro-board-20261014.md).

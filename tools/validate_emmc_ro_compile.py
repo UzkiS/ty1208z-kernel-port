@@ -19,7 +19,9 @@ for name in ('dw_mmc.o', 'dw_mmc-hi3798mv100-ident.o', 'block.o'):
 log = (artifacts / 'checks/actual-policy.log').read_text()
 for marker in ('EMMC_RO_POLICY_QUEUE_PASS:', 'EMMC_RO_SLOT_PASS:',
                'EMMC_RO_BLOCK_CORE_PASS: actual allocation/probe, RO=1;',
-               'EMMC_RO_BLOCK_CORE_PASS: actual allocation/probe, RO=0;'):
+               'EMMC_RO_BLOCK_CORE_PASS: actual allocation/probe, RO=0;',
+               'EMMC_RO_DISK_FLAG_PASS actual MMC readonly and force_ro callback profile=1;',
+               'EMMC_RO_DISK_FLAG_PASS actual MMC readonly and force_ro callback profile=0;'):
     assert marker in log
 paths = [p for p in artifacts.rglob('*') if p.is_file() and p.name != 'manifest.json']
 files = {p.relative_to(artifacts).as_posix(): {'bytes': p.stat().st_size,

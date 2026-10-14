@@ -49,7 +49,8 @@ class DiagnosticTests(unittest.TestCase):
                         return
                     diagnostic = (b"usb-diag; diag" if profile == "usb-host1" else
                                   b"ram768-diag; diag" if profile == "ram768" else
-                                  b"emmc-ro-diag; diag" if profile == "emmc-ro1" else
+                                  b"if test ! -e /tmp/emmc-ro-report; then emmc-ro-diag > /tmp/emmc-ro-report; "
+                                  b"cat /tmp/emmc-ro-report; rm /tmp/emmc-ro-report; fi; diag" if profile == "emmc-ro1" else
                                   b"sd-ro-diag; diag" if profile == "sd-ro1" else
                                   b"sd-diag; diag" if profile == "sd-ident1" else b"diag")
                     self.assertEqual(read_command(), diagnostic + b"; echo TY1208Z_DIAG_COMPLETE\r")

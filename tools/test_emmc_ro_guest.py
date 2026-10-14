@@ -5,6 +5,8 @@ from pathlib import Path
 import subprocess
 import tempfile
 
+from board_diag_cli import EMMC_RO_DIAGNOSTIC
+
 ROOT = Path(__file__).resolve().parents[1]
 LAYOUT = ((0, 2048), (2048, 2048), (4096, 8192), (12288, 8192), (20480, 8192),
           (28672, 40960), (69632, 131072), (200704, 1048576), (1249280, 14020608))
@@ -68,6 +70,39 @@ emmc-ro-probe() {{
                 assert 'EMMC_RO_DIAG_COMPLETE partitions=9 filesystems=1 no-card-writes' in result.stdout
             else:
                 assert 'EMMC_RO_DIAG_COMPLETE' not in result.stdout
+    marker = 'EMMC_RO_FS_FILE_READ_PASS bytes=444 content-and-name-excluded'
+    with tempfile.TemporaryDirectory(prefix='emmc-ro-uart-') as directory:
+        path = Path(directory) / 'report'
+        command = EMMC_RO_DIAGNOSTIC.decode().replace('/tmp/emmc-ro-report', str(path))
+        wrappers = '''
+emmc-ro-diag() {
+    printf 'EMMC_RO_FS_FILE_READ_PASS bytes=4'
+    printf '[kernel] ext4 unmount printk\n' >&2
+    printf '44 content-and-name-excluded\n'
+}
+diag() { echo RAM_DIAG; }
+'''
+        # Reproduce the observed console interleaving with the actual ARM shell.
+        old = subprocess.run(['qemu-arm', str(busybox), 'sh', '-s'],
+                             input=wrappers + 'emmc-ro-diag; diag\n', text=True,
+                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
+        assert old.returncode == 0 and marker not in old.stdout.splitlines()
+        result = subprocess.run(['qemu-arm', str(busybox), 'sh', '-s'], input=wrappers + command,
+                                text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
+        assert result.returncode == 0 and result.stdout.splitlines().count(marker) == 1
+        assert not path.exists()
+        # A preexisting report must not be accepted, emitted or removed.
+        path.write_text(marker + '\n')
+        refused = subprocess.run(['qemu-arm', str(busybox), 'sh', '-s'], input=wrappers + command,
+                                 text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=10)
+        assert refused.returncode == 0 and refused.stdout == 'RAM_DIAG\n'
+        assert path.read_text() == marker + '\n'
+        path.unlink()
+        failed = subprocess.run(['qemu-arm', str(busybox), 'sh', '-s'],
+                                input='emmc-ro-diag() { echo INCOMPLETE; return 1; }; diag() { :; };\n' + command,
+                                text=True, capture_output=True, timeout=10)
+        assert failed.stdout == 'INCOMPLETE\n' and not path.exists()
+    print('EMMC_RO_UART_BUFFER_PASS actual ARM shell: interleaved printk reproduction, intact buffered marker, stale-report refusal and failure cleanup')
     print('EMMC_RO_ARM_GUEST_PASS actual shell/applets, exact board/RO/layout guards, ro,noload arguments and failure cleanup; synthetic files only')
 
 

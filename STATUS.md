@@ -32,15 +32,19 @@ actual COM9 reception and interactive input recovered; the second runtime
 trial returned automatically with fresh configuration backup and both
 device CRCs verified. No card/persistent writes occurred;
 [native SD report](verification/openwrt-sdro-board-20261014.md).
-Clean remote native SD CI, eMMC blocks/backups and physical Docker remain pending.
+Clean remote native SD CI, eMMC backups and physical Docker remain pending.
 The eMMC user-area read-only groundwork passes actual request/queue/slot and
 both block-core suppression paths under ASan/UBSan, selected Kconfig and ARM
 objects; [object report](verification/emmc-ro-offline-20261014.md).
 The separate low256 `emmc-ro1` RAM candidate now also builds with measured
 partitions, ext4 ro,noload, controller shutdown and guarded restart. Actual
-functions, ARM guest-shell, layout/CRC, PTY and QEMU checks pass. Physical
-block/filesystem/shutdown/restart and full backups remain unverified;
-[RAM candidate report](verification/emmc-ro-ram-offline-20261014.md).
+functions, ARM guest-shell, layout/CRC, PTY and QEMU checks pass. The corrected
+MMC disk-flag candidate now physically passes nine-partition/RO checks,
+block/overlap/end/header reads, ext4 ro,noload file read/unmount, measured
+shutdown and command restart with exact original-router/config return.
+New actual MMC readonly/force_ro regressions reproduce the old failure and
+pass both corrected profile states. Full backups, native integration and
+physical Docker remain pending; [board report](verification/emmc-ro-board-20261014.md).
 The latest receive-only monitor expired at 08:42:59 Asia/Shanghai without a
 restart attempt. The subsequent user TTL reconnection restored actual UART
 reception. One guarded command restart at 08:59 verified SD controller shutdown,
@@ -60,7 +64,7 @@ installed Passwall cores from an actual container network namespace and clean
 shutdown alongside Chinese/empty-password/unzip/time64 checks. The canonical
 build/test/export command passes all 26 required markers; 17 combined and 13
 native core delivery files were independently verified and copied. This uses
-the current E848 patch and remains QEMU-only, without a board image or physical
+the recorded E848 patch and remains QEMU-only, without a board image or physical
 Docker/storage/Wi-Fi acceptance. Fresh combined CI is pending;
 [combined report](verification/container-applications-qemu-20261014.md).
 Downloaded clean diagnostic
@@ -108,6 +112,7 @@ a separate, newer development branch. Additional package/runtime work remains.
 | eMMC register audit | Passed on hardware: separate RAM candidate, MMC/BLOCK disabled, DW revision `0x270a`, HCON `0x00e44c81`, inherited source 100 MHz; no card commands; [measurement](verification/emmc-audit-20261012.md) |
 | eMMC card identification | Passed physically: inherited DMA/IRQ cleanup, CMD1 dual-voltage OCR, `008G30`, EXT_CSD rev 8, 7818182656 bytes; PIO/1-bit/25-MHz legacy mode, BLOCK disabled. Actual policy/core callback/takeover tests and QEMU pass locally. No sector I/O; [hardware report](verification/emmc-identification-20261012.md) |
 | eMMC fixed sector reads | Passed physically: exactly four PIO CMD17 user-area reads; Hinas kernel header CRC matches local original, root-partition ext4 magic/block size pass. No block interface, mounts, writes or card-setting changes; [hardware report](verification/emmc-reads-20261012.md) |
+| eMMC user-area read-only blocks | Corrected independent low256 candidate physically passes RO=1 and all nine partitions, block/overlap/end/header/ext4 checks, ext4 ro,noload mount/444-byte existing-file read/unmount, measured controller shutdown and command restart with exact original Chinese router/configuration return. The actual MMC readonly/force_ro regression reproduces the old disk-flag failure and passes both corrected profile states. Native integration, full backups, writes and physical Docker remain pending; [board report](verification/emmc-ro-board-20261014.md) |
 | Ethernet inherited-state audit | Passed physically: CRG51 `0x3`, internal PHY clock/reset `0x101`, address 1. MDIO/MAC access skipped because the SDK clock gate requires `0xb`; no PHY ID or working network yet. UART/timer/time64 pass; [hardware report](verification/ethernet-audit-20261012.md) |
 | Temporary Ethernet clock / PHY-ID | Passed physically: CRG51 `0x3 -> 0xb -> 0x3`, restoration verified; PHY ID `0x20669823` at address 1 matches FESTAv220. No PHY reset/register, DMA or storage writes. UART/timer/time64 and offline gates pass; [hardware report](verification/ethernet-clock-id-20261012.md) |
 | Ethernet inherited-PHY datapath | Passed physically after TX-level/NAPI correction: exact FESTAv220 binding, 100 Mbps full duplex, DHCP/gateway replies, 20/20 DF MTU pings and three software down/up cycles; final RX/TX errors/drops zero. Actual patched datapath functions pass ASan/UBSan. [Hardware report](verification/ethernet-net-20261012.md) distinguishes the booted image from the later fancy-ping [tooling rebuild](verification/ethernet-net-offline-20261012.md). Sustained TCP, cable reconnection and complete cold-start support remain pending |

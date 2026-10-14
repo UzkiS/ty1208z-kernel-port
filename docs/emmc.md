@@ -6,9 +6,11 @@ eMMC 型号 `008G30`，容量 7818182656 字节。分区布局已记录，尚无
 
 `make emmc-ro` 已构建独立低256 RAM-root 只读候选，包含精确用户区分区、
 ext4 `ro,noload`、控制器 shutdown 和受限命令重启。实际函数、ARM shell、
-镜像/配置/布局、串口 PTY 与通用 QEMU 已通过；这一路径仍未实机启动，
-不能据此宣称可挂载硬盘、已备份或 Docker 存储可用。
-详见 [离线 RAM 候选报告](../verification/emmc-ro-ram-offline-20261014.md)。
+镜像/配置/布局、串口 PTY 与通用 QEMU 已通过。修正 eMMC 核心磁盘只读标志后，
+实机已完成 9 个分区核对、块读取、ext4 只读文件读取/卸载、命令重启及中文系统恢复。
+完整备份、可写存储和 Docker 存储仍待验证。
+详见 [实机报告](../verification/emmc-ro-board-20261014.md)及
+[原离线候选报告](../verification/emmc-ro-ram-offline-20261014.md)。
 
 固定 SDK 中 `himciv200_def.h` 的寄存器布局对应 DesignWare MSHC：
 CTRL/PWREN/CLKDIV/CMD/RESP、VERID/HCON 和 IDMAC 地址均有对应主线定义。
@@ -130,6 +132,7 @@ CMD17/CMD18 读取一起检查；仍拒绝所有数据写入、擦除、CMD6 分
 七种原生 SD Kconfig 回归已通过，见 [编译报告](../verification/emmc-ro-offline-20261014.md)。
 该对象入口仍不输出启动镜像。后续独立 `make emmc-ro` 已补齐设备树/配置/身份、
 停止控制器、命令重启和分区/文件系统探测，并通过离线构建及 RAM 规划检查，
-见 [RAM 候选报告](../verification/emmc-ro-ram-offline-20261014.md)。实机块读取、
-文件系统/重启/恢复、完整备份、文件系统完整性和 Docker 存储仍未验收；
-后续 ext4 挂载必须使用 `ro,noload`，不修复、不回放日志。
+见 [RAM 候选报告](../verification/emmc-ro-ram-offline-20261014.md)。修正后的独立候选
+已实机完成块读取、ext4 `ro,noload` 文件读取/卸载、控制器关闭、命令重启及原中文系统恢复，
+见 [实机报告](../verification/emmc-ro-board-20261014.md)。完整备份、文件系统完整性、
+原生 eMMC 整合、可写存储和 Docker 存储仍未验收；不修复、不回放日志。

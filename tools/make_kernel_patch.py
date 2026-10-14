@@ -318,6 +318,11 @@ changes.update({
         'obj-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += dw_mmc-hi3798mv100-sd-ident.o\n'
         'obj-$(CONFIG_MMC_DW_HI3798CV200)'),
     "drivers/mmc/core/block.c": [
+        ('\treturn mmc_card_readonly(card) ||\n'
+         '\t       !(card->csd.cmdclass & CCC_BLOCK_WRITE);\n',
+         '\treturn IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||\n'
+         '\t       mmc_card_readonly(card) ||\n'
+         '\t       !(card->csd.cmdclass & CCC_BLOCK_WRITE);\n'),
         ('static int mmc_blk_alloc_parts(struct mmc_card *card, struct mmc_blk_data *md)\n'
          '{\n'
          '\tint idx, ret;\n',

@@ -12,6 +12,10 @@ from serial_cli import console_text, open_receiver
 from ymodem_sender import TransferError
 
 PROMPT = re.compile(rb"(?:^|[\r\n])(?:/ )?# $")
+EMMC_RO_DIAGNOSTIC = (
+    # Emit userspace markers after ext4 unmount printk has completed.
+    b"if test ! -e /tmp/emmc-ro-report; then emmc-ro-diag > /tmp/emmc-ro-report; "
+    b"cat /tmp/emmc-ro-report; rm /tmp/emmc-ro-report; fi; diag")
 PROFILES = {
     "diag1": b"6.12.112-ty1208z-diag1",
     "emmc-audit1": b"6.12.112-ty1208z-emmc-audit1",
@@ -76,7 +80,7 @@ def run(args, serial_module):
                 result["kernel_verified"] = True
                 diagnostic = (b"usb-diag; diag" if args.profile == "usb-host1" else
                               b"ram768-diag; diag" if args.profile == "ram768" else
-                              b"emmc-ro-diag; diag" if args.profile == "emmc-ro1" else
+                              EMMC_RO_DIAGNOSTIC if args.profile == "emmc-ro1" else
                               b"sd-ro-diag; diag" if args.profile == "sd-ro1" else
                               b"sd-diag; diag" if args.profile == "sd-ident1" else b"diag")
                 report = shell_command(exchange, diagnostic + b"; echo TY1208Z_DIAG_COMPLETE",

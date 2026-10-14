@@ -253,6 +253,59 @@ int main(void) {
 }
 '''
 
+READONLY_HARNESS = r'''
+#include <assert.h>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdio.h>
+#define IS_ENABLED(option) (option)
+#define CCC_BLOCK_WRITE 16
+#define EINVAL 22
+struct mmc_card { bool readonly; struct { unsigned cmdclass; } csd; };
+#define mmc_card_readonly(card) ((card)->readonly)
+struct gendisk { bool readonly; };
+struct device { struct gendisk *disk; };
+struct device_attribute { int unused; };
+struct mmc_blk_data { bool read_only; };
+static struct mmc_blk_data md;
+#define dev_to_disk(dev) ((dev)->disk)
+static struct mmc_blk_data *mmc_blk_get(struct gendisk *disk) { (void)disk; return &md; }
+static void mmc_blk_put(struct mmc_blk_data *data) { assert(data == &md); }
+static void set_disk_ro(struct gendisk *disk, bool ro) { disk->readonly = ro; }
+static int kstrtoul(const char *buf, unsigned base, unsigned long *value) {
+    (void)base;
+    if (buf[1] || (buf[0] != '0' && buf[0] != '1')) return -1;
+    *value = buf[0] - '0'; return 0;
+}
+/* READONLY */
+/* FORCE_RO */
+int main(void) {
+    struct mmc_card card = {0};
+    struct gendisk disk = {0};
+    struct device dev = {.disk = &disk};
+    for (unsigned protected = 0; protected < 2; protected++) {
+        for (unsigned writable = 0; writable < 2; writable++) {
+            card.readonly = protected;
+            card.csd.cmdclass = writable ? CCC_BLOCK_WRITE : 0;
+            md.read_only = mmc_blk_readonly(&card);
+            bool expected = CONFIG_HI3798MV100_EMMC_READ_ONLY || protected || !writable;
+            assert(md.read_only == expected);
+            set_disk_ro(&disk, md.read_only);
+            assert(disk.readonly == expected);
+            assert(force_ro_store(&dev, NULL, "0", 1) == 1);
+            assert(disk.readonly == expected);
+            assert(force_ro_store(&dev, NULL, "1", 1) == 1);
+            assert(disk.readonly);
+            assert(force_ro_store(&dev, NULL, "bad", 3) == -EINVAL);
+            assert(disk.readonly);
+            assert(force_ro_store(&dev, NULL, "0", 1) == 1);
+            assert(disk.readonly == expected);
+        }
+    }
+    printf("EMMC_RO_DISK_FLAG_PASS actual MMC readonly and force_ro callback profile=%d; writable card metadata and flag-clear attempts covered\n", CONFIG_HI3798MV100_EMMC_READ_ONLY);
+}
+'''
+
 
 def test(linuxsrc):
     driver_path = "drivers/mmc/host/dw_mmc-hi3798mv100-ident.c"
@@ -273,6 +326,11 @@ def test(linuxsrc):
     policy = HARNESS.replace('/* HOST_CAPS */', caps).replace('/* SLOT */', slot)
     policy = policy.replace('/* VALIDATE */', validate).replace('/* QUEUE */', request)
     core = BLOCK_HARNESS.replace('/* PARTS */', parts).replace('/* PROBE */', probe)
+    readonly = block[block.index('static inline int mmc_blk_readonly('):block.index('static struct mmc_blk_data *mmc_blk_alloc_req(')]
+    force_ro = block[block.index('static ssize_t force_ro_store('):block.index('static DEVICE_ATTR(force_ro,')]
+    assert '\tmd->read_only = mmc_blk_readonly(card);\n' in block
+    assert 'set_disk_ro(md->disk, md->read_only || default_ro);' in block
+    flags = READONLY_HARNESS.replace('/* READONLY */', readonly).replace('/* FORCE_RO */', force_ro)
     with tempfile.TemporaryDirectory(prefix='emmc-ro-') as directory:
         temp = Path(directory)
         (temp / 'linux/mmc').mkdir(parents=True)
@@ -290,7 +348,8 @@ def test(linuxsrc):
         (temp / 'linux/completion.h').write_text('struct completion { int unused; };\n')
         for name, harness, enabled, samples in (
                 ('policy', policy, 1, 0), ('policy-samples-enabled', policy, 1, 1),
-                ('block-ro', core, 1, 0), ('block-ordinary', core, 0, 0)):
+                ('block-ro', core, 1, 0), ('block-ordinary', core, 0, 0),
+                ('readonly-ro', flags, 1, 0), ('readonly-ordinary', flags, 0, 0)):
             path = temp / (name + '.c')
             path.write_text(harness)
             command = ['cc', '-std=c11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
@@ -303,6 +362,8 @@ def test(linuxsrc):
                 # Upstream uses an int index against unsigned nr_parts;
                 # retain its real types and the kernel's warning policy.
                 command.append('-Wno-sign-compare')
+            if name.startswith('readonly-'):
+                command.extend(('-include', 'sys/types.h', '-Wno-unused-parameter'))
             binary = temp / name
             subprocess.run([*command, str(path), '-o', str(binary)], check=True)
             subprocess.run([str(binary)], check=True)

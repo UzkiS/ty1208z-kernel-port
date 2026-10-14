@@ -24,7 +24,8 @@ Linux 诊断入口是 `make build`，不会引用 OpenWrt feeds、UCI 或无线�
 `make emmc-ro-compile` 单独编译用户区只读块支持和实际请求/块核心回归；
 它不输出镜像。`make emmc-ro` 另建低256 RAM-root 镜像，只有精确用户区只读、
 已测分区、ext4 ro,noload 与独立 shutdown/restart 配置可通过 RAM 规划器；
-编译/模拟已通过，尚无实机块/文件系统/重启验收，详见 [eMMC](emmc.md)。
+编译/模拟及独立实机块/文件系统/关闭/命令重启/原系统恢复已通过；
+原生存储整合、完整备份和可写存储仍待完成，详见 [eMMC](emmc.md)。
 `make ethernet-audit` 另用独立配置/输出目录，只观察固定时钟/复位状态，并在
 继承状态符合条件时通过 MDIO 读取 PHY ID；关闭 NET、debugfs 和存储，不进入普通诊断。
 `make ethernet-clock-id` 单独验证暂时启用已实测的 MAC 时钟位、读取 PHY ID 并恢复；
