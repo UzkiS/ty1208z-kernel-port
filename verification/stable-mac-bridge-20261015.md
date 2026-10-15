@@ -31,6 +31,8 @@
 - 通过桥内临时 veth / network namespace 客户端，真实主路由 DHCP 租约、盒子及主路由 ping 通过；
   管理入口可达并返回认证前 HTTP 403。另以已认证会话检查无线和 DiskMan 页面 HTTP 200。
   临时接口/命名空间已删除。这验证桥的 DHCP、过滤和管理路径，不替代真实无线客户端空口测试。
+- 最终重启后，使用已有本地 ARM 小镜像创建 `--rm` 容器，经 Docker bridge/LAN 上联 ping 真实主路由通过。
+  该镜像的精简 BusyBox ping 仅接受主机参数，未把测试命令参数错误当成网络失败。
 - 最终升级包通过主机 sanitizer/异常归档、实际 ARM parser 和实机 `sysupgrade --test`；
   本地 make lint 通过。未再次执行整个 sysupgrade 或完整 1 GiB 首刷。
 
@@ -51,3 +53,4 @@ DHCP 的租约策略仍由主路由决定；需要永久固定 IP 时应在主�
 | 最终 APK 普通重启 | `7a7e1fb043867a0bda4a5c059492c81a5cf51f31150ae3941af912e37ac2f044` |
 | 桥内 DHCP 与管理访问 | `6cbffe460d169d1cb7eefba5fbaf40ae3bd249c1934cc25c0b97b009e5782cc1` |
 | 最终升级包实机检查 | `f8a5c5a13ce03314ed1c935ef39065e9af72ca37bce8bf39071e808e48158db2` |
+| Docker bridge 经 LAN 上联 | `d815350899c2ca26cb3e8adf7cef5d432cb3139f21df5e2824be0bf99d4b09e3` |

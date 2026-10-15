@@ -79,3 +79,8 @@ pyserial 后，`make test-serial` 的七组共 93 项测试全部通过，该目
 污染 PATH 能产生自循环，标准 host PATH 保留 `/usr/bin/bash` 并可执行。shellcheck 与 make lint 通过。
 没有因此重编设备内核、应用或重复实机安装；远端干净组合构建将从修复提交重新派发，
 完成前不把这个局部回归当成整套 CI 成功。
+
+修复提交 `9cc68ad352790f2a9693786e82bfdc2bad04dbb6` 已显式派发新组合运行
+[38679690918](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38679690918)，
+`.2` 公开下载核对时状态为 `in_progress`。诊断重跑 `38676803636` 同时仍为 `in_progress`。
+当前设备内核和应用二进制未因这次 host 构建入口修复改变。

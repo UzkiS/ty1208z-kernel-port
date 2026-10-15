@@ -42,6 +42,7 @@
 `2026.10.15` 因重复 radio、`.1` 因随机网口 MAC 撤回公开下载，旧文件身份仅供追溯。
 替代版 [2026.10.15.2](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.2)
 包括首刷包、sysupgrade、RAM 配套包、固件及两份清单；见[发布记录](verification/release-20261015.2.md)。
+六个资产已正式公开，服务器大小/SHA-256 和匿名清单下载匹配，两版旧升级下载链接均为 404。
 本机 MAC 和桥地址已持久化，桥接多次普通重启保持原 DHCP 地址；单个 TY1208Z 开放热点自启，
 主路由 DHCP 和管理路径通过，见[修复记录](verification/stable-mac-bridge-20261015.md)。
 普通 CI 附件只用于开发验证。
