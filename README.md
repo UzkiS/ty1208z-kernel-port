@@ -13,6 +13,7 @@ OpenWrt 25.12 的系统集成。**已完成实机 eMMC 安装、中文 LuCI 网�
 - 简体中文 LuCI；默认账号 `root`、空密码；升级可保留已有配置和密码。
 - Passwall 26.10.4，含 Xray 26.10.10、sing-box 1.14.3；InfoZIP unzip。
 - Docker 29.6.1、中文 Dockerman、Compose；eMMC 数据持久化和冷启动自启已实测。
+- 中文 ttyd 网页终端及配置页，入口为“服务 → 终端”，使用系统账号与密码。
 - 有线 DHCP、双向 TCP；板载 RDA5995 的 WPA2 STA/AP 已分别实测，默认开启无密码热点 `TY1208Z`，与网口桥接，由主路由分配地址。
 - eMMC ext4 可写根和完整 p9 在线扩容；USB 存储的 VFAT/NTFS3 文件访问已实测（写入仍需用户自行挂载验证）。
 - 中文 DiskMan 磁盘管理和挂载点；SD 的 FAT32、exFAT、ext4 格式化、挂载、读写及重启自动挂载已实测。
@@ -25,9 +26,9 @@ USB 写入及吞吐没有新增验收。time64 已覆盖选定用户空间与应
 
 ## 安装与使用
 
-正式下载：[2026.10.15.3 Release](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.3)。
+正式下载：[2026.10.15.4 Release](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.4)。
 首刷、日常升级、RAM 配套包、无线固件和校验文件在同一页面，RAM 包内附独立中文步骤。
-`2026.10.15` 的重复 radio、`.1` 的随机 MAC、`.2` 缺少 ext4 恢复默认的问题已修复，受影响旧版均撤下公开下载。
+`2026.10.15` 的重复 radio、`.1` 的随机 MAC、`.2` 缺少 ext4 恢复默认、`.3` 缺少 ttyd LuCI 页的问题已修复，受影响旧版均撤下公开下载。
 连接热点后使用主路由分给盒子的地址管理；不另设无线子网，不在桥上运行 DHCP 服务器。
 
 首次安装采用 TTL 加网线启动专用临时 OpenWrt，再通过官方 LuCI“系统 → 备份与更新”
