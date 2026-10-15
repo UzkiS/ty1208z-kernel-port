@@ -43,6 +43,8 @@
 `2026.10.15` 因默认路径导致重复 radio 已撤回公开下载，旧文件身份仅供追溯。
 替代版 [2026.10.15.1](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.1)
 包括首刷包、sysupgrade、RAM 配套包、RDA5995 固件及两份清单；见[发布记录](verification/release-20261015.1.md)。
+六个文件已正式公开，GitHub 大小/SHA-256 和公开清单下载核对通过；设备已安装无线修复，
+真实 PHY hotplug 与普通重启后均只有一个 radio，见[修复报告](verification/rda-radio-path-20261015.md)。
 普通 CI 附件只用于开发验证。
 
 诊断 CI 在 `559c2d8` 上[通过](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38642766702)。

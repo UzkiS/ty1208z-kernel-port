@@ -63,4 +63,7 @@ pyserial 后，`make test-serial` 的七组共 93 项测试全部通过，该目
 诊断 run 的 `test_emmc_ro_driver.py` 使用自行定义的 `IS_ENABLED`，缺少
 `CONFIG_HI3798MV100_EMMC_WRITE` 后无法编译实际 probe/shutdown 函数。
 已将该宏绑定到 harness 原有的安装模式变量，分别验证原只读 host 移除和持久写入 host 保留分支，
-实际 Linux 源码的 ASan/UBSan 检查通过；内核驱动和二进制不变。修复提交将显式重跑诊断 CI。
+实际 Linux 源码的 ASan/UBSan 检查通过；内核驱动和二进制不变。
+修复提交 `4782c4c1f5e4b00f21e0c3ce7d58213e9c4f6ff8` 的新诊断
+[38676803636](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38676803636)
+已显式派发，修复版发布时仍在运行。组合应用 run 保留原进度；无线修复没有改变其应用二进制。
