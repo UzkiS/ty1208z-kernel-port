@@ -69,7 +69,7 @@ SD ext4 rw 自动挂载与持久文件、用户持久标记、Docker 数据目�
 |---|---:|---|
 | 生产 zImage | — | `18a7efd40a08291a551f37ca47354278de460b9e7cb0d1db2844ef68b7e12f6c` |
 | p6 kernel | 4925410 | `c2b72c4dd56705a93ead0d54a3151d3f1dbe934e0938d1ea5632743c109f135c` |
-| 运行 RDA 模块 | 318916 | `3eb398b1c6495d8385c3a026ae4c4874a8dad029053789b12596ab9dc2981ffd` |
+| 运行 RDA 模块 | 317980 | `3eb398b1c6495d8385c3a026ae4c4874a8dad029053789b12596ab9dc2981ffd` |
 | Release sysupgrade | 131379402 | `b0f21dd0865677eba39b2b85e78784f66c9f93a428f4230de57055b433d9bf28` |
 | Release first-install | 132362441 | `744edb18b79cfd8f423e51603edb1e8782192d4036b9e7253d214dce9a51ce75` |
 
