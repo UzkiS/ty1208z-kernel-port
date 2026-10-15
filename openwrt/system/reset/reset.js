@@ -15,7 +15,7 @@ return view.extend({
 			result.code ? E('pre', {}, result.stderr || '恢复默认预检失败') : '',
 			E('button', {
 				'class': 'cbi-button cbi-button-negative important',
-				'disabled': result.code !== 0 || !L.hasViewPermission(),
+				'disabled': (result.code !== 0 || !L.hasViewPermission()) || null,
 				'click': ui.createHandlerFn(this, function() {
 					ui.showModal('确认恢复默认', [
 						E('p', {}, '系统将清除配置与登录授权并重启。热点恢复为 TY1208Z，无密码。是否继续？'),

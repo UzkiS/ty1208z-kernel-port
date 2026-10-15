@@ -12,7 +12,7 @@ SOURCE = PROJECT / 'openwrt/system/reset'
 FILES = {
     'sbin/ty1208z-reset': 'ty1208z-reset',
     'lib/preinit/81-ty1208z-reset': '81-ty1208z-reset',
-    'www/luci-static/resources/view/system/ty1208z-reset.js': 'reset.js',
+    'www/luci-static/resources/view/system/reset.js': 'reset.js',
     'usr/share/luci/menu.d/ty1208z-reset.json': 'menu.json',
     'usr/share/rpcd/acl.d/ty1208z-reset.json': 'acl.json',
 }

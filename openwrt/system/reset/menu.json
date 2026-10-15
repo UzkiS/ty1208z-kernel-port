@@ -1,8 +1,12 @@
 {
-	"admin/system/ty1208z-reset": {
+	"admin/system/reset": {
 		"title": "恢复默认设置",
 		"order": 69,
-		"action": { "type": "view", "path": "system/ty1208z-reset" },
+		"action": { "type": "view", "path": "system/reset" },
+		"depends": { "acl": [ "ty1208z-reset" ] }
+	},
+	"admin/system/ty1208z-reset": {
+		"action": { "type": "alias", "path": "admin/system/reset" },
 		"depends": { "acl": [ "ty1208z-reset" ] }
 	}
 }
