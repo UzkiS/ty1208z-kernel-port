@@ -22,8 +22,8 @@ Dockerman 可以管理部署出的容器，但没有 Compose YAML 编辑、项�
 默认服务绑定 LAN，执行 `/bin/login`，使用系统账号和密码。
 已发布的 `2026.10.15.3` 含 ttyd 1.7.7，但漏选 LuCI 插件；
 当前源码已补齐插件和中文翻译，实机通过 APK 增量安装后，页面和实际终端命令均通过。
-此次未生成新的完整 Release，也未修改 `.3` 已发布资产；
-见[实测记录](../verification/ttyd-compose-board-20261015.md)。
+包含插件的 `.4` 完整包已装配，发布状态见[发布记录](../verification/release-20261015.4.md)；
+没有修改 `.3` 已发布资产。页面实测见[记录](../verification/ttyd-compose-board-20261015.md)。
 
 ## 使用边界
 
