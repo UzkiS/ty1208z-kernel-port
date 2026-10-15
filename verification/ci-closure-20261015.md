@@ -84,3 +84,9 @@ pyserial 后，`make test-serial` 的七组共 93 项测试全部通过，该目
 [38679690918](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38679690918)，
 `.2` 公开下载核对时状态为 `in_progress`。诊断重跑 `38676803636` 同时仍为 `in_progress`。
 当前设备内核和应用二进制未因这次 host 构建入口修复改变。
+
+## 恢复默认发布时的状态
+
+诊断重跑 [38676803636](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38676803636)
+在 `4782c4c` 上已 completed/success。组合应用 [38679690918](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38679690918)
+在 `9cc68ad` 上仍为 in_progress，不计为整套通过。本次恢复默认复用内核和应用，只增加配置事务、APK 与 LuCI 集成检查，未另跑无关组合 CI。
