@@ -6,6 +6,7 @@
 
 当前正式版本为 [2026.10.15](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15)。
 首刷用户同时下载 `first-install` 和 `install-ram` 两包；已安装用户只需 `sysupgrade`。
+该版本六个文件均已上传并核对 GitHub SHA-256；精确身份见[发布记录](../verification/release-20261015.md)。
 
 文件用途固定如下：
 

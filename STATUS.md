@@ -40,13 +40,15 @@
 配套首刷包和精确身份见[生产报告](verification/production-profile-board-20261015.md)。
 含用户提供 RDA5995 固件的完整 Release 包按项目所有者授权公开；固件来源和哈希单独记录。
 
-正式下载包统一放在 [GitHub Releases](https://github.com/UzkiS/ty1208z-kernel-port/releases)，
-不会要求用户从 CI 的短期 artifact 中猜测文件。首刷包、sysupgrade、RAM 配套包和
-RDA5995 固件会在同一 Release 附带 `SHA256SUMS.txt`；普通 CI 附件只用于开发验证。
+正式下载包已发布到 [2026.10.15 Release](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15)。
+首刷包、sysupgrade、RAM 配套包、RDA5995 固件及两份清单共六个文件均已上传，
+GitHub 返回的大小和 SHA-256 与本地一致，清单下载核对通过；见[发布记录](verification/release-20261015.md)。
+普通 CI 附件只用于开发验证。
 
 诊断 CI 在 `559c2d8` 上[通过](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38642766702)。
 应用、router、eMMC、修复后 SD/router768 和 Docker/Passwall 组合已有成功干净构建；
 实时结果与修复原因集中在 [CI 记录](verification/ci-closure-20261015.md)，不由工作流文件存在推断成功。
+发布提交 `8be787a` 的新诊断及 Docker/Passwall/DiskMan 组合 CI 已显式派发，发布时仍在运行。
 
 安装只替换固定 p6/p9，保留 CA fastboot、持久 boot 环境、其他分区、
 SD、boot0/boot1/RPMB 和安全状态。使用方法见[安装与升级](docs/installation-plan.md)。

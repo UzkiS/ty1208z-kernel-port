@@ -42,3 +42,20 @@ router768失联由GitHub check annotation明确记录，发生在toolchain完成
 
 此前组合构建还遇到BusyBox HTTPS下载超时，发生在编译/运行前；
 后续由修复内存交接的运行替代。重复、无变化的任务取消记录不作成功计数。
+
+## 生产配置发布提交的新增运行
+
+`5f3b863` 包含四核、完整内存、普通存储读写、DiskMan、仓库内 RDA 文件及公开构建路径处理。
+`8be787a1e97631818c637bbd98de3e625270dc71` 仅进一步更正生产报告中的模块字节数，
+两次提交均跳过自动广泛触发，随后在该精确提交上显式派发以下检查：
+
+| 检查 | run | 派发后的状态 |
+|---|---|---|
+| 完整诊断及 time64 回归 | [38673515248](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38673515248) | 运行中，尚未取得完成结论 |
+| Docker/fw4/Passwall/DiskMan 组合构建与 QEMU | [38673519682](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38673519682) | 运行中，尚未取得完成结论 |
+
+以上两项均于 2026-10-15 02:55 UTC 派发。表格记录发布时的状态，后续结果以对应 run 页面为准，
+不把旧提交的成功结果算作本提交通过。最终源码本地 `make lint` 已通过；补装固定哈希的
+pyserial 后，`make test-serial` 的七组共 93 项测试全部通过，该目标不操作真实硬件。
+生产内核编译、实际策略 sanitizer、真实升级和变化应用组件的实机结果见
+[生产报告](production-profile-board-20261015.md)，与上述远端干净构建分开记录。
