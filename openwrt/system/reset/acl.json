@@ -1,0 +1,13 @@
+{
+	"ty1208z-reset": {
+		"description": "恢复 TY1208Z 出厂配置",
+		"read": {
+			"ubus": { "file": [ "exec" ] },
+			"file": { "/sbin/ty1208z-reset --check": [ "exec" ] }
+		},
+		"write": {
+			"ubus": { "file": [ "exec" ] },
+			"file": { "/sbin/ty1208z-reset -y -r": [ "exec" ] }
+		}
+	}
+}

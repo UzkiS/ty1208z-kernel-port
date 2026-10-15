@@ -6,6 +6,7 @@ import io
 import json
 from pathlib import Path
 import subprocess
+import sys
 import tarfile
 import tempfile
 
@@ -99,6 +100,10 @@ def main():
         check("unexpected-outer-name", ["outer", str(path)], valid=False)
         path.write_bytes(bytes(1024))
         check("empty-outer", ["outer", str(path)], valid=False)
+    if (args.delivery / 'root/sbin/ty1208z-reset').is_file():
+        subprocess.run([sys.executable, str(PROJECT / 'tools/test_native_reset.py'),
+                        '--root', str(args.delivery / 'root')], check=True)
+        checked.append('configuration-reset-transactions-real-ARM-UCI')
     output = {"status": "offline parser/ARM checks passed; not a physical upgrade acceptance",
               "checks": checked, "image_sha256": receipt["image"]["sha256"],
               "parser_sha256": digest(source)}

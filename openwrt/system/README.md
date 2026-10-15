@@ -89,3 +89,19 @@ RDA 固件已获项目所有者授权公开，归档于 `firmware/rda5995/` 并�
 后续升级使用独立文件级 sysupgrade 包，不能再次用首刷包替代日常升级。
 [首刷报告](../../verification/compact-first-install-board-20261014.md)记录完整实测；
 最新全包只复用该流程，未再覆盖首刷，变化的内核由日常升级验证。
+
+## ext4 恢复默认
+
+`tools/native_reset.py` 为持久系统生成真实 `ty1208z-reset` APK，保存当前固件的干净 `/etc`、
+文件/软链接校验清单、LuCI 页面和 preinit 后端。`prepare_native_upgrade.py` 安装该包并检查式
+重打包固定 fstools；`prepare_native_first_install.py` 在安装扩容 APK 后另生成相符的默认快照。
+`firstboot` / `factoryreset` / `jffs2reset` 最终调用同一个板级后端。
+
+请求阶段保存本机 MAC、SSH 主机密钥和 APK world；下一次 preinit 在服务启动前原子交换
+完整 `/etc`，清除 `/root/.ssh` 的登录授权，回收旧配置。事务 token 防止掉电重入时回滚。
+不清理 `/opt/docker`、SD 或用户数据，不写入 p6，也不借用 overlay 擦除。
+后装软件新增的 `/etc` 文件恢复为固件默认范围，可能需重新配置或安装；不等同于软件文件回滚。
+
+隔离事务、异常快照、交换前后中断、真实 ARM UCI 和实机重置结果见
+[恢复默认报告](../../verification/factory-reset-board-20261015.md)，用户入口见
+[操作说明](../../docs/factory-reset.md)。实体复位键尚未验收。

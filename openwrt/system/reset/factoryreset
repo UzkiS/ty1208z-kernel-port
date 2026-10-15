@@ -1,0 +1,4 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Owned by the board-adapted fstools APK. firstboot/jffs2reset use this too.
+exec /sbin/ty1208z-reset "$@"

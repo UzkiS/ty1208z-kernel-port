@@ -13,6 +13,7 @@ import tarfile
 
 from native_upgrade import digest
 from prepare_native_package_supplement import public_runtime_metadata
+import native_reset
 
 PROJECT = Path(__file__).resolve().parents[1]
 EPOCH = 1791676800
@@ -121,6 +122,10 @@ def main():
          "--allow-untrusted", "--no-network", "--no-scripts", "--no-commit-hooks",
          "--repositories-file", "/dev/null", grow_apk], env=env)
     public_runtime_metadata(root)
+    # Snapshot the actual first-install /etc, including the grow APK files.
+    reset_apk = native_reset.make_package(Path(env['CC']), apk, version, root, args.output / 'reset-package')
+    native_reset.install(apk, root, [reset_apk])
+    public_runtime_metadata(root)
     image = args.output / "rootfs.ext4"
     with image.open("wb") as stream:
         stream.truncate(1073741824)
@@ -175,6 +180,8 @@ def main():
     receipt = {"status": "public first-install candidate; hardware writing not performed",
                "image": {"file": firmware.name, "bytes": firmware.stat().st_size, "sha256": digest(firmware)},
                "installer": {"file": installer.name, "sha256": digest(installer)},
+               "reset_package": {"file": reset_apk.relative_to(args.output).as_posix(), "sha256": digest(reset_apk)},
+               "reset_sources": native_reset.source_identity(),
                "root_bytes_written": 1073741824, "full_p9_bytes": 7178551296,
                "manifest": manifest, "redistribution": "User-supplied RDA firmware included in the public release with explicit project-owner authorization"}
     (args.output / "manifest.json").write_text(json.dumps(receipt, indent=2) + "\n")

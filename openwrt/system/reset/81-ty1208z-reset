@@ -1,0 +1,13 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+ty1208z_reset_boot() {
+	[ -e /.ty1208z-reset ] || [ -L /.ty1208z-reset ] || return 0
+	/sbin/ty1208z-reset apply-boot && return 0
+	echo 'TY1208Z configuration reset stopped; use the serial console to repair.' >/dev/console
+	# Never start network/services with an unverified or partial reset.
+	while :; do
+		/bin/ash -i </dev/console >/dev/console 2>&1
+		sleep 1
+	done
+}
+[ "$INITRAMFS" = 1 ] || boot_hook_add preinit_main ty1208z_reset_boot

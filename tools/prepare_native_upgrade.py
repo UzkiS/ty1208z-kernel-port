@@ -10,6 +10,7 @@ import subprocess
 from native_upgrade import digest, make_image, make_package, source_identity
 from prepare_openwrt import toolchain_from_native
 from prepare_native_package_supplement import public_runtime_metadata
+import native_reset
 
 
 def main():
@@ -45,6 +46,13 @@ def main():
                  "etc/config/network", "etc/shadow"):
         assert (root / name).read_bytes() == (old_root / name).read_bytes(), name
     public_runtime_metadata(root)
+    candidates = list((args.source / 'bin').rglob('fstools-2026.05.23~16718b6e-r1.apk'))
+    assert len(candidates) == 1, 'Pinned native fstools APK missing or ambiguous'
+    fstools = native_reset.adapt_fstools(apk, candidates[0], args.output / 'fstools-package')
+    native_reset.install(apk, root, [fstools])
+    reset = native_reset.make_package(compiler, apk, version, root, args.output / 'reset-package')
+    native_reset.install(apk, root, [reset])
+    public_runtime_metadata(root)
     kernel = args.disk_root / "kernel-p6-INSTALL-UNTESTED.bin"
     original = json.loads((args.disk_root / "manifest.json").read_bytes())
     assert digest(kernel) == original["files"][kernel.name]["sha256"]
@@ -55,7 +63,8 @@ def main():
     receipt = {"status": "public offline web upgrade candidate; physical acceptance pending",
                "image": {"file": image.name, "bytes": image.stat().st_size, "sha256": digest(image)},
                "package": {"file": package.relative_to(args.output).as_posix(), "sha256": digest(package)},
-               "manifest": manifest, "sources": source_identity(), "toolchain": toolchain_identity,
+               "manifest": manifest, "sources": {**source_identity(), **native_reset.source_identity()}, "toolchain": toolchain_identity,
+               "reset_packages": {p.relative_to(args.output).as_posix(): digest(p) for p in (fstools, reset)},
                "data_preserved": ["/opt", "/root", "/mnt", "/srv"],
                "hardware_actions": False, "redistribution": "User-supplied RDA firmware included in the public release with explicit project-owner authorization"}
     (args.output / "manifest.json").write_text(json.dumps(receipt, indent=2) + "\n")

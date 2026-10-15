@@ -29,6 +29,7 @@ cleanup() {
 }
 
 hardware() {
+	[ ! -e /.ty1208z-reset ] && [ ! -L /.ty1208z-reset ] || die 'configuration reset pending; reboot first'
 	[ "$(tr '\000' '\n' < /sys/firmware/devicetree/base/compatible | head -n 1)" = 'tianyi,ty1208z-ca-openwrt-system-ram' ] || die 'board differs'
 	[ "$(cat /sys/class/block/mmcblk0/device/type)" = MMC ] || die 'not eMMC'
 	[ "$(cat /sys/class/block/mmcblk0/device/name)" = 008G30 ] || die 'eMMC identity differs'

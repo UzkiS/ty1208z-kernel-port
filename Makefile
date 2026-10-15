@@ -81,6 +81,7 @@ lint:
 	shellcheck initramfs/usb-diag
 	shellcheck openwrt/system/wireless/defaults openwrt/system/wireless/rda-path openwrt/system/wireless/hotplug
 	shellcheck openwrt/system/ethernet-mac openwrt/system/docker-network
+	shellcheck openwrt/system/reset/ty1208z-reset openwrt/system/reset/factoryreset openwrt/system/reset/81-ty1208z-reset
 	shellcheck initramfs/sd-diag
 	shellcheck initramfs/sd-ro-diag
 	shellcheck initramfs/emmc-ro-diag

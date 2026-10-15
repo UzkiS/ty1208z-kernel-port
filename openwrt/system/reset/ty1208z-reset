@@ -1,0 +1,132 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Each A && B || fail below intentionally rejects either failed condition.
+# shellcheck disable=SC2015
+set -eu
+PATH=/usr/sbin:/usr/bin:/sbin:/bin
+export PATH
+defaults=/usr/share/ty1208z-reset
+state=/.ty1208z-reset
+
+fail() { echo "TY1208Z reset: $*" >&2; exit 1; }
+directory() { [ -d "$1" ] && [ ! -L "$1" ]; }
+check_links() {
+	base=$1
+	manifest=$2
+	while read -r name target; do
+		[ -L "$base/$name" ] && [ "$(readlink "$base/$name")" = "$target" ] || fail 'configuration symlink differs'
+	done <"$manifest"
+}
+platform() {
+	grep -q 'root=/dev/mmcblk0p9' /proc/cmdline || fail 'not the installed p9 system'
+	grep -q 'TY1208Z_EMMC_INSTALL_CANDIDATE=y' /etc/ty1208z-disk-root || fail 'board marker missing'
+	[ "$(cat /sys/class/block/mmcblk0p9/start)" = 1249280 ] || fail 'p9 start differs'
+	[ "$(cat /sys/class/block/mmcblk0p9/size)" = 14020608 ] || fail 'p9 size differs'
+	awk '$3 == "179:9" && $5 == "/" && $0 ~ / - ext4 / { ok=1 }
+	     $5 == "/etc" || index($5, "/etc/") == 1 { bad=1 }
+	     END { exit !(ok && !bad) }' /proc/self/mountinfo || fail 'ext4 root or /etc mounts differ'
+	directory /etc || fail 'invalid /etc'
+}
+check_defaults() {
+	directory "$defaults/etc" || fail 'default configuration missing'
+	(cd "$defaults" && sha256sum -c files.sha256 >/dev/null) || fail 'default configuration checksum differs'
+	check_links "$defaults" "$defaults/links.list"
+	cmp -s "$defaults/etc/ty1208z-upgrade-abi" /etc/ty1208z-upgrade-abi || fail 'default ABI differs'
+	grep -q '^root::' "$defaults/etc/shadow" || fail 'default root password differs'
+}
+cleanup() {
+	# No filesystem is ever mounted in this private transaction directory.
+	awk '$5 == "/.ty1208z-reset" || index($5, "/.ty1208z-reset/") == 1 { bad=1 }
+	     END { exit bad }' /proc/self/mountinfo || fail 'transaction contains mounts'
+	rm -rf "$state"
+	sync
+}
+apply_boot() {
+	platform
+	directory "$state" || fail 'invalid transaction directory'
+	# An interrupted preparation did not change /etc and is safe to discard.
+	if [ ! -f "$state/pending" ]; then cleanup; return; fi
+	[ ! -L "$state/pending" ] || fail 'invalid transaction marker'
+	token=$(cat "$state/pending")
+	printf '%s\n' "$token" | grep -Eq '^[0-9a-f]{32}$' || fail 'invalid transaction identity'
+	if [ "$(cat /etc/.ty1208z-reset-id 2>/dev/null || true)" != "$token" ]; then
+		directory "$state/etc" || fail 'staged configuration missing'
+		[ "$(cat "$state/etc/.ty1208z-reset-id")" = "$token" ] || fail 'staged identity differs'
+		(cd "$state" && sha256sum -c staged.sha256 >/dev/null) || fail 'staged checksum differs'
+		check_links "$state" "$state/links.list"
+		/usr/libexec/ty1208z-reset-exchange || fail 'atomic exchange failed'
+	fi
+	# Never retain login authorization or password copies outside /etc.
+	if [ -L /root/.ssh ]; then
+		rm /root/.ssh
+	else
+		rm -f /root/.ssh/authorized_keys /root/.ssh/authorized_keys2
+	fi
+	cleanup
+	echo 'TY1208Z_CONFIG_RESET_COMPLETE'
+}
+
+case "${1:-}" in
+apply-boot) apply_boot; exit 0 ;;
+--check) platform; check_defaults; [ ! -e "$state" ] && [ ! -L "$state" ] || fail 'reset already pending'; echo 'TY1208Z_RESET_READY'; exit 0 ;;
+esac
+yes=0
+reboot=0
+while getopts 'yrk' flag; do
+	case "$flag" in
+	y) yes=1 ;; r) reboot=1 ;; k) : ;; *) exit 2 ;;
+	esac
+done
+shift $((OPTIND - 1))
+[ "$#" = 0 ] || fail 'usage: ty1208z-reset [-y] [-r]'
+platform
+check_defaults
+[ ! -e "$state" ] && [ ! -L "$state" ] || fail 'reset already pending'
+if [ "$yes" != 1 ]; then
+	printf 'Reset configuration/passwords and reboot? SD and Docker data are kept. [y/N] '
+	read -r answer
+	[ "$answer" = y ] || [ "$answer" = Y ] || exit 1
+fi
+umask 077
+mkdir -m 700 "$state" || fail 'cannot lock reset transaction'
+trap 'echo "Reset preparation interrupted; next boot will discard incomplete staging." >&2' EXIT
+cp -a "$defaults/etc" "$state/etc"
+cp "$defaults/links.list" "$state/links.list"
+# APK's installed database lives outside /etc; keep its explicit package set
+# consistent with that database, while resetting repository configuration.
+if [ -f /etc/apk/world ] && [ ! -L /etc/apk/world ]; then
+	cp -p /etc/apk/world "$state/etc/apk/world"
+fi
+# Keep the current Ethernet identity, including a user-selected MAC. There
+# is no shared address in the firmware; only this device supplies the value.
+mac=$(cat /sys/class/net/eth0/address)
+printf '%s\n' "$mac" | grep -Eq '^[[:xdigit:]][02468aAcCeE](:[[:xdigit:]]{2}){5}$' || fail 'invalid Ethernet MAC'
+[ "$mac" != 00:00:00:00:00:00 ] || fail 'zero Ethernet MAC'
+mkdir "$state/uci-override" "$state/uci-delta"
+uci -c "$state/etc/config" -C "$state/uci-override" -t "$state/uci-delta" batch <<EOF
+set network.ty1208z_eth0=device
+set network.ty1208z_eth0.name='eth0'
+set network.ty1208z_eth0.macaddr='$mac'
+commit network
+EOF
+# Preserve device SSH host identity only; never preserve authorized_keys.
+if directory /etc/dropbear; then
+	for key in /etc/dropbear/dropbear_*_host_key; do
+		[ -f "$key" ] && [ ! -L "$key" ] || continue
+		mkdir -p "$state/etc/dropbear"
+		cp -p "$key" "$state/etc/dropbear/"
+	done
+fi
+token=$(hexdump -n 16 -e '16/1 "%02x"' /dev/urandom)
+printf '%s\n' "$token" >"$state/etc/.ty1208z-reset-id"
+(cd "$state" && find etc -type f -exec sha256sum '{}' \; >staged.sha256; sha256sum links.list >>staged.sha256)
+sync
+printf '%s\n' "$token" >"$state/pending.tmp"
+mv "$state/pending.tmp" "$state/pending"
+sync
+trap - EXIT
+echo 'TY1208Z reset scheduled for next boot; SD and Docker data are kept.'
+if [ "$reboot" = 1 ]; then
+	# Return the RPC result before the connection closes.
+	(sleep 3; /sbin/reboot) </dev/null >/dev/null 2>&1 &
+fi
