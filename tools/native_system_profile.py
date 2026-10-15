@@ -10,13 +10,14 @@ import zlib
 from inspect_images import parse_fdt
 from native_emmc_profile import BOOTARGS, NODE as EMMC_NODE, PROPERTIES as EMMC_PROPERTIES
 from sd_ident_profile import NODE as SD_NODE, PROPERTIES as SD_PROPERTIES
-from ram768_profile import memory_boot_evidence
+from ram768_profile import memory_boot_evidence, ALLOCATIONS
 from ethernet_net_profile import NETWORK_NODES
 from usb_host_profile import HOST_NODES, USB_OPTIONS, validate_usb_resources
 
 COMPATIBLE = 'tianyi,ty1208z-ca-openwrt-system-ram'
 RESTART = '/soc/system-restart@f8a2c000'
 BASE = {'/', '/aliases', '/chosen', '/memory@0', '/cpus', '/cpus/cpu@0',
+        '/cpus/cpu@1', '/cpus/cpu@2', '/cpus/cpu@3',
         '/clock-24m', '/clock-83m3', '/interrupt-controller@f8a01000', '/soc',
         '/soc/timer@f8a29000', '/soc/serial@f8b00000'}
 
@@ -25,16 +26,19 @@ def native_system_profile(tree, config, *, allow_install_candidate=False):
     props = {n['path']: n['properties'] for n in tree['nodes']}
     if props['/'].get('compatible', {}).get('strings') != [COMPATIBLE, 'hi3798mv100-series']:
         return False
-    required = {'TY1208Z_OPENWRT_SYSTEM', 'HI3798MV100_TIMER', 'ARCH_HI3798MV100',
+    required = {'TY1208Z_OPENWRT_SYSTEM', 'HI3798MV100_TIMER', 'HI3798MV100_SMP',
+                'HI3798MV100_SMP_TIMER', 'SMP', 'HIGHMEM', 'ARCH_HI3798MV100',
                 'HISI_FEMAC', 'MDIO_HISI_FEMAC', 'TY1208Z_ETHERNET_INHERITED', 'FESTA_TY1208Z_PHY',
-                'HI3798MV100_EMMC_READ_ONLY', 'HI3798MV100_SD_READ_ONLY', 'CMDLINE_PARTITION',
+                'HI3798MV100_EMMC_WRITE', 'HI3798MV100_SD_WRITE', 'CMDLINE_PARTITION',
                 'MMC_DW_HI3798MV100_IDENT', 'MMC_DW_HI3798MV100_SD_IDENT', 'MMC_BLOCK',
                 'POWER_RESET_TY1208Z_MV100_SYSTEM', 'PROC_PAGE_MONITOR', 'MEMCG', 'CGROUPS',
                 'CFS_BANDWIDTH', 'SECCOMP', 'SECCOMP_FILTER', 'NAMESPACES', 'NET_NS', 'PID_NS',
                 'OVERLAY_FS', 'TMPFS_XATTR', 'BLOCK', 'EXT4_FS', 'VFAT_FS', 'EXFAT_FS',
                 'ARM_APPENDED_DTB', 'BLK_DEV_INITRD', 'RD_GZIP', 'MODULES',
-                'TY1208Z_USB_HOST0_EXPERIMENT', 'CFG80211', 'FW_LOADER', 'CRYPTO_MD5'} | USB_OPTIONS
-    forbidden = {'USB_STORAGE', 'USB_UAS', 'SMP', 'HIGHMEM', 'WATCHDOG', 'DEBUG_FS', 'PM', 'MTD', 'MMC_TEST',
+                'TY1208Z_USB_HOST0_EXPERIMENT', 'CFG80211', 'FW_LOADER', 'CRYPTO_MD5',
+                'SCSI', 'BLK_DEV_SD', 'USB_STORAGE', 'NTFS3_FS'} | USB_OPTIONS
+    forbidden = {'USB_UAS', 'WATCHDOG', 'DEBUG_FS', 'PM', 'MTD', 'MMC_TEST',
+                 'HI3798MV100_EMMC_READ_ONLY', 'HI3798MV100_SD_READ_ONLY',
                  'TY1208Z_EMMC_INSTALL_CANDIDATE',
                  'OF_PARTITION', 'BLK_DEV_WRITE_MOUNTED', 'TY1208Z_ROUTER_RAM768',
                  'TY1208Z_ROUTER_SD_RO', 'TY1208Z_ROUTER_EMMC_RO', 'POWER_RESET_TY1208Z_MV100_EMMC_RO',
@@ -45,17 +49,29 @@ def native_system_profile(tree, config, *, allow_install_candidate=False):
         if active.get('TY1208Z_EMMC_INSTALL_CANDIDATE') != 'y':
             raise ValueError('Explicit installation mode requires its exact opt-in kernel')
         forbidden.remove('TY1208Z_EMMC_INSTALL_CANDIDATE')
-        forbidden.remove('USB_STORAGE')
-        if 'USB_STORAGE' in active:
-            required.update({'SCSI', 'BLK_DEV_SD', 'USB_STORAGE'})
     if not all(active.get(n) == 'y' for n in required) or active.keys() & forbidden:
         raise ValueError('Integrated native configuration differs from the measured composition')
     if ('CONFIG_LOCALVERSION="-ty1208z-openwrt-system"\n' not in config or
             'CONFIG_INITRAMFS_SOURCE=""\n' not in config or
+            'CONFIG_NR_CPUS=4\n' not in config or
             set(props) != BASE | NETWORK_NODES | HOST_NODES | {EMMC_NODE, SD_NODE, RESTART} or
-            props['/memory@0']['reg'].get('cells') != [0, 0x30000000] or
+            props['/memory@0']['reg'].get('cells') != [0, 0x40000000] or
             props['/chosen']['bootargs'].get('strings') != [BOOTARGS]):
         raise ValueError('Integrated identity/memory/peripherals/partitions differ')
+    for cpu in ('/cpus/cpu@0', '/cpus/cpu@1', '/cpus/cpu@2', '/cpus/cpu@3'):
+        if (props[cpu].get('compatible', {}).get('strings') != ['arm,cortex-a7'] or
+                props[cpu].get('enable-method', {}).get('strings') != ['hisilicon,hi3798mv100-smp']):
+            raise ValueError('Integrated SMP CPU nodes differ: ' + cpu)
+    timer = props['/soc/timer@f8a29000']
+    if (timer.get('compatible', {}).get('strings') != ['hisilicon,hisp804'] or
+            timer.get('reg', {}).get('cells') != [0xf8a29000, 0x20,
+                                                   0xf8a2a000, 0x20,
+                                                   0xf8a2a020, 0x20,
+                                                   0xf8a2b000, 0x20,
+                                                   0xf8a2b020, 0x20] or
+            timer.get('interrupts', {}).get('cells') != [0, 26, 4, 0, 59, 4,
+                                                          0, 27, 4, 0, 60, 4]):
+        raise ValueError('Integrated SMP timer resources differ')
     validate_usb_resources(props)
     for node, expected in ((EMMC_NODE, EMMC_PROPERTIES), (SD_NODE, SD_PROPERTIES)):
         if set(props[node]) != set(expected) or any(props[node][name].get(kind) != value
@@ -71,8 +87,24 @@ def native_system_profile(tree, config, *, allow_install_candidate=False):
         raise ValueError('Integrated storage/USB reset resources differ')
     aliases = props['/aliases']
     if aliases.get('mmc0', {}).get('strings') != [EMMC_NODE] or aliases.get('mmc1', {}).get('strings') != [SD_NODE]:
-        raise ValueError('Stable read-only disk host aliases differ')
+        raise ValueError('Stable disk host aliases differ')
     return True
+
+
+def full_memory_reservations(dtb):
+    """Require precise loader reservations instead of excluding upper 256 MiB."""
+    offset = struct.unpack_from('>I', dtb, 16)[0]
+    reservations = []
+    for _ in range(32):
+        address, size = struct.unpack_from('>QQ', dtb, offset)
+        offset += 16
+        if (address, size) == (0, 0):
+            break
+        reservations.append((address, size))
+    expected = [(0, 0x1000000)] + ALLOCATIONS
+    if reservations != expected:
+        raise ValueError('Full-memory loader reservations differ')
+    return reservations
 
 
 def prepare_native_system(artifacts, metadata, allocation_evidence, *, allow_install_candidate=False):
@@ -81,7 +113,7 @@ def prepare_native_system(artifacts, metadata, allocation_evidence, *, allow_ins
     if bool(manifest.get('persistent_candidate')) != allow_install_candidate:
         raise ValueError('Installation candidate requires an explicit authorized boot mode')
     if (manifest['board'] != COMPATIBLE or manifest['persistent_writes'] is not False or
-            manifest['memory_end'] != 0x30000000 or allocation_evidence is None):
+            manifest['memory_end'] != 0x40000000 or allocation_evidence is None):
         raise ValueError('Native system lacks its fresh allocation evidence or exact manifest')
     allocation_hash = memory_boot_evidence(allocation_evidence, metadata)
     for name, expected in manifest['files'].items():
@@ -97,9 +129,7 @@ def prepare_native_system(artifacts, metadata, allocation_evidence, *, allow_ins
                                  allow_install_candidate=allow_install_candidate):
         raise ValueError('Native system board profile differs')
     dtb = (artifacts / 'ty1208z-diagnostic.dtb').read_bytes()
-    offset = struct.unpack_from('>I', dtb, 16)[0]
-    if struct.unpack_from('>QQQQ', dtb, offset) != (0, 0x1000000, 0, 0):
-        raise ValueError('Native system lacks the exact low reservation')
+    reservations = full_memory_reservations(dtb)
     layout = json.loads((artifacts / 'checks/kernel-layout.json').read_bytes())
     if not 0x8000 == layout['physical_start'] < layout['physical_image_end'] <= layout['physical_bss_end'] < 0x1000000:
         raise ValueError('Native system kernel footprint crosses the measured reservation')
@@ -121,12 +151,13 @@ def prepare_native_system(artifacts, metadata, allocation_evidence, *, allow_ins
         raise ValueError('Native bootstrap DT range differs')
     return {'schema': 1, 'status': 'validated native RAM placement; hardware untested',
             'installation_candidate': allow_install_candidate,
-            'storage_write_capable': allow_install_candidate,
-            'card_cache_control_allowed': allow_install_candidate,
+            'storage_write_capable': True,
+            'card_cache_control_allowed': True,
             'image_bytes': len(image), 'image_sha256': hashlib.sha256(image).hexdigest(),
             'image_crc32': f'{zlib.crc32(image):08x}', 'header_address': 0x1ffffc0,
             'load_address': 0x2000000, 'entry_address': 0x2000000, 'kernel_layout': layout,
-            'inspection_raw_sha256': metadata['raw_sha256'], 'memory_end': 0x30000000,
+            'inspection_raw_sha256': metadata['raw_sha256'], 'memory_end': 0x40000000,
+            'memory_reservations': reservations,
             'allocation_evidence_sha256': allocation_hash, 'load_command': 'loady 1ffffc0 115200',
             'crc_command': f'crc32 1ffffc0 {len(image):x}', 'boot_command': 'bootm 1ffffc0',
             'persistent_writes': False,

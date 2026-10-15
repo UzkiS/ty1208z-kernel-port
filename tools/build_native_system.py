@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Build a copy of the exact native OpenWrt kernel; leave accepted trees intact."""
-from native_system_patch import TRANSFORMATIONS, ensure, source_text
+from refresh_native_board_patch import refresh, identity
 from prepare_openwrt import toolchain_from_native
 from datetime import datetime, timezone
 import argparse
@@ -53,16 +53,14 @@ else:
     work.mkdir(parents=True)
     save('copying-exact-native-kernel')
     shutil.copytree(original, kernel, symlinks=True)
-for name in TRANSFORMATIONS:
-    path = kernel / name
-    expected = ensure(source_text(original, project, name), name)
-    if path.read_text() != expected:
-        path.write_text(expected)
-for name in ('drivers/power/reset/ty1208z-mv100-system-restart.c',
-             'drivers/clk/hisilicon/clk-ty1208z-usb.c'):
-    overlay = project / 'overlay' / name
-    if not (kernel / name).exists() or overlay.read_bytes() != (kernel / name).read_bytes():
-        shutil.copyfile(overlay, kernel / name)
+patch = project / 'patches/0001-hi3798mv100-diagnostic.patch'
+applied_patch = work / 'board-support.patch'
+previous_patch = applied_patch if applied_patch.exists() else (
+    source / 'target/linux/hi3798mv100/patches-6.12/0001-board-support.patch')
+with (work / 'board-patch.log').open('wb') as handle:
+    refresh(kernel, previous_patch, patch, log=handle)
+shutil.copyfile(patch, applied_patch)
+state['board_patch_sha256'] = identity(patch)
 
 if args.persistent_candidate:
     from native_persistent_patch import apply as apply_persistent
@@ -120,6 +118,11 @@ with log.open('wb') as handle:
     if args.persistent_candidate:
         assert actual.get('TY1208Z_EMMC_INSTALL_CANDIDATE') == 'CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE=y'
     state['config_sha256'] = digest(kernel / '.config')
+    subprocess.run([sys.executable, project / 'tools/test_native_production_profile.py',
+                    '--linuxsrc', kernel], stdout=handle, stderr=subprocess.STDOUT, check=True)
+    for test in ('test_sd_rw.py', 'test_native_persistent_policy.py'):
+        subprocess.run([sys.executable, project / 'tools' / test, '--linuxsrc', kernel],
+                       stdout=handle, stderr=subprocess.STDOUT, check=True)
     save('building-integrated-native-kernel-and-modules')
     result = subprocess.run(make + ['-j4', 'zImage', 'modules'], stdout=handle, stderr=subprocess.STDOUT, env=environment)
 state['exit_code'] = result.returncode

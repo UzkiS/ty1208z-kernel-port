@@ -1,8 +1,9 @@
 # 原生 OpenWrt 系统集成
 
-本目录维护 TY1208Z CA 的系统组合：单核、低768内存、网口、SD/eMMC、Docker、
+本目录维护 TY1208Z CA 的系统组合：四核 SMP、HIGHMEM、1 GiB 地址范围、网口、SD/eMMC、Docker、
 中文 LuCI、Passwall 双核心、unzip 和 RDA 无线。**持久安装、在线扩容、原生网页升级及
-普通重启已通过实机验证**，见[当前状态](../../STATUS.md)和[安装说明](../../docs/installation-plan.md)。
+普通重启已通过实机验证**；新四核、全内存与多块队列的实机状态单独记录，
+见[当前状态](../../STATUS.md)和[安装说明](../../docs/installation-plan.md)。
 
 ## RAM 开发系统
 
@@ -17,7 +18,8 @@ make openwrt-system TASKBASE=/path/to/existing/taskbase
 `--native-source` 可指定已有基线。`kernel.config` 维护系统内核配置差异，
 `toolchain_from_native` 核对实际编译器。所有模块来自本次内核，不能混用其他 target。
 
-RAM 开发 profile 保持 SD/eMMC 请求级只读；bootstrap 在已测传输和展开预算内，
+生产 RAM profile 提供 SD/USB 普通读写与 eMMC p6/p9 多块读写；历史只读诊断独立保留。
+bootstrap 在已测传输和展开预算内，
 较大用户空间由 SSH supplement 提供。模块直接放在 `/lib/modules/6.12.112/`，
 因为 ubox kmodloader 不递归 `kernel/`。离线 APK 事务登记包与所有模块的归属。
 首次默认配置将 DHCP 接口 `probe` 加入 WAN，并建立 Docker 区域及 Docker → WAN 转发。
@@ -37,18 +39,20 @@ RAM 包本身不作为持久安装包。早期验收见[系统 RAM 报告](../..
 `tools/luci_rda_wireless.py` 对固定官方 LuCI 表单作检查式适配；
 `tools/netifd_wireless_eof.py` 修复 handler discovery 的 EOF 循环。
 STA、AP 与角色切换的具体版本边界见[无线报告](../../verification/rda-wireless-board-20261014.md)。
-RDA 固件来自私有原厂备份，未纳入公开仓库；完整私有镜像不能直接公开发布。
+RDA 固件已获项目所有者授权公开，归档于 `firmware/rda5995/` 并随完整 Release 发布，
+精确来源和哈希见其 manifest。完整 63 文件的驱动和 USB/SDIO 固件参考同时保存在
+`wifi/vendor/rdaw80211/`，默认直接从仓库读取。打包脚本默认包含匹配运行固件。
 
 ## 持久候选与恢复工具
 
 `build_native_system.py --persistent-candidate` 使用独立输出树，只允许已测 p6/p9 范围。
-`prepare_native_disk_root.py` 用精确内核和 APK 生成私有 ext4 p9 与 disk-root uImage，
-只处理文件。普通只读 RAM 规划器拒绝这种可写内核。
+`prepare_native_disk_root.py` 用精确内核和 APK 生成 ext4 p9 与 disk-root uImage，
+只处理文件。生产内核始终采用同一份多块读写策略，持久打包标志不再改成单扇区实验驱动。
 
-`probe_native_emmc_write.py` 默认输出单扇区写入/读回/恢复计划；
+`probe_native_emmc_write.py` 保留历史单扇区写入/读回/恢复计划，供已有证据回归；
 `install_native_emmc.py` 默认生成离线校验计划。`--apply` 会实际操作存储，
 应只用于已建立备份、恢复条件和精确设备身份的安装。
-安装器先 p9 后 p6，清块缓存后作 SHA-256 读回，再锁回只读；
+安装器先 p9 后 p6，清块缓存后作 SHA-256 读回，再锁回受保护分区；
 `--mode restore` 仅恢复备份对应的 p9 范围和 p6 内容。
 单扇区恢复、紧凑安装和 eMMC 根启动已实测；完整原系统写回恢复没有重复实测。
 
@@ -68,7 +72,7 @@ RDA 固件来自私有原厂备份，未纳入公开仓库；完整私有镜像�
 
 ## 紧凑网页首刷
 
-`make openwrt-first-install` 从已准备的新根和精确 disk-root 内核生成私有首刷包。
+`make openwrt-first-install` 从已准备的新根和精确 disk-root 内核生成首刷包。
 输入位于其他目录时设置 `NATIVE_SOURCE`、`UPGRADED_ROOT`、`DISK_ROOT` 和 `OUTPUT`。
 匹配的 `ty1208z-first-install` APK 只用于专用临时 RAM 安装环境。
 

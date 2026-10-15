@@ -13,10 +13,12 @@ HARNESS = r'''
 #include <assert.h>
 #include <stdio.h>
 #include "hi3798mv100-emmc-install-policy.h"
+#include "hi3798mv100-emmc-rw-policy.h"
 #define IS_ENABLED(option) (option)
 struct mmc_host { unsigned max_blk_count, max_req_size; };
 struct mmc_card { bool mmc, ro; struct { unsigned cmdclass; } csd; struct mmc_host *host; };
 #define mmc_card_mmc(card) ((card)->mmc)
+#define mmc_card_sd(card) (!(card)->mmc)
 #define mmc_card_readonly(card) ((card)->ro)
 /* READONLY */
 /* SWITCH_PREP */
@@ -37,13 +39,18 @@ static unsigned transfer_blocks(struct mmc_card *card, unsigned requested) {
 int main(void) {
     struct mmc_host host = {.max_blk_count = 1, .max_req_size = PAGE_SIZE};
     struct mmc_card card = {.mmc = true, .csd.cmdclass = CCC_BLOCK_WRITE, .host = &host};
-    assert(queue_limit(&card) == (CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE ? 8U : 1U));
+    assert(queue_limit(&card) == (CONFIG_HI3798MV100_EMMC_WRITE ? 8U : 1U));
     assert(transfer_blocks(&card, 8) == 1);
-    card.mmc = false; assert(queue_limit(&card) == 1); card.mmc = true;
+    card.mmc = false;
+    assert(queue_limit(&card) == (CONFIG_HI3798MV100_SD_WRITE ? 8U : 1U));
+    assert(transfer_blocks(&card, 8) == 1);
+    card.mmc = true;
     host.max_blk_count = 8; assert(queue_limit(&card) == 8); host.max_blk_count = 1;
-    assert(!!mmc_blk_readonly(&card) == !CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE);
+    assert(!!mmc_blk_readonly(&card) == !CONFIG_HI3798MV100_EMMC_WRITE);
     card.ro = true; assert(mmc_blk_readonly(&card)); card.ro = false;
-    card.mmc = false; assert(mmc_blk_readonly(&card));
+    card.mmc = false;
+    assert(!!mmc_blk_readonly(&card) == !CONFIG_HI3798MV100_SD_WRITE);
+    card.ro = true; assert(mmc_blk_readonly(&card)); card.ro = false;
     struct mmc_command cmd = {.opcode = MMC_WRITE_BLOCK,
         .flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC};
     struct mmc_data data = {.blksz = 512, .blocks = 1, .flags = MMC_DATA_WRITE};
@@ -87,6 +94,41 @@ int main(void) {
         cmd.opcode = op; cmd.arg = 0xffffffff;
         assert(hi3798mv100_emmc_install_request(&mrq, true, 15269888) != 0);
     }
+    struct mmc_command stop = {.opcode = MMC_STOP_TRANSMISSION,
+        .flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC};
+    cmd = (struct mmc_command){.opcode = MMC_WRITE_MULTIPLE_BLOCK,
+        .flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC, .data = &data};
+    data = (struct mmc_data){.blksz = 512, .blocks = 512,
+        .flags = MMC_DATA_WRITE, .stop = &stop};
+    mrq = (struct mmc_request){.cmd = &cmd, .data = &data, .stop = &stop};
+    for (unsigned i = 0; i < sizeof(sectors)/sizeof(sectors[0]); i++) {
+        cmd.arg = sectors[i];
+        bool allowed = (cmd.arg >= 28672 && cmd.arg <= 69632 - data.blocks) ||
+                       (cmd.arg >= 1249280 && cmd.arg <= 15269888 - data.blocks);
+        assert((hi3798mv100_emmc_rw_request(&mrq, true, 15269888) == 0) == allowed);
+        data.flags = MMC_DATA_WRITE | MMC_DATA_DAT_TAG;
+        assert((hi3798mv100_emmc_rw_request(&mrq, true, 15269888) == 0) == allowed);
+        data.flags = MMC_DATA_WRITE | MMC_DATA_REL_WR;
+        assert(hi3798mv100_emmc_rw_request(&mrq, true, 15269888) == -EPERM);
+        data.flags = MMC_DATA_WRITE;
+    }
+    cmd.arg = 69632 - 512;
+    assert(!hi3798mv100_emmc_rw_request(&mrq, true, 15269888));
+    cmd.arg++;
+    assert(hi3798mv100_emmc_rw_request(&mrq, true, 15269888) == -EPERM);
+    cmd.arg = 1249280;
+    assert(hi3798mv100_emmc_rw_request(&mrq, false, 15269888) == -EPERM);
+    assert(hi3798mv100_emmc_rw_request(&mrq, true, 15269887) == -EPERM);
+    stop.flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
+    assert(hi3798mv100_emmc_rw_request(&mrq, true, 15269888) == -EPERM);
+    cmd.data = mrq.data = NULL; mrq.stop = NULL;
+    cmd = prepare_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_CACHE_CTRL, 1);
+    assert(!hi3798mv100_emmc_rw_request(&mrq, false, 0));
+    cmd = prepare_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_FLUSH_CACHE, 1);
+    assert(!hi3798mv100_emmc_rw_request(&mrq, true, 15269888));
+    cmd = prepare_switch(EXT_CSD_CMD_SET_NORMAL, EXT_CSD_PART_CONFIG, 1);
+    assert(hi3798mv100_emmc_rw_request(&mrq, true, 15269888) != 0);
+    puts("EMMC_RW_POLICY_PASS: multi-block p6/p9, cross-partition rejection and cache/flush; boot/RPMB settings denied");
     puts("NATIVE_PERSISTENT_POLICY_PASS");
 }
 '''
@@ -145,12 +187,15 @@ def main():
         harness = temp / "test.c"
         harness.write_text(HARNESS.replace("/* READONLY */", readonly).replace("/* SWITCH_PREP */", switch_prep)
                            .replace("/* QUEUE_LIMIT */", queue_limit).replace("/* TRANSFER_LIMIT */", transfer_limit))
-        for enabled in (0, 1):
-            binary = temp / f"test-{enabled}"
+        for enabled, sd_write in ((0, 0), (1, 0), (1, 1)):
+            binary = temp / f"test-{enabled}-{sd_write}"
             subprocess.run(["cc", "-std=c11", "-O1", "-Wall", "-Wextra", "-Werror",
                             "-fsanitize=address,undefined", "-fno-pie", "-no-pie", "-I", str(temp),
                             "-I", str(ROOT / "overlay/drivers/mmc/host"),
                             "-DCONFIG_HI3798MV100_EMMC_READ_ONLY=1",
+                            f"-DCONFIG_HI3798MV100_EMMC_WRITE={enabled}",
+                            "-DCONFIG_HI3798MV100_SD_READ_ONLY=1",
+                            f"-DCONFIG_HI3798MV100_SD_WRITE={sd_write}",
                             f"-DCONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE={enabled}",
                             str(harness), "-o", str(binary)], check=True)
             subprocess.run([str(binary)], check=True)

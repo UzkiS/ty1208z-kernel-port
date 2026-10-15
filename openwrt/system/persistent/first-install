@@ -33,7 +33,6 @@ hardware() {
 	[ "$(cat /sys/class/block/mmcblk0p6/size)" = 40960 ] || die 'p6 capacity differs'
 	[ "$(cat /sys/class/block/mmcblk0p9/start)" = 1249280 ] || die 'p9 start differs'
 	[ "$(cat /sys/class/block/mmcblk0p9/size)" = 14020608 ] || die 'p9 capacity differs'
-	[ "$(cat /sys/class/block/mmcblk1/ro)" = 1 ] || die 'SD must stay read-only'
 	for device in /sys/class/block/mmcblk0p*; do
 		[ "$(cat "$device/ro")" = 1 ] || die 'partition not locked read-only'
 		[ -z "$(ls -A "$device/holders")" ] || die 'partition holder active'

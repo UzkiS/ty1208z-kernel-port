@@ -26,10 +26,10 @@
 | 检查 | 提交 / run | 当前结果 |
 |---|---|---|
 | 完整诊断 | `559c2d8` / [38642766702](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38642766702) | 成功，包括实际eMMC shutdown harness及后续独立profile |
-| 应用矩阵原运行 | `5bba089` / [38639747752](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38639747752) | eMMC应用已成功；普通应用/路由仍在构建；SD因上述配置项失败，router768构建机失联 |
-| 修复后的SD单项 | `32cab4a` / [38650502790](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38650502790) | 已启动，待实际结果 |
-| router768单项重跑 | `32cab4a` / [38650507793](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38650507793) | 已提交，待实际结果 |
-| Docker/fw4/双核心组合 | `086df54` / [38641050654](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38641050654) | 仍在构建，待实际结果 |
+| 应用矩阵原运行 | `5bba089` / [38639747752](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38639747752) | 普通应用、路由、eMMC 成功；SD 因上述配置项失败，router768 构建机失联；原矩阵整体失败 |
+| 修复后的SD单项 | `32cab4a` / [38650502790](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38650502790) | 成功 |
+| router768单项重跑 | `32cab4a` / [38650507793](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38650507793) | 成功 |
+| Docker/fw4/双核心组合 | `086df54` / [38641050654](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38641050654) | 成功；尚不包含随后加入的 DiskMan |
 
 router768失联由GitHub check annotation明确记录，发生在toolchain完成前，
 没有可用编译错误或产物，不能报告为源码失败或成功。

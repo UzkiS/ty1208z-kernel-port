@@ -9,6 +9,7 @@ import subprocess
 
 from native_upgrade import digest, make_image, make_package, source_identity
 from prepare_openwrt import toolchain_from_native
+from prepare_native_package_supplement import public_runtime_metadata
 
 
 def main():
@@ -43,6 +44,7 @@ def main():
     for name in ("usr/bin/xray", "usr/bin/sing-box", "bin/busybox", "lib/modules/6.12.112/rdawfmac.ko",
                  "etc/config/network", "etc/shadow"):
         assert (root / name).read_bytes() == (old_root / name).read_bytes(), name
+    public_runtime_metadata(root)
     kernel = args.disk_root / "kernel-p6-INSTALL-UNTESTED.bin"
     original = json.loads((args.disk_root / "manifest.json").read_bytes())
     assert digest(kernel) == original["files"][kernel.name]["sha256"]
@@ -50,12 +52,12 @@ def main():
     checker = root / "sbin/ty1208z-image-check"
     subprocess.run(["qemu-arm", str(checker), "outer", str(image)], check=True)
     subprocess.run(["qemu-arm", str(checker), "kernel", str(kernel)], check=True)
-    receipt = {"status": "private offline web upgrade candidate; physical acceptance pending",
+    receipt = {"status": "public offline web upgrade candidate; physical acceptance pending",
                "image": {"file": image.name, "bytes": image.stat().st_size, "sha256": digest(image)},
                "package": {"file": package.relative_to(args.output).as_posix(), "sha256": digest(package)},
                "manifest": manifest, "sources": source_identity(), "toolchain": toolchain_identity,
                "data_preserved": ["/opt", "/root", "/mnt", "/srv"],
-               "hardware_actions": False, "redistribution": "PRIVATE original RDA firmware; do not publish"}
+               "hardware_actions": False, "redistribution": "User-supplied RDA firmware included in the public release with explicit project-owner authorization"}
     (args.output / "manifest.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps({"status": receipt["status"], "image": receipt["image"], "root_space": manifest["root_space"]}))
 

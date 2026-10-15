@@ -154,6 +154,8 @@ def prepare(project, taskbase):
     if not (destination / ".config").exists():
         shutil.copyfile(config, destination / ".config")
     print(destination)
+    from prepare_public_build_paths import toolchain as prepare_toolchain_paths
+    prepare_toolchain_paths(destination)
     return destination
 
 

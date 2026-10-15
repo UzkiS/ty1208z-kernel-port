@@ -19,7 +19,9 @@ from prepare_native_userspace import native_archive, record
 REQUIRED = ("docker", "dockerd", "containerd", "runc", "tini", "luci-app-dockerman",
             "luci-i18n-dockerman-zh-cn", "docker-compose", "ttyd", "ucode-mod-socket",
             "iw-full", "wpad-mbedtls", "hostapd-common", "wireless-regdb", "wifi-scripts",
-            "ucode-mod-nl80211", "ucode-mod-rtnl", "block-mount", "lsblk")
+            "ucode-mod-nl80211", "ucode-mod-rtnl", "block-mount", "lsblk",
+            "luci-app-diskman", "luci-i18n-diskman-zh-cn", "parted", "e2fsprogs",
+            "dosfstools", "exfat-mkfs", "exfat-fsck", "blkid", "smartmontools")
 ARCH = "arm_cortex-a7_neon-vfpv4"
 EPOCH = "1791676800"
 PROJECT = Path(__file__).resolve().parents[1]
@@ -42,6 +44,23 @@ def board_files(kernel_build):
 
 def run(command, **kwargs):
     return subprocess.check_output([str(p) for p in command], **kwargs)
+
+
+def public_runtime_metadata(root):
+    """Normalize informational origins, retaining all APK payload checksums."""
+    database = root / 'lib/apk/db/installed'
+    lines = database.read_text().splitlines(True)
+    for index, line in enumerate(lines):
+        if line.startswith('o:/'):
+            if '/feeds/' not in line:
+                raise ValueError('Review unexpected absolute APK origin')
+            lines[index] = 'o:feeds/' + line.split('/feeds/', 1)[1]
+    database.write_text(''.join(lines))
+    # Host APK invocation logs and unowned cross-GDB auto-load files are not
+    # runtime content. The latter refer only to the build host's Python tree.
+    (root / 'tmp/log/apk.log').unlink(missing_ok=True)
+    for path in (root / 'lib').glob('libstdc++.so.*-gdb.py'):
+        path.unlink()
 
 
 def metadata(apk, package):
@@ -292,6 +311,7 @@ def prepare(base, source, baseline_source, board_root, kernel_build, output):
     actual_modules = {p.name: p.read_bytes() for p in (root / "lib/modules/6.12.112").glob("*.ko")}
     if actual_modules != expected_modules:
         raise ValueError("APK transaction does not own every exact-board module")
+    public_runtime_metadata(root)
     # Archive every actual difference plus all metadata, so software management
     # describes the delivered files. The board module APKs own their exact payloads.
     delivered = {}

@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Restricted RAM diagnostic, not the production MV100 storage driver. */
+/* Shared legacy PIO host, with independent diagnostic/production policies. */
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/mmc/card.h>
@@ -14,6 +14,7 @@
 #include "../core/core.h"
 #include "hi3798mv100-ident-policy.h"
 #include "hi3798mv100-emmc-ro-policy.h"
+#include "hi3798mv100-emmc-rw-policy.h"
 
 static int mv100_ident_init(struct dw_mci *host)
 {
@@ -60,9 +61,11 @@ static int mv100_ident_slot(struct dw_mci_slot *slot)
 	mmc->pm_caps = 0;
 	mmc->f_max = 25000000;
 	mmc->max_blk_size = 512;
-	mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ? 8 : 1;
-	mmc->max_req_size = 512 * mmc->max_blk_count;
-	mmc->max_seg_size = mmc->max_req_size;
+	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) {
+		mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ? 8 : 1;
+		mmc->max_req_size = 512 * mmc->max_blk_count;
+		mmc->max_seg_size = mmc->max_req_size;
+	}
 	mmc->dsr_req = 0;
 	return 0;
 }
@@ -71,7 +74,8 @@ static int mv100_ident_validate(struct dw_mci *host, struct mmc_request *mrq)
 {
 	int ret = hi3798mv100_ident_request(mrq);
 
-	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY)) {
+	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||
+	    IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) {
 		struct mmc_card *card = host->slot ? host->slot->mmc->card : NULL;
 		bool user_area = card && mmc_card_mmc(card) &&
 			mmc_card_is_blockaddr(card) && card->csd.read_blkbits == 9 &&
@@ -80,7 +84,10 @@ static int mv100_ident_validate(struct dw_mci *host, struct mmc_request *mrq)
 			!(card->ext_csd.part_config & EXT_CSD_PART_CONFIG_ACC_MASK);
 		u64 sectors = user_area ? card->ext_csd.sectors : 0;
 
-		ret = hi3798mv100_emmc_ro_request(mrq, user_area, sectors);
+		if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE))
+			ret = hi3798mv100_emmc_rw_request(mrq, user_area, sectors);
+		else
+			ret = hi3798mv100_emmc_ro_request(mrq, user_area, sectors);
 	}
 
 	if (ret && mrq && mrq->cmd)
@@ -105,7 +112,8 @@ static const struct dw_mci_drv_data mv100_ident_data = {
 	.validate_request = mv100_ident_validate,
 	.switch_voltage = mv100_ident_voltage,
 	.force_pio = true,
-	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY),
+	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
+		    !IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE),
 };
 
 static int mv100_ident_probe(struct platform_device *pdev)
@@ -117,7 +125,8 @@ static int mv100_ident_probe(struct platform_device *pdev)
 	u32 value;
 	int irq;
 
-	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
+	if ((IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||
+	     IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) &&
 	    !of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram") &&
 	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
 	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram")) &&
@@ -173,10 +182,11 @@ static void mv100_ident_shutdown(struct platform_device *pdev)
 {
 	struct dw_mci *host;
 
-	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))
+	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
+	    !IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE))
 		return;
 	host = platform_get_drvdata(pdev);
-	if (IS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE)) {
+	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) {
 		/* A disk-root reboot must not unregister its still-mounted gendisk.
 		 * del_gendisk marks ext4 dead and can wait on the root mount forever.
 		 * Userspace has synced/remounted it read-only before device_shutdown.
@@ -209,7 +219,7 @@ static void mv100_ident_shutdown(struct platform_device *pdev)
 		return;
 	}
 	dev_info(&pdev->dev, "EMMC_RO_SHUTDOWN_COMPLETE %s clock-disabled no-card-writes\n",
-		 IS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE) ?
+		 IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE) ?
 		 "host-retained" : "host-removed");
 }
 

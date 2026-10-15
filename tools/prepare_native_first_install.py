@@ -12,6 +12,7 @@ import subprocess
 import tarfile
 
 from native_upgrade import digest
+from prepare_native_package_supplement import public_runtime_metadata
 
 PROJECT = Path(__file__).resolve().parents[1]
 EPOCH = 1791676800
@@ -119,6 +120,7 @@ def main():
     run([apk, "add", "--root", root, "--usermode", "--arch", "arm_cortex-a7_neon-vfpv4",
          "--allow-untrusted", "--no-network", "--no-scripts", "--no-commit-hooks",
          "--repositories-file", "/dev/null", grow_apk], env=env)
+    public_runtime_metadata(root)
     image = args.output / "rootfs.ext4"
     with image.open("wb") as stream:
         stream.truncate(1073741824)
@@ -163,18 +165,18 @@ def main():
     (files / "etc/ty1208z-first-installer").write_text(version + "\n")
     for destination, source in (("ty1208z-first-check", "first-image-check.c"),
                                 ("emmc-p9-control", "emmc-p9-control.c")):
-        run([env["CC"], "-static", "-Os", "-Wall", "-Wextra", "-Werror",
+        run([env["CC"], "-static", "-s", "-Os", "-Wall", "-Wextra", "-Werror",
              persistent / source, "-o", files / "sbin" / destination], env=env)
     installer = package(apk, files, args.output, "ty1208z-first-install", version)
     run(["qemu-arm", files / "sbin/ty1208z-first-check", "outer", firmware])
     run(["qemu-arm", files / "sbin/ty1208z-first-check", "kernel", kernel])
     with image.open("rb") as stream:
         subprocess.run(["qemu-arm", str(files / "sbin/ty1208z-first-check"), "ext4"], stdin=stream, check=True)
-    receipt = {"status": "private first-install candidate; hardware writing not performed",
+    receipt = {"status": "public first-install candidate; hardware writing not performed",
                "image": {"file": firmware.name, "bytes": firmware.stat().st_size, "sha256": digest(firmware)},
                "installer": {"file": installer.name, "sha256": digest(installer)},
                "root_bytes_written": 1073741824, "full_p9_bytes": 7178551296,
-               "manifest": manifest, "redistribution": "PRIVATE original RDA firmware; do not publish"}
+               "manifest": manifest, "redistribution": "User-supplied RDA firmware included in the public release with explicit project-owner authorization"}
     (args.output / "manifest.json").write_text(json.dumps(receipt, indent=2) + "\n")
     print(json.dumps(receipt))
 

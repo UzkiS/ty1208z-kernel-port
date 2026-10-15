@@ -27,6 +27,11 @@ EMMC_RO_RESTART_GUARD = (b"if grep -q '^/dev/mmcblk0' /proc/mounts || "
                          b'test "$(cat /sys/class/block/mmcblk0/ro)" = 1 && '
                          b'test "$(cat /sys/class/block/mmcblk0/size)" = 15269888 && '
                          b"echo EMMC_RO_RESTART_GUARD; fi")
+SYSTEM_STORAGE_GUARD = (b"if grep -Eq '^[^ ]+ [^ ]+ 179:' /proc/self/mountinfo || "
+                        b"grep -q mmcblk /proc/swaps; then echo SYSTEM_STORAGE_ACTIVE; else "
+                        b'test "$(cat /sys/class/block/mmcblk0/device/name)" = 008G30 && '
+                        b'test "$(cat /sys/class/block/mmcblk0/size)" = 15269888 && '
+                        b"test ! -e /tmp/ram768-area/memory-test && echo SYSTEM_STORAGE_GUARD; fi")
 
 
 def run(args, serial_module):
@@ -90,18 +95,12 @@ def run(args, serial_module):
                         binding = command(exchange, b"readlink /sys/bus/platform/devices/f8a2c000.system-restart/driver")
                         if b"../../../bus/platform/drivers/ty1208z-mv100-system-restart" not in binding:
                             raise TransferError("Integrated two-host restart binding missing")
-                        guard = (b"if grep -Eq '^[^ ]+ [^ ]+ 179:' /proc/self/mountinfo || "
-                                 b"grep -q mmcblk /proc/swaps; then echo SYSTEM_STORAGE_ACTIVE; else "
-                                 b'test "$(cat /sys/class/block/mmcblk0/device/name)" = 008G30 && '
-                                 b'test "$(cat /sys/class/block/mmcblk0/size)" = 15269888 && '
-                                 b'test "$(cat /sys/class/block/mmcblk0/ro)" = 1 && '
-                                 b'test "$(cat /sys/class/block/mmcblk1/ro)" = 1 && '
-                                 b"test ! -e /tmp/ram768-area/memory-test && echo SYSTEM_STORAGE_GUARD; fi")
+                        guard = SYSTEM_STORAGE_GUARD
                         if install_version is not None:
                             no_mounts = command(exchange,
                                 b"! grep -Eq '^[^ ]+ [^ ]+ 179:' /proc/self/mountinfo && ! grep -q mmcblk /proc/swaps && "
                                 b'test "$(cat /sys/bus/mmc/devices/mmc0:0001/name)" = 008G30 && '
-                                b'test "$(cat /sys/class/block/mmcblk1/ro)" = 1 && echo INSTALL_STORAGE_UNMOUNTED')
+                                b'echo INSTALL_STORAGE_UNMOUNTED')
                             if not re.search(rb"(?:^|[\r\n])INSTALL_STORAGE_UNMOUNTED[\r\n]", no_mounts):
                                 raise TransferError("Installation storage is active or card identity differs")
                             guard = (b"if test -e /sys/class/block/mmcblk0; then "
@@ -111,7 +110,7 @@ def run(args, serial_module):
                                      b"else test ! -e /dev/mmcblk0; fi && echo SYSTEM_STORAGE_GUARD")
                         state = command(exchange, guard)
                         if not re.search(rb"(?:^|[\r\n])SYSTEM_STORAGE_GUARD[\r\n]", state):
-                            raise TransferError("Integrated storage is mounted/swapped or readonly identity differs")
+                            raise TransferError("Integrated storage is mounted/swapped or device identity differs")
                     if profile == "router-sdro":
                         state = command(exchange, SD_RO_RESTART_GUARD)
                         if not re.search(rb"(?:^|[\r\n])SD_RO_RESTART_GUARD[\r\n]", state):
@@ -177,7 +176,9 @@ def run(args, serial_module):
                         continue
                     print(console_text(data.decode("utf-8", "backslashreplace")), end="", flush=True)
                     failure_tail = (failure_tail + data)[-4096:]
-                    if sd_shutdown and b"SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes" in failure_tail:
+                    sd_marker = (b"SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled" if system_native else
+                                 b"SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes")
+                    if sd_shutdown and sd_marker in failure_tail:
                         result["sd_shutdown_verified"] = True
                     if (emmc_ro or system_native) and any(marker in failure_tail for marker in (
                             b"EMMC_RO_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes",

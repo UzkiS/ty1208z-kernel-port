@@ -1,0 +1,16 @@
+{
+  "repository": "https://github.com/lisaac/luci-app-diskman",
+  "commit": "c20df1d4f40d86e32fd919f33122b2a48f8a99b4",
+  "url": "https://codeload.github.com/lisaac/luci-app-diskman/tar.gz/c20df1d4f40d86e32fd919f33122b2a48f8a99b4",
+  "archive": "diskman-c20df1d4f40d86e32fd919f33122b2a48f8a99b4.tar.gz",
+  "sha256": "7e4e8dc33c36284a96793d855fc894565721fa45fdff4faa29718cf66af69ae3",
+  "archive_root": "luci-app-diskman-c20df1d4f40d86e32fd919f33122b2a48f8a99b4",
+  "license": "AGPL-3.0",
+  "original_files": {
+    "Makefile": "97d521efb4390210785033c7a591624a9a4ab881c50a84257e76e947db60b0cd",
+    "luasrc/controller/diskman.lua": "778bcbe4280867b418239228ec55a6deefc1b54a7deaded99575348e7c0aa2b4",
+    "luasrc/model/diskman.lua": "da3d553bf5f5d9e0f95f3b1591fc07ad660853f150c0d03c3bee448eb0bf1524",
+    "luasrc/model/cbi/diskman/partition.lua": "4caa947dcf7640365e93deb226d5587d8a17587abe9f0e43af562ce6758ec400",
+    "luasrc/view/diskman/partition_info.htm": "843cfbf84db2ea23ea8157e56fc86f7682cbaa856370e7a7903ab2af38284e86"
+  }
+}

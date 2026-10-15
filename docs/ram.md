@@ -1,7 +1,9 @@
-# 内存范围与独立低768验证
+# 生产内存范围与历史低768验证
 
-板上物理 DDR 为1 GiB。当前集成系统只启用低768 MiB，
-低16 MiB和上方256 MiB继续保留，原生内核约744 MiB可用。
+板上物理 DDR 为1 GiB。生产配置启用完整 `0x00000000–0x3fffffff` 地址范围，
+同时启用 ARM32 HIGHMEM，取消上方整块256 MiB排除。低16 MiB与引导器实际11项
+分配按精确范围保留；这些必要占用以及内核本身仍会从 MemTotal 中扣除。
+新配置的构建和实机状态见[状态页](../STATUS.md)。
 最小诊断及普通旧 router profile仍限制低256。
 原引导器十一项分配从 `0x3e507000` 起，`ddrfree` 不扣除这些分配，
 也不能建立完整安全内存图。
@@ -36,7 +38,10 @@ QEMU只验证通用 shell/time64及helper，不验证真实PFN图。
 命令重启和配置返回通过；
 [原生记录](../verification/openwrt-router768-board-20261014.md)。
 
-后续只读SD、eMMC及完整Docker系统沿用已测内存边界，
-并各自验证新的集成依赖。持久系统不需要每次串口人工启动；
+历史只读SD、eMMC及Docker系统曾沿用已测低768内存边界。
+当前生产 DT 的 reservation 与完整 allocation 表逐项一致，不能把引导器仍在使用的
+页面交给 Linux；本轮已通过四核并发 512 MiB 双模式和高于 768 MiB 的真实页面验证，
+见[生产实测](../verification/production-profile-board-20261015.md)。
+持久系统不需要每次串口人工启动；
 上述新分配证据要求用于主动切换 RAM profile，
 不能由旧记录放宽新的RAM加载范围。

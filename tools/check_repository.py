@@ -17,6 +17,10 @@ for path in root.rglob("*"):
     rel = path.relative_to(root)
     if not path.is_file() or skip.intersection(rel.parts) or rel.parts[:2] == ("reference", "sdk"):
         continue
+    # Locked vendor files retain their original bytes, line endings and notices.
+    # `fetch_wifi.py --check-lock` verifies every one in the next lint step.
+    if rel.parts[:3] == ("wifi", "vendor", "rdaw80211"):
+        continue
     if path.suffix not in {".py", ".sh", ".ps1", ".c", ".h", ".dts", ".json", ".yaml", ".yml", ".md", ".toml"} and path.name not in {"Makefile", "init", "diag", "ethernet-diag", "ethernet-dhcp", "usb-diag", "sd-diag", "sd-ro-diag", "emmc-ro-diag", "ram768-diag", *container_scripts}:
         continue
     blob = path.read_bytes()

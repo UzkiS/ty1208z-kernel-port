@@ -108,7 +108,7 @@ int main(void) {
 '''
 
 
-def test(linuxsrc):
+def queue_harness(linuxsrc, main, *, write=False):
     project = Path(__file__).resolve().parents[1]
     driver_path = "drivers/mmc/host/dw_mmc-hi3798mv100-sd-ident.c"
     driver = (linuxsrc / driver_path).read_text()
@@ -117,9 +117,11 @@ def test(linuxsrc):
     validate = driver[driver.index("static int mv100_sd_ident_validate("):driver.index("static int mv100_sd_ident_voltage(")]
     prefix = HARNESS[:HARNESS.index("int main(void)")]
     prefix = prefix.replace('#include "hi3798mv100-sd-ident-policy.h"',
-                            '#include "hi3798mv100-sd-ro-policy.h"\nstatic bool addressed = true; static u64 sectors = 16;\n'
+                            '#include "hi3798mv100-sd-rw-policy.h"\nstatic bool addressed = true; static u64 sectors = 16;\n'
                             'static bool card_missing, slot_missing, card_sd = true; static unsigned card_read_bits = 9;\n'
-                            '#define IS_ENABLED(option) 1\n#define dev_info_ratelimited(...) ((void)0)\n')
+                            '#define CONFIG_HI3798MV100_SD_READ_ONLY 1\n'
+                            '#define CONFIG_HI3798MV100_SD_WRITE 0\n'
+                            '#define IS_ENABLED(option) (option)\n#define dev_info_ratelimited(...) ((void)0)\n')
     prefix = prefix.replace("struct dw_mci;", "struct mmc_card { bool sd, blockaddr; struct { unsigned read_blkbits; u64 capacity; } csd; };\n"
                             "#define mmc_card_sd(card) ((card)->sd)\n"
                             "static bool mmc_card_is_blockaddr(struct mmc_card *card) { return card->blockaddr; }\n"
@@ -137,7 +139,14 @@ def test(linuxsrc):
                             "    struct mmc_host mmc = { .slot = &slot, .card = card_missing ? NULL : &card };\n"
                             "    host.slot = slot_missing ? NULL : &slot; slot.mmc = &mmc;")
     prefix = prefix.replace("    assert(hi3798mv100_sd_ident_request(mrq) == (allowed ? 0 : -EPERM));\n", "")
-    test_policy(linuxsrc, prefix + MAIN)
+    if write:
+        prefix = prefix.replace('#define CONFIG_HI3798MV100_SD_WRITE 0',
+                                '#define CONFIG_HI3798MV100_SD_WRITE 1')
+    return prefix + main
+
+
+def test(linuxsrc):
+    test_policy(linuxsrc, queue_harness(linuxsrc, MAIN))
     source = (linuxsrc / "drivers/mmc/host/dw_mmc.c").read_text()
     ro = source[source.index("static int dw_mci_get_ro("):source.index("static void dw_mci_hw_reset(")]
     with tempfile.TemporaryDirectory(prefix="sd-ro-callback-") as directory:

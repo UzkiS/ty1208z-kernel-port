@@ -5,6 +5,9 @@
  * the ARM kernel itself decompresses below it, as in the existing boot path.
  */
 /memreserve/ 0x00000000 0x01000000;
+#ifdef TY1208Z_FULL_MEMORY
+#include "hi3798mv100-ty1208z-loader-reservations.dtsi"
+#endif
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 
 /*

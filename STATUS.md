@@ -14,18 +14,17 @@
 | 中文管理 | 简体中文 LuCI、默认 root 空密码；官方无线表单和中文挂载页已验证；[UI 记录](verification/luci-ui-board-20261014.md) |
 | 代理与工具 | Passwall 26.10.4、Xray 26.10.10、sing-box 1.14.3、unzip 6.0-r9；[双核心记录](verification/passwall-dual-core-20261013.md) |
 | Docker | 29.6.1、Dockerman、Compose；ARMv7 小容器、资源限制、seccomp、DNS/物理网口 HTTP 已实测，持久数据和冷启动自启通过；[容器记录](verification/openwrt-system-board-20261014.md) |
-| 内存 | 低 768 MiB 范围、约 744 MiB 可用；512 MiB 双模式压力和全部 PFN 边界通过；[原生记录](verification/openwrt-router768-board-20261014.md) |
+| CPU / 内存 | 四核 `0-3` 在线，1 GiB 地址范围与 HIGHMEM；MemTotal 994384 kB，512 MiB 双模式及高于 768 MiB 的真实页测试通过；[记录](verification/production-profile-board-20261015.md) |
 | 有线网络 | 100 Mbps 全双工、DHCP、双向 TCP、网线重连；统计语义和传输边界见[网口记录](verification/openwrt-ethernet-board-20261013.md) |
 | 板载无线 | RDA5995 USB `1e04:8888`；WPA2 STA、AP 客户端、netifd 角色切换通过，默认关闭；最终模块复用早期 AP 客户端证据，见[无线记录](verification/rda-wireless-board-20261014.md) |
 | USB 存储 | USB2 `320a:827b`、58.2 GiB；VFAT/NTFS3 只读文件访问和卸载通过，NTFS 访问前后写计数相同；[记录](verification/usb-storage-board-20261015.md) |
-| SD | 受限块读取及 VFAT 读取通过；驱动继续在请求层拒绝写入；[SD 记录](verification/openwrt-sdro-board-20261014.md) |
+| SD / 磁盘管理 | 普通多块读写通过；中文 DiskMan、挂载点，SD FAT32/exFAT/ext4 格式化、挂载和读回通过，UUID 自动挂载跨普通重启保留；[记录](verification/production-profile-board-20261015.md) |
 | time64 | 诊断及原生 musl 用户空间、选定应用 2040 年、NTP 2036/2038 边界在隔离 QEMU 通过；[应用说明](docs/openwrt-applications.md) |
 
 ## 当前限制
 
-- 单核；上方 256 MiB 和低 16 MiB 保留，不能仅凭 DDR 容量放开内存。
-- eMMC 单扇区 PIO；首刷 p9 写入约 29 分钟、读回约 11 分钟，后续网页升级的更新阶段约 16 分钟，上传另计。
-- SD 只读；热插拔和其他文件系统没有完整实测。USB 写入、速度、exFAT 和外接 ext4 未新增实测，也未保存自动挂载配置。
+- SD/eMMC 继续使用已有 PIO、1-bit/25 MHz 控制器路径；DMA、宽总线和高速模式仍需驱动适配与硬件验证。历史单扇区首刷/升级耗时不代表新多块队列性能。
+- eMMC 写入保留 p6/p9 边界；SD 原始擦除命令、锁卡、持久卡设置和未知命令仍被拒绝；普通文件系统格式化和读写已实测。热插拔、USB 写入速度尚未完整实测；自动挂载由用户配置。
 - 无线仅一个 AP 或路由型 STA，2.4 GHz、HT20/legacy、开放或 WPA2-PSK/CCMP；
   不支持桥接 STA、mesh、WPA3 或 TKIP。无线 STA 上联旁路由组合未测。
 - Docker 只验收小型 `linux/arm/v7` 工作负载；大容器、镜像仓库、IPv6 和综合性能未全部验收。
@@ -35,14 +34,18 @@
 
 ## 当前包与 CI
 
-最新私有 sysupgrade 包 131,399,882 B，SHA-256：
-`38d42824f3189e24f079ec8693e334076736dce07fb8854c38e38079937544a2`。
-内核 ABI `6.12.112~120d00c44db5befcdb6ed8d1f6825a56-r1`。
-配套首刷包和精确身份见[USB 报告](verification/usb-storage-board-20261015.md)。
-含原厂 RDA 固件的镜像仅私有交付。
+2026.10.15 Release 的 sysupgrade 包 131,379,402 B，SHA-256：
+`b0f21dd0865677eba39b2b85e78784f66c9f93a428f4230de57055b433d9bf28`。
+内核 ABI `6.12.112~0757bd0e5fb295b399d4be7ea0c4decb-r1`。
+配套首刷包和精确身份见[生产报告](verification/production-profile-board-20261015.md)。
+含用户提供 RDA5995 固件的完整 Release 包按项目所有者授权公开；固件来源和哈希单独记录。
+
+正式下载包统一放在 [GitHub Releases](https://github.com/UzkiS/ty1208z-kernel-port/releases)，
+不会要求用户从 CI 的短期 artifact 中猜测文件。首刷包、sysupgrade、RAM 配套包和
+RDA5995 固件会在同一 Release 附带 `SHA256SUMS.txt`；普通 CI 附件只用于开发验证。
 
 诊断 CI 在 `559c2d8` 上[通过](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38642766702)。
-应用矩阵和 Docker/Passwall 组合的最新干净构建仍待收尾；
+应用、router、eMMC、修复后 SD/router768 和 Docker/Passwall 组合已有成功干净构建；
 实时结果与修复原因集中在 [CI 记录](verification/ci-closure-20261015.md)，不由工作流文件存在推断成功。
 
 安装只替换固定 p6/p9，保留 CA fastboot、持久 boot 环境、其他分区、

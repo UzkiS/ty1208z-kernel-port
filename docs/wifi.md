@@ -19,16 +19,16 @@ station dump仍不完整，STA/AP同时运行和综合吞吐未验收。
 
 ## 来源、固件与模块
 
-驱动以固定realme公开内核源码
-`ef379d496bc0cd4b7bbeced783245f5e450a506d`
-的 `drivers/net/wireless/rdaw80211` 为基础，
-`reference/wifi-rda-usb.lock.json` 记录63文件身份。
-下载器只取48代码文件，排除固件，保留原许可。
-OrangePi等候选的审计保留于来源和历史报告，不用于替代当前驱动。
+完整的 63 个驱动、构建及固件参考文件已纳入 [wifi/vendor/rdaw80211](../wifi/vendor/README.md)，
+由本仓库维护。默认构建直接读取本地文件，不依赖上游网络或 CI 附件；
+`make references-wifi` 校验并准备完整离线副本。原文件版权和许可证保留，
+固定版本与哈希集中记录于 `reference/wifi-rda-usb.lock.json`。
 
-固件来自本地私有原厂备份，未确认为可公开再分发。
-构建不下载或提交固件，完整镜像只私有交付。
-旧3.10或4.4模块不能用于Linux6.12；完整系统模块必须匹配本次内核ABI。
+完整系统默认包含 [firmware/rda5995](../firmware/rda5995/README.md) 中已在本板验证的
+USB 运行固件，并按项目所有者授权随公开 Release 提供。
+上游自带的 USB/SDIO `.hex` 参考也已保存；其 USB 文件与本板已验收版本不同，
+不会在构建时自动替换运行固件。固件是给无线芯片加载的字节数据，不是 Linux 模块源码。
+完整系统的驱动模块从本地源码编译，必须匹配本次 Linux 6.12 内核 ABI。
 
 `wifi/overlay/` 维护新增代码，`wifi/replacements/` 维护协议函数替换，
 `wifi/Kbuild` 维护共享对象列表。

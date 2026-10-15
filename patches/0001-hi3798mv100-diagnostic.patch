@@ -1,17 +1,34 @@
+--- a/include/linux/cpuhotplug.h
++++ b/include/linux/cpuhotplug.h
+@@ -164,6 +164,7 @@
+ 	CPUHP_AP_ARM_ARCH_TIMER_STARTING,
+ 	CPUHP_AP_ARM_ARCH_TIMER_EVTSTRM_STARTING,
+ 	CPUHP_AP_ARM_GLOBAL_TIMER_STARTING,
++	CPUHP_AP_HI3798MV100_TIMER_STARTING,
+ 	CPUHP_AP_JCORE_TIMER_STARTING,
+ 	CPUHP_AP_ARM_TWD_STARTING,
+ 	CPUHP_AP_QCOM_TIMER_STARTING,
 --- a/arch/arm/mach-hisi/Kconfig
 +++ b/arch/arm/mach-hisi/Kconfig
-@@ -12,6 +12,51 @@
+@@ -12,6 +12,65 @@
  if ARCH_HISI
  
  menu "Hisilicon platform type"
 +
 +config ARCH_HI3798MV100
-+	bool "Hi3798MV100 single-core diagnostic support"
-+	depends on ARCH_MULTI_V7 && !SMP
++	bool "Hi3798MV100 board support"
++	depends on ARCH_MULTI_V7
 +	select HI3798MV100_TIMER
 +	help
-+	  Experimental RAM-only diagnostic candidate for TY1208Z CA.
-+	  Hardware boot and secure-boot acceptance remain unverified.
++	  TY1208Z CA board support, including the measured UP and SMP profiles.
++
++config HI3798MV100_SMP
++	bool "TY1208Z Hi3798MV100 four-core SMP"
++	depends on ARCH_HI3798MV100 && SMP
++	select HI3798MV100_SMP_TIMER
++	help
++	  Enable the public HiSilicon CPU1-3 reset/vector sequence and
++	  four local hisp804 timer instances.
 +
 +config TY1208Z_ROUTER_RAM768
 +	bool "TY1208Z measured 768-MiB native router RAM experiment"
@@ -33,13 +50,20 @@
 +	  pages and reject all card writes before the hardware queue.
 +
 +config TY1208Z_OPENWRT_SYSTEM
-+	bool "TY1208Z native OpenWrt system with measured memory and read-only storage"
++	bool "TY1208Z native OpenWrt production system"
 +	depends on ARCH_HI3798MV100 && NET && BLOCK && MMC
-+	depends on !HIGHMEM && !SMP && !MTD
++	depends on !MTD
 +	depends on !DEBUG_FS && !WATCHDOG && !PM
 +	help
-+	  Integrate the measured 768-MiB memory, Ethernet, SD and eMMC paths.
-+	  Both storage controllers retain their existing request-level write denial.
++	  Integrate 1-GiB memory, four-core SMP, Ethernet, SD and eMMC paths.
++	  Production block I/O has independent writable SD/eMMC policies.
++
++config TY1208Z_EMMC_INSTALL_CANDIDATE
++	bool "TY1208Z first-install and persistent-system packaging"
++	depends on TY1208Z_OPENWRT_SYSTEM && HI3798MV100_EMMC_WRITE
++	help
++	  Select the installer and disk-root delivery. The production
++	  eMMC policy permits multi-block p6/p9 writes and cache flush.
 +
 +config TY1208Z_ROUTER_EMMC_RO
 +	bool "TY1208Z native low256 router with enforced read-only eMMC"
@@ -54,16 +78,17 @@
  	bool "Hisilicon Hi36xx family"
 --- a/arch/arm/mach-hisi/Makefile
 +++ b/arch/arm/mach-hisi/Makefile
-@@ -6,5 +6,6 @@
+@@ -6,5 +6,7 @@
  CFLAGS_platmcpm.o	:= -march=armv7-a
  
  obj-y	+= hisilicon.o
 +obj-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100.o
++obj-$(CONFIG_HI3798MV100_SMP) += hi3798mv100-smp.o
  obj-$(CONFIG_MCPM)		+= platmcpm.o
  obj-$(CONFIG_SMP)		+= platsmp.o hotplug.o
 --- a/arch/arm/boot/dts/hisilicon/Makefile
 +++ b/arch/arm/boot/dts/hisilicon/Makefile
-@@ -1,4 +1,20 @@
+@@ -1,4 +1,21 @@
  # SPDX-License-Identifier: GPL-2.0
 +dtb-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100-ty1208z-diagnostic.dtb
 +dtb-$(CONFIG_MMC_DW_HI3798MV100_IDENT) += hi3798mv100-ty1208z-emmc-ident.dtb
@@ -75,6 +100,7 @@
 +dtb-$(CONFIG_HI3798MV100_SD_READ_ONLY) += hi3798mv100-ty1208z-sd-ro.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb
++dtb-$(CONFIG_HI3798MV100_SMP) += hi3798mv100-ty1208z-smp.dtb
 +dtb-$(CONFIG_HI3798MV100_USB_AUDIT) += hi3798mv100-ty1208z-usb-audit.dtb
 +dtb-$(CONFIG_HI3798MV100_USB_CLOCK_AUDIT) += hi3798mv100-ty1208z-usb-clock-audit.dtb
 +dtb-$(CONFIG_POWER_RESET_TY1208Z_SP805) += hi3798mv100-ty1208z-restart.dtb
@@ -154,7 +180,7 @@
  obj-$(CONFIG_KUNPENG_HCCS)	+= kunpeng_hccs.o
 --- a/drivers/clocksource/Kconfig
 +++ b/drivers/clocksource/Kconfig
-@@ -400,6 +400,12 @@
+@@ -400,6 +400,18 @@
  	  increase wrt the initial clock value.
  	  This affects CPU_FREQ max delta from the initial frequency.
  
@@ -164,16 +190,23 @@
 +	select CLKSRC_MMIO
 +	select TIMER_OF
 +
++config HI3798MV100_SMP_TIMER
++	bool
++	depends on ARM && OF && SMP
++	select CLKSRC_MMIO
++	select TIMER_OF
++
  config ARM_TIMER_SP804
  	bool "Support for Dual Timer SP804 module"
  	depends on ARM || ARM64 || COMPILE_TEST
 --- a/drivers/clocksource/Makefile
 +++ b/drivers/clocksource/Makefile
-@@ -65,6 +65,7 @@
+@@ -65,6 +65,8 @@
  obj-$(CONFIG_ARM_ARCH_TIMER)		+= arm_arch_timer.o
  obj-$(CONFIG_ARM_GLOBAL_TIMER)		+= arm_global_timer.o
  obj-$(CONFIG_ARMV7M_SYSTICK)		+= armv7m_systick.o
 +obj-$(CONFIG_HI3798MV100_TIMER) += timer-hi3798mv100.o
++obj-$(CONFIG_HI3798MV100_SMP_TIMER) += timer-hi3798mv100-smp.o
  obj-$(CONFIG_ARM_TIMER_SP804)		+= timer-sp804.o
  obj-$(CONFIG_ARCH_HAS_TICK_BROADCAST)	+= dummy_timer.o
  obj-$(CONFIG_KEYSTONE_TIMER)		+= timer-keystone.o
@@ -220,6 +253,19 @@
  
  config POWER_RESET_AS3722
  	bool "ams AS3722 power-off driver"
+@@ -111,6 +145,12 @@
+ 	  If your board needs a GPIO high/low to restart, say Y and
+ 	  create a binding in your devicetree.
+ 
++config POWER_RESET_TY1208Z_MV100_SYSTEM
++	bool "TY1208Z integrated SD/eMMC guarded RAM restart"
++	depends on TY1208Z_OPENWRT_SYSTEM
++	help
++	  Arm the measured reset only after BOTH storage hosts have shut down.
++
+ config POWER_RESET_HISI
+ 	bool "Hisilicon power-off driver"
+ 	depends on ARCH_HISI
 --- a/drivers/power/reset/Makefile
 +++ b/drivers/power/reset/Makefile
 @@ -1,4 +1,8 @@
@@ -231,6 +277,14 @@
  obj-$(CONFIG_POWER_RESET_AS3722) += as3722-poweroff.o
  obj-$(CONFIG_POWER_RESET_AT91_POWEROFF) += at91-poweroff.o
  obj-$(CONFIG_POWER_RESET_AT91_RESET) += at91-reset.o
+@@ -11,6 +15,7 @@
+ obj-$(CONFIG_POWER_RESET_GEMINI_POWEROFF) += gemini-poweroff.o
+ obj-$(CONFIG_POWER_RESET_GPIO) += gpio-poweroff.o
+ obj-$(CONFIG_POWER_RESET_GPIO_RESTART) += gpio-restart.o
++obj-$(CONFIG_POWER_RESET_TY1208Z_MV100_SYSTEM) += ty1208z-mv100-system-restart.o
+ obj-$(CONFIG_POWER_RESET_HISI) += hisi-reboot.o
+ obj-$(CONFIG_POWER_RESET_LINKSTATION) += linkstation-poweroff.o
+ obj-$(CONFIG_POWER_RESET_MSM) += msm-poweroff.o
 --- a/arch/arm/mm/init.c
 +++ b/arch/arm/mm/init.c
 @@ -14,6 +14,7 @@
@@ -319,7 +373,7 @@
  				   sdio.o sdio_ops.o sdio_bus.o \
 --- a/drivers/mmc/host/Kconfig
 +++ b/drivers/mmc/host/Kconfig
-@@ -802,6 +802,49 @@
+@@ -802,6 +802,64 @@
  	  Synopsys DesignWare Memory Card Interface driver. Select this option
  	  for platforms based on Exynos4 and Exynos5 SoC's.
  
@@ -338,6 +392,13 @@
 +	  Report read-only and reject writes/settings before hardware queue.
 +	  Allow bounded sector-addressed SD single/multi-block reads.
 +
++config HI3798MV100_SD_WRITE
++	bool "TY1208Z ordinary SD user-area writes"
++	depends on MMC_DW_HI3798MV100_SD_IDENT && BLOCK && MMC_BLOCK
++	help
++	  Enable ordinary block writes while retaining the measured PIO
++	  controller path and rejecting erase, lock and vendor commands.
++
 +config HI3798MV100_EMMC_READ_SAMPLES
 +	bool "TY1208Z fixed four-sector read-only diagnostic"
 +	depends on MMC_DW_HI3798MV100_IDENT && !BLOCK
@@ -349,7 +410,7 @@
 +config MMC_DW_HI3798MV100_IDENT
 +	bool "TY1208Z restricted eMMC identification diagnostic"
 +	depends on MMC_DW && ARCH_HI3798MV100
-+	depends on !BLOCK || HI3798MV100_EMMC_READ_ONLY
++	depends on !BLOCK || HI3798MV100_EMMC_READ_ONLY || TY1208Z_OPENWRT_SYSTEM
 +	select MMC_DW_PLTFM
 +	help
 +	  PIO, 1-bit, legacy identification only. Blocks card settings,
@@ -359,12 +420,20 @@
 +	bool "TY1208Z enforced read-only eMMC user-area block experiment"
 +	depends on ARCH_HI3798MV100 && MMC_DW && MMC_BLOCK && BLOCK
 +	depends on (!NET && !MODULES) || TY1208Z_ROUTER_EMMC_RO || TY1208Z_OPENWRT_SYSTEM
-+	depends on !SMP && !MTD
++	depends on (!SMP || TY1208Z_OPENWRT_SYSTEM) && !MTD
 +	depends on !USB_SUPPORT || TY1208Z_OPENWRT_SYSTEM
 +	depends on !DEBUG_FS && !PM
 +	help
 +	  Dedicated user-area-only RAM experiment, not a production driver.
 +	  Enforce queue write denial and suppress boot/RPMB devices.
++
++config HI3798MV100_EMMC_WRITE
++	bool "TY1208Z ordinary eMMC user-area writes"
++	depends on ARCH_HI3798MV100 && MMC_DW_HI3798MV100_IDENT && MMC_BLOCK && BLOCK
++	depends on !TY1208Z_ROUTER_EMMC_RO
++	help
++	  Enable ordinary user-area block I/O with the measured PIO host.
++	  Boot, RPMB, partition-switch, erase and vendor commands remain denied.
 +
  config MMC_DW_HI3798CV200
  	tristate "Hi3798CV200 specific extensions for Synopsys DW Memory Card Interface"
@@ -382,22 +451,25 @@
  obj-$(CONFIG_MMC_DW_K3)		+= dw_mmc-k3.o
 --- a/drivers/mmc/core/block.c
 +++ b/drivers/mmc/core/block.c
-@@ -2521,7 +2521,8 @@
+@@ -2521,7 +2521,11 @@
  
  static inline int mmc_blk_readonly(struct mmc_card *card)
  {
 -	return mmc_card_readonly(card) ||
-+	return IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||
++	return (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) && mmc_card_mmc(card) &&
++		!IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) ||
++	       (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) && mmc_card_sd(card) &&
++		!IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE)) ||
 +	       mmc_card_readonly(card) ||
  	       !(card->csd.cmdclass & CCC_BLOCK_WRITE);
  }
  
-@@ -2538,7 +2539,12 @@
+@@ -2538,7 +2542,12 @@
  	char cap_str[10];
  	unsigned int features = 0;
  
 -	devidx = ida_alloc_max(&mmc_blk_ida, max_devices - 1, GFP_KERNEL);
-+	/* Pin the two integrated read-only disks to the measured DT host aliases. */
++	/* Pin the two integrated disks to the measured DT host aliases. */
 +	if (IS_ENABLED(CONFIG_TY1208Z_OPENWRT_SYSTEM))
 +		devidx = ida_alloc_range(&mmc_blk_ida, card->host->index,
 +					card->host->index, GFP_KERNEL);
@@ -406,27 +478,51 @@
  	if (devidx < 0) {
  		/*
  		 * We get -ENOSPC because there are no more any available
-@@ -3004,6 +3010,10 @@
+@@ -3004,6 +3013,11 @@
  {
  	int idx, ret;
  
 +	/* This independent RAM profile exposes only the measured user area. */
-+	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))
++	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||
++	    IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE))
 +		return 0;
 +
  	if (!mmc_card_mmc(card))
  		return 0;
  
-@@ -3303,7 +3313,8 @@
+@@ -3303,7 +3317,9 @@
  		pm_runtime_enable(&card->dev);
  	}
  
 -	mmc_blk_rpmb_add(card);
-+	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))
++	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
++	    !IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE))
 +		mmc_blk_rpmb_add(card);
  
  	return 0;
  
+--- a/drivers/mmc/core/queue.c
++++ b/drivers/mmc/core/queue.c
+@@ -363,10 +363,18 @@
+ 	};
+ 	struct gendisk *disk;
+ 
+-	if (mmc_can_erase(card))
++	/* The measured PIO policies reject erase/WRITE_ZEROES; do not
++	 * advertise discard for their ordinary writable user areas. */
++	if (mmc_can_erase(card) &&
++	    !(IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE) && mmc_card_mmc(card)) &&
++	    !(IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE) && mmc_card_sd(card)))
+ 		mmc_queue_setup_discard(card, &lim);
+ 
+ 	lim.max_hw_sectors = min(host->max_blk_count, host->max_req_size / 512);
++	if (((IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE) && mmc_card_mmc(card)) ||
++	     (IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE) && mmc_card_sd(card))) &&
++	    host->max_blk_count == 1)
++		lim.max_hw_sectors = max(lim.max_hw_sectors, PAGE_SIZE / 512);
+ 
+ 	if (mmc_card_mmc(card) && card->ext_csd.data_sector_size)
+ 		lim.logical_block_size = card->ext_csd.data_sector_size;
 --- a/drivers/mmc/host/dw_mmc.h
 +++ b/drivers/mmc/host/dw_mmc.h
 @@ -588,6 +588,10 @@
@@ -541,7 +637,7 @@
 +config TY1208Z_USB_HOST0_EXPERIMENT
 +	bool "TY1208Z USB host0 clock/PHY experiment"
 +	depends on ARCH_HI3798MV100 && USB_EHCI_HCD_PLATFORM=y
-+	depends on USB_OHCI_HCD_PLATFORM=y && !MTD && !PM && !SMP && !DEBUG_FS
++	depends on USB_OHCI_HCD_PLATFORM=y && !MTD && !PM && (!SMP || TY1208Z_OPENWRT_SYSTEM) && !DEBUG_FS
 +	depends on (!BLOCK && !MMC && !NET && !MODULES) || TY1208Z_OPENWRT_SYSTEM
 +	help
 +	  Optional shared host0 clock provider for an independent experiment.
@@ -927,7 +1023,7 @@
  	{.compatible = "hisilicon,hi3516cv300-femac",},
 --- /dev/null
 +++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-diagnostic.dts
-@@ -0,0 +1,90 @@
+@@ -0,0 +1,93 @@
 +// SPDX-License-Identifier: GPL-2.0-only
 +/dts-v1/;
 +
@@ -935,6 +1031,9 @@
 + * the ARM kernel itself decompresses below it, as in the existing boot path.
 + */
 +/memreserve/ 0x00000000 0x01000000;
++#ifdef TY1208Z_FULL_MEMORY
++#include "hi3798mv100-ty1208z-loader-reservations.dtsi"
++#endif
 +#include <dt-bindings/interrupt-controller/arm-gic.h>
 +
 +/*
@@ -1170,6 +1269,65 @@
 +	};
 +};
 --- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-loader-reservations.dtsi
+@@ -0,0 +1,15 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++/* Exact inherited loader allocations. Do not exclude the whole upper 256 MiB.
++ * A changed loader allocation table requires a matching reservation update.
++ */
++/memreserve/ 0x3fbfd000 0x00400000;
++/memreserve/ 0x3f8fc000 0x00300000;
++/memreserve/ 0x3f87b000 0x00080000;
++/memreserve/ 0x3f878000 0x00002000;
++/memreserve/ 0x3f843000 0x00034000;
++/memreserve/ 0x3f742000 0x00100000;
++/memreserve/ 0x3f73e000 0x00003000;
++/memreserve/ 0x3ef54000 0x007e9000;
++/memreserve/ 0x3edbe000 0x00195000;
++/memreserve/ 0x3e5d4000 0x007e9000;
++/memreserve/ 0x3e507000 0x000cc000;
+--- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-openwrt-smp.dts
+@@ -0,0 +1,38 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-ethernet-net.dts"
++
++&{/cpus/cpu@0} {
++	enable-method = "hisilicon,hi3798mv100-smp";
++};
++
++&{/cpus} {
++	cpu@1 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a7";
++		reg = <1>;
++		enable-method = "hisilicon,hi3798mv100-smp";
++	};
++	cpu@2 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a7";
++		reg = <2>;
++		enable-method = "hisilicon,hi3798mv100-smp";
++	};
++	cpu@3 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a7";
++		reg = <3>;
++		enable-method = "hisilicon,hi3798mv100-smp";
++	};
++};
++
++&{/soc/timer@f8a29000} {
++	compatible = "hisilicon,hisp804";
++	reg = <0xf8a29000 0x20>,
++	      <0xf8a2a000 0x20>, <0xf8a2a020 0x20>,
++	      <0xf8a2b000 0x20>, <0xf8a2b020 0x20>;
++	interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++};
+--- /dev/null
 +++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-ram768.dts
 @@ -0,0 +1,21 @@
 +// SPDX-License-Identifier: GPL-2.0-only
@@ -1265,6 +1423,48 @@
 +	compatible = "tianyi,ty1208z-ca-sd-ro-ram", "hi3798mv100-series";
 +};
 --- /dev/null
++++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-smp.dts
+@@ -0,0 +1,39 @@
++// SPDX-License-Identifier: GPL-2.0-only
++#include "hi3798mv100-ty1208z-diagnostic.dts"
++
++/* Four-core profile using the public HiSilicon CPU and hisp804 layout. */
++&{/cpus/cpu@0} {
++	enable-method = "hisilicon,hi3798mv100-smp";
++};
++
++&{/cpus} {
++	cpu@1 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a7";
++		reg = <1>;
++		enable-method = "hisilicon,hi3798mv100-smp";
++	};
++	cpu@2 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a7";
++		reg = <2>;
++		enable-method = "hisilicon,hi3798mv100-smp";
++	};
++	cpu@3 {
++		device_type = "cpu";
++		compatible = "arm,cortex-a7";
++		reg = <3>;
++		enable-method = "hisilicon,hi3798mv100-smp";
++	};
++};
++
++&{/soc/timer@f8a29000} {
++	compatible = "hisilicon,hisp804";
++	reg = <0xf8a29000 0x20>,
++	      <0xf8a2a000 0x20>, <0xf8a2a020 0x20>,
++	      <0xf8a2b000 0x20>, <0xf8a2b020 0x20>;
++	interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 27 IRQ_TYPE_LEVEL_HIGH>,
++		     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>;
++};
+--- /dev/null
 +++ b/arch/arm/boot/dts/hisilicon/hi3798mv100-ty1208z-usb-audit.dts
 @@ -0,0 +1,15 @@
 +// SPDX-License-Identifier: GPL-2.0-only
@@ -1335,6 +1535,158 @@
 +		};
 +	};
 +};
+--- /dev/null
++++ b/arch/arm/mach-hisi/hi3798mv100-smp.c
+@@ -0,0 +1,149 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Hi3798MV100 SMP bring-up.
++ *
++ * This is the Linux 6.12 form of the public HiSilicon mach-hi3798mx
++ * sequence.  CPU1..3 are released through the SRAM vector at 0xffff0000,
++ * then the CPU low-power selector and the three documented reset fields at
++ * CRG 0xf8a22050 are changed in the vendor order.  No guessed PMU, mailbox,
++ * OTP or security-state register is used.
++ */
++#include <linux/bitops.h>
++#include <linux/delay.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <linux/kernel.h>
++#include <linux/smp.h>
++#include <linux/spinlock.h>
++
++#include <asm/smp_plat.h>
++#include <asm/memory.h>
++
++#define HI3798MV100_NR_CPUS		4
++#define HI3798MV100_SRAM_VECTOR		0xffff0000
++#define HI3798MV100_CPU_LP		0xf8a22048
++#define HI3798MV100_CPU_RESET		0xf8a22050
++#define HI3798MV100_CPU_SW_BEGIN		10
++#define HI3798MV100_ARM_POR_SRST		12
++#define HI3798MV100_ARM_SRST		16
++#define HI3798MV100_CLUSTER_DBG_SRST	20
++
++static void __iomem *hi3798mv100_sram_vector;
++static void __iomem *hi3798mv100_cpu_lp;
++static void __iomem *hi3798mv100_cpu_reset;
++static DEFINE_SPINLOCK(hi3798mv100_boot_lock);
++
++static void hi3798mv100_set_boot_vector(void)
++{
++	writel_relaxed(0xe51ff004, hi3798mv100_sram_vector);
++	writel_relaxed(__pa_symbol(secondary_startup),
++		       hi3798mv100_sram_vector + 4);
++	/* Ensure the SRAM instruction fetch sees both words before the IPI. */
++	__iowmb();
++}
++
++static void hi3798mv100_release_reset(unsigned int cpu)
++{
++	u32 value;
++
++	value = readl_relaxed(hi3798mv100_cpu_reset);
++	value &= ~BIT(cpu + HI3798MV100_ARM_POR_SRST);
++	writel_relaxed(value, hi3798mv100_cpu_reset);
++
++	value = readl_relaxed(hi3798mv100_cpu_reset);
++	value &= ~BIT(cpu + HI3798MV100_CLUSTER_DBG_SRST);
++	writel_relaxed(value, hi3798mv100_cpu_reset);
++
++	value = readl_relaxed(hi3798mv100_cpu_reset);
++	value &= ~BIT(cpu + HI3798MV100_ARM_SRST);
++	writel_relaxed(value, hi3798mv100_cpu_reset);
++	__iowmb();
++}
++
++static int hi3798mv100_boot_secondary(unsigned int cpu,
++					      struct task_struct *idle)
++{
++	unsigned long flags;
++	u32 saved_lp, value;
++
++	if (cpu == 0 || cpu >= HI3798MV100_NR_CPUS ||
++	    !hi3798mv100_sram_vector || !hi3798mv100_cpu_lp ||
++	    !hi3798mv100_cpu_reset)
++		return -ENXIO;
++
++	spin_lock_irqsave(&hi3798mv100_boot_lock, flags);
++	hi3798mv100_set_boot_vector();
++
++	/* Public SDK selects 400MHz while the secondary reset is released. */
++	saved_lp = readl_relaxed(hi3798mv100_cpu_lp);
++	writel_relaxed(0x306, hi3798mv100_cpu_lp);
++	writel_relaxed(0x706, hi3798mv100_cpu_lp);
++	hi3798mv100_release_reset(cpu);
++
++	/* Restore the exact inherited low-power selector and its SW_BEGIN bit. */
++	value = saved_lp & ~BIT(HI3798MV100_CPU_SW_BEGIN);
++	writel_relaxed(value, hi3798mv100_cpu_lp);
++	writel_relaxed(saved_lp, hi3798mv100_cpu_lp);
++	__iowmb();
++	spin_unlock_irqrestore(&hi3798mv100_boot_lock, flags);
++
++	arch_send_wakeup_ipi_mask(cpumask_of(cpu));
++	return 0;
++}
++
++#ifdef CONFIG_HOTPLUG_CPU
++static int hi3798mv100_cpu_kill(unsigned int cpu)
++{
++	u32 value;
++
++	if (cpu == 0 || cpu >= HI3798MV100_NR_CPUS || !hi3798mv100_cpu_reset)
++		return 0;
++	value = readl_relaxed(hi3798mv100_cpu_reset);
++	value |= BIT(cpu + HI3798MV100_ARM_SRST);
++	writel_relaxed(value, hi3798mv100_cpu_reset);
++	value = readl_relaxed(hi3798mv100_cpu_reset);
++	value |= BIT(cpu + HI3798MV100_CLUSTER_DBG_SRST);
++	writel_relaxed(value, hi3798mv100_cpu_reset);
++	value = readl_relaxed(hi3798mv100_cpu_reset);
++	value |= BIT(cpu + HI3798MV100_ARM_POR_SRST);
++	writel_relaxed(value, hi3798mv100_cpu_reset);
++	__iowmb();
++	return 1;
++}
++#endif
++
++static void __init hi3798mv100_smp_prepare_cpus(unsigned int max_cpus)
++{
++	hi3798mv100_sram_vector = ioremap(HI3798MV100_SRAM_VECTOR, PAGE_SIZE);
++	hi3798mv100_cpu_lp = ioremap(HI3798MV100_CPU_LP, sizeof(u32));
++	hi3798mv100_cpu_reset = ioremap(HI3798MV100_CPU_RESET, sizeof(u32));
++	if (!hi3798mv100_sram_vector || !hi3798mv100_cpu_lp ||
++	    !hi3798mv100_cpu_reset)
++		pr_err("SMP MMIO mapping failed; secondary CPUs remain offline\n");
++}
++
++static void __init hi3798mv100_smp_init_cpus(void)
++{
++	unsigned int i, ncores;
++	u32 scu_cfg;
++
++	asm volatile("mrc p15, 1, %0, c9, c0, 2" : "=r" (scu_cfg));
++	ncores = ((scu_cfg >> 24) & 0x3) + 1;
++	if (ncores > HI3798MV100_NR_CPUS)
++		ncores = HI3798MV100_NR_CPUS;
++	for (i = 0; i < ncores; i++)
++		set_cpu_possible(i, true);
++	pr_info("SMP reports %u Cortex-A7 cores\n", ncores);
++}
++
++static const struct smp_operations hi3798mv100_smp_ops __initconst = {
++	.smp_init_cpus = hi3798mv100_smp_init_cpus,
++	.smp_prepare_cpus = hi3798mv100_smp_prepare_cpus,
++	.smp_boot_secondary = hi3798mv100_boot_secondary,
++#ifdef CONFIG_HOTPLUG_CPU
++	.cpu_kill = hi3798mv100_cpu_kill,
++#endif
++};
++
++CPU_METHOD_OF_DECLARE(hi3798mv100_smp, "hisilicon,hi3798mv100-smp",
++			     &hi3798mv100_smp_ops);
 --- /dev/null
 +++ b/arch/arm/mach-hisi/hi3798mv100.c
 @@ -0,0 +1,16 @@
@@ -1748,6 +2100,263 @@
 +}
 +#endif
 --- /dev/null
++++ b/drivers/clocksource/timer-hi3798mv100-smp.c
+@@ -0,0 +1,254 @@
++// SPDX-License-Identifier: GPL-2.0-only
++/*
++ * Hi3798MV100 four-core local timer.
++ *
++ * The register layout and IRQ order are taken from the public HiSilicon
++ * hisp804 driver: one free-running source at 0xf8a29000 followed by local
++ * timers at 0xf8a2a000, 0xf8a2a020, 0xf8a2b000 and 0xf8a2b020.  This driver
++ * is selected only by the explicit SMP profile; the older two-resource
++ * diagnostic timer remains unchanged for UP images.
++ */
++#define pr_fmt(fmt) "hi3798mv100-smp-timer: " fmt
++
++#include <linux/clk.h>
++#include <linux/clockchips.h>
++#include <linux/clocksource.h>
++#include <linux/cpuhotplug.h>
++#include <linux/err.h>
++#include <linux/interrupt.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/of_address.h>
++#include <linux/of_clk.h>
++#include <linux/of_irq.h>
++#include <linux/percpu.h>
++#include <linux/sched_clock.h>
++
++#include "timer-sp.h"
++
++struct mv100_smp_event {
++	struct clock_event_device clkevt;
++	void __iomem *base;
++	unsigned long rate;
++	unsigned long reload;
++	unsigned int irq;
++	bool requested;
++};
++
++static struct mv100_smp_event __percpu *mv100_events;
++static unsigned int mv100_event_count;
++static void __iomem *mv100_source;
++static void __iomem *mv100_sched_base;
++static struct clocksource mv100_smp_clksrc;
++
++static u64 notrace mv100_smp_sched_read(void)
++{
++	return ~readl_relaxed(mv100_sched_base + TIMER_VALUE);
++}
++
++static u64 mv100_smp_clocksource_read(struct clocksource *cs)
++{
++	return ~readl_relaxed(mv100_source + TIMER_VALUE);
++}
++
++static inline struct mv100_smp_event *to_mv100_event(
++		struct clock_event_device *evt)
++{
++	return container_of(evt, struct mv100_smp_event, clkevt);
++}
++
++static int mv100_smp_shutdown(struct clock_event_device *evt)
++{
++	struct mv100_smp_event *event = to_mv100_event(evt);
++
++	writel(0, event->base + TIMER_CTRL);
++	return 0;
++}
++
++static int mv100_smp_set_next(unsigned long next,
++				      struct clock_event_device *evt)
++{
++	struct mv100_smp_event *event = to_mv100_event(evt);
++
++	writel(TIMER_CTRL_32BIT, event->base + TIMER_CTRL);
++	/* The second LOAD write is required by the vendor hardware workaround. */
++	writel(next, event->base + TIMER_LOAD);
++	writel(next, event->base + TIMER_LOAD);
++	writel(TIMER_CTRL_32BIT | TIMER_CTRL_IE | TIMER_CTRL_ONESHOT |
++	       TIMER_CTRL_ENABLE, event->base + TIMER_CTRL);
++	return 0;
++}
++
++static int mv100_smp_set_periodic(struct clock_event_device *evt)
++{
++	struct mv100_smp_event *event = to_mv100_event(evt);
++
++	writel(TIMER_CTRL_32BIT, event->base + TIMER_CTRL);
++	writel(event->reload, event->base + TIMER_LOAD);
++	writel(event->reload, event->base + TIMER_LOAD);
++	writel(TIMER_CTRL_32BIT | TIMER_CTRL_IE | TIMER_CTRL_PERIODIC |
++	       TIMER_CTRL_ENABLE, event->base + TIMER_CTRL);
++	return 0;
++}
++
++static irqreturn_t mv100_smp_interrupt(int irq, void *dev_id)
++{
++	struct mv100_smp_event *event = dev_id;
++
++	writel(1, event->base + TIMER_INTCLR);
++	event->clkevt.event_handler(&event->clkevt);
++	return IRQ_HANDLED;
++}
++
++static int mv100_smp_cpu_starting(unsigned int cpu)
++{
++	struct mv100_smp_event *event;
++
++	if (cpu >= mv100_event_count)
++		return -EINVAL;
++	event = per_cpu_ptr(mv100_events, cpu);
++	irq_force_affinity(event->irq, cpumask_of(cpu));
++	clockevents_config_and_register(&event->clkevt, event->rate, 0xf,
++					0x7fffffff);
++	return 0;
++}
++
++static int mv100_smp_cpu_dying(unsigned int cpu)
++{
++	if (cpu < mv100_event_count)
++		mv100_smp_shutdown(&per_cpu_ptr(mv100_events, cpu)->clkevt);
++	return 0;
++}
++
++static void mv100_smp_source_enable(void __iomem *base)
++{
++	writel(0, base + TIMER_CTRL);
++	writel(0xffffffff, base + TIMER_LOAD);
++	writel(0xffffffff, base + TIMER_VALUE);
++	writel(TIMER_CTRL_32BIT | TIMER_CTRL_ENABLE | TIMER_CTRL_PERIODIC,
++	       base + TIMER_CTRL);
++}
++
++static int __init mv100_smp_timer_init(struct device_node *node)
++{
++	struct clk *clk;
++	unsigned long rate, reload;
++	unsigned int i;
++	int ret, irq, hotplug_state;
++
++	if (!IS_ENABLED(CONFIG_SMP))
++		return -ENODEV;
++	mv100_event_count = min_t(unsigned int, of_irq_count(node), nr_cpu_ids);
++	if (!mv100_event_count || of_address_count(node) != of_irq_count(node) + 1)
++		return -EINVAL;
++
++	clk = of_clk_get(node, 0);
++	if (IS_ERR(clk))
++		return PTR_ERR(clk);
++	ret = clk_prepare_enable(clk);
++	if (ret)
++		goto put_clk;
++	rate = clk_get_rate(clk);
++	if (!rate) {
++		ret = -EINVAL;
++		goto disable_clk;
++	}
++	reload = DIV_ROUND_CLOSEST(rate, HZ);
++
++	mv100_events = alloc_percpu(struct mv100_smp_event);
++	if (!mv100_events) {
++		ret = -ENOMEM;
++		goto disable_clk;
++	}
++	mv100_source = of_iomap(node, 0);
++	if (!mv100_source) {
++		ret = -ENXIO;
++		goto free_events;
++	}
++	mv100_sched_base = mv100_source;
++	mv100_smp_source_enable(mv100_source);
++	for (i = 0; i < mv100_event_count; i++) {
++		struct mv100_smp_event *event = per_cpu_ptr(mv100_events, i);
++
++		event->base = NULL;
++		event->irq = 0;
++		event->base = of_iomap(node, i + 1);
++		if (!event->base) {
++			ret = -ENXIO;
++			goto free_irqs;
++		}
++		irq = irq_of_parse_and_map(node, i);
++		if (irq <= 0) {
++			ret = -EINVAL;
++			goto free_irqs;
++		}
++		event->irq = irq;
++		event->rate = rate;
++		event->reload = reload;
++		event->clkevt.name = "hi3798mv100-local-timer";
++		event->clkevt.rating = 400;
++		event->clkevt.features = CLOCK_EVT_FEAT_PERIODIC |
++			CLOCK_EVT_FEAT_ONESHOT;
++		event->clkevt.set_state_shutdown = mv100_smp_shutdown;
++		event->clkevt.set_state_oneshot = mv100_smp_shutdown;
++		event->clkevt.set_state_periodic = mv100_smp_set_periodic;
++		event->clkevt.set_next_event = mv100_smp_set_next;
++		event->clkevt.tick_resume = mv100_smp_shutdown;
++		event->clkevt.irq = irq;
++		event->clkevt.cpumask = cpumask_of(i);
++		writel(0, event->base + TIMER_CTRL);
++		writel(1, event->base + TIMER_INTCLR);
++		ret = request_irq(irq, mv100_smp_interrupt,
++				  IRQF_TIMER | IRQF_NOBALANCING,
++				  event->clkevt.name, event);
++		if (ret)
++			goto free_irqs;
++		event->requested = true;
++	}
++
++	mv100_smp_clksrc.name = "hi3798mv100-smp";
++	mv100_smp_clksrc.rating = 499;
++	mv100_smp_clksrc.read = mv100_smp_clocksource_read;
++	mv100_smp_clksrc.mask = CLOCKSOURCE_MASK(32);
++	mv100_smp_clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
++	ret = clocksource_register_hz(&mv100_smp_clksrc, rate);
++	if (ret)
++		goto free_irqs;
++
++	hotplug_state = cpuhp_setup_state(CPUHP_AP_HI3798MV100_TIMER_STARTING,
++					  "clockevents/hi3798mv100-smp:online",
++					  mv100_smp_cpu_starting, mv100_smp_cpu_dying);
++	if (hotplug_state < 0) {
++		ret = hotplug_state;
++		clocksource_unregister(&mv100_smp_clksrc);
++		goto free_irqs;
++	}
++	pr_info("four local timers, %lu Hz, %u CPUs\n", rate, mv100_event_count);
++	sched_clock_register(mv100_smp_sched_read, 32, rate);
++	return 0;
++
++free_irqs:
++	for (i = 0; i < mv100_event_count; i++) {
++		struct mv100_smp_event *event = per_cpu_ptr(mv100_events, i);
++
++		if (event->requested)
++			free_irq(event->irq, event);
++		if (event->irq)
++			irq_dispose_mapping(event->irq);
++		if (event->base)
++			iounmap(event->base);
++	}
++	if (mv100_source)
++		writel(0, mv100_source + TIMER_CTRL);
++	if (mv100_source)
++		iounmap(mv100_source);
++free_events:
++	free_percpu(mv100_events);
++disable_clk:
++	clk_disable_unprepare(clk);
++put_clk:
++	clk_put(clk);
++	return ret;
++}
++
++TIMER_OF_DECLARE(hi3798mv100_smp, "hisilicon,hisp804", mv100_smp_timer_init);
+--- /dev/null
 +++ b/drivers/clocksource/timer-hi3798mv100.c
 @@ -0,0 +1,145 @@
 +// SPDX-License-Identifier: GPL-2.0-only
@@ -2040,9 +2649,9 @@
 +#endif
 --- /dev/null
 +++ b/drivers/mmc/host/dw_mmc-hi3798mv100-ident.c
-@@ -0,0 +1,233 @@
+@@ -0,0 +1,243 @@
 +// SPDX-License-Identifier: GPL-2.0-only
-+/* Restricted RAM diagnostic, not the production MV100 storage driver. */
++/* Shared legacy PIO host, with independent diagnostic/production policies. */
 +#include <linux/io.h>
 +#include <linux/irq.h>
 +#include <linux/mmc/card.h>
@@ -2057,6 +2666,7 @@
 +#include "../core/core.h"
 +#include "hi3798mv100-ident-policy.h"
 +#include "hi3798mv100-emmc-ro-policy.h"
++#include "hi3798mv100-emmc-rw-policy.h"
 +
 +static int mv100_ident_init(struct dw_mci *host)
 +{
@@ -2103,9 +2713,11 @@
 +	mmc->pm_caps = 0;
 +	mmc->f_max = 25000000;
 +	mmc->max_blk_size = 512;
-+	mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ? 8 : 1;
-+	mmc->max_req_size = 512 * mmc->max_blk_count;
-+	mmc->max_seg_size = mmc->max_req_size;
++	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) {
++		mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ? 8 : 1;
++		mmc->max_req_size = 512 * mmc->max_blk_count;
++		mmc->max_seg_size = mmc->max_req_size;
++	}
 +	mmc->dsr_req = 0;
 +	return 0;
 +}
@@ -2114,7 +2726,8 @@
 +{
 +	int ret = hi3798mv100_ident_request(mrq);
 +
-+	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY)) {
++	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||
++	    IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) {
 +		struct mmc_card *card = host->slot ? host->slot->mmc->card : NULL;
 +		bool user_area = card && mmc_card_mmc(card) &&
 +			mmc_card_is_blockaddr(card) && card->csd.read_blkbits == 9 &&
@@ -2123,7 +2736,10 @@
 +			!(card->ext_csd.part_config & EXT_CSD_PART_CONFIG_ACC_MASK);
 +		u64 sectors = user_area ? card->ext_csd.sectors : 0;
 +
-+		ret = hi3798mv100_emmc_ro_request(mrq, user_area, sectors);
++		if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE))
++			ret = hi3798mv100_emmc_rw_request(mrq, user_area, sectors);
++		else
++			ret = hi3798mv100_emmc_ro_request(mrq, user_area, sectors);
 +	}
 +
 +	if (ret && mrq && mrq->cmd)
@@ -2148,7 +2764,8 @@
 +	.validate_request = mv100_ident_validate,
 +	.switch_voltage = mv100_ident_voltage,
 +	.force_pio = true,
-+	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY),
++	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
++		    !IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE),
 +};
 +
 +static int mv100_ident_probe(struct platform_device *pdev)
@@ -2160,7 +2777,8 @@
 +	u32 value;
 +	int irq;
 +
-+	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
++	if ((IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||
++	     IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) &&
 +	    !of_machine_is_compatible("tianyi,ty1208z-ca-emmc-ro-ram") &&
 +	    !(IS_ENABLED(CONFIG_TY1208Z_ROUTER_EMMC_RO) &&
 +	      of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-emmcro-ram")) &&
@@ -2216,10 +2834,11 @@
 +{
 +	struct dw_mci *host;
 +
-+	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))
++	if (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&
++	    !IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE))
 +		return;
 +	host = platform_get_drvdata(pdev);
-+	if (IS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE)) {
++	if (IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) {
 +		/* A disk-root reboot must not unregister its still-mounted gendisk.
 +		 * del_gendisk marks ext4 dead and can wait on the root mount forever.
 +		 * Userspace has synced/remounted it read-only before device_shutdown.
@@ -2252,7 +2871,7 @@
 +		return;
 +	}
 +	dev_info(&pdev->dev, "EMMC_RO_SHUTDOWN_COMPLETE %s clock-disabled no-card-writes\n",
-+		 IS_ENABLED(CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE) ?
++		 IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE) ?
 +		 "host-retained" : "host-removed");
 +}
 +
@@ -2276,9 +2895,9 @@
 +MODULE_LICENSE("GPL");
 --- /dev/null
 +++ b/drivers/mmc/host/dw_mmc-hi3798mv100-sd-ident.c
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,224 @@
 +// SPDX-License-Identifier: GPL-2.0-only
-+/* Restricted RAM diagnostic, not the production MV100 storage driver. */
++/* Measured legacy PIO SD path, with separate diagnostic/production policies. */
 +#include <linux/io.h>
 +#include <linux/irq.h>
 +#include <linux/mmc/card.h>
@@ -2291,6 +2910,7 @@
 +#include "dw_mmc-pltfm.h"
 +#include "hi3798mv100-sd-ident-policy.h"
 +#include "hi3798mv100-sd-ro-policy.h"
++#include "hi3798mv100-sd-rw-policy.h"
 +
 +static int mv100_sd_ident_init(struct dw_mci *host)
 +{
@@ -2337,9 +2957,12 @@
 +	mmc->pm_caps = 0;
 +	mmc->f_max = 25000000;
 +	mmc->max_blk_size = 512;
-+	mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ? 8 : 1;
-+	mmc->max_req_size = 512 * mmc->max_blk_count;
-+	mmc->max_seg_size = mmc->max_req_size;
++	/* Production retains the normal DW queue limits and multi-block I/O. */
++	if (!IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE)) {
++		mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ? 8 : 1;
++		mmc->max_req_size = 512 * mmc->max_blk_count;
++		mmc->max_seg_size = mmc->max_req_size;
++	}
 +	mmc->dsr_req = 0;
 +	return 0;
 +}
@@ -2348,13 +2971,17 @@
 +{
 +	int ret = hi3798mv100_sd_ident_request(mrq);
 +
-+	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY)) {
++	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ||
++	    IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE)) {
 +		struct mmc_card *card = host->slot ? host->slot->mmc->card : NULL;
 +		bool addressed = card && mmc_card_sd(card) &&
 +			mmc_card_is_blockaddr(card) && card->csd.read_blkbits == 9;
 +		u64 sectors = addressed ? card->csd.capacity : 0;
 +
-+		ret = hi3798mv100_sd_ro_request(mrq, addressed, sectors);
++		if (IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE))
++			ret = hi3798mv100_sd_rw_request(mrq, addressed, sectors);
++		else
++			ret = hi3798mv100_sd_ro_request(mrq, addressed, sectors);
 +	}
 +
 +	if (ret)
@@ -2379,7 +3006,8 @@
 +	.validate_request = mv100_sd_ident_validate,
 +	.switch_voltage = mv100_sd_ident_voltage,
 +	.force_pio = true,
-+	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY),
++	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) &&
++		    !IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE),
 +};
 +
 +static int mv100_sd_ident_probe(struct platform_device *pdev)
@@ -2391,7 +3019,8 @@
 +	u32 value;
 +	int irq;
 +
-+	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ?
++	if ((IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ||
++	     IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE)) ?
 +	    !(of_machine_is_compatible("tianyi,ty1208z-ca-sd-ro-ram") ||
 +	      (IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) &&
 +	       of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")) ||
@@ -2458,7 +3087,7 @@
 +
 +	/* Remove the host before reset: stop rescans/requests, mask IRQs and
 +	 * disable its card clock through the existing DW remove path. No
-+	 * CRG/LDO provider exists and request policy rejects card writes.
++	 * CRG/LDO provider exists. Removal waits for outstanding requests.
 +	 */
 +	dw_mci_pltfm_remove(pdev);
 +	if (mci_readl(host, INTMASK) || mci_readl(host, CLKENA) ||
@@ -2467,7 +3096,10 @@
 +		dev_err(&pdev->dev, "SD_IDENT_SHUTDOWN_FAILED controller-not-quiesced\n");
 +		return;
 +	}
-+	dev_info(&pdev->dev, "SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\n");
++	if (IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE))
++		dev_info(&pdev->dev, "SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled\n");
++	else
++		dev_info(&pdev->dev, "SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\n");
 +}
 +
 +static const struct of_device_id mv100_sd_ident_match[] = {
@@ -2486,8 +3118,69 @@
 +	},
 +};
 +module_platform_driver(mv100_sd_ident_driver);
-+MODULE_DESCRIPTION("TY1208Z restricted PIO SD identification diagnostic");
++MODULE_DESCRIPTION("TY1208Z legacy PIO SD with bounded request policies");
 +MODULE_LICENSE("GPL");
+--- /dev/null
++++ b/drivers/mmc/host/hi3798mv100-block-rw-policy.h
+@@ -0,0 +1,58 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef HI3798MV100_BLOCK_RW_POLICY_H
++#define HI3798MV100_BLOCK_RW_POLICY_H
++
++#include <linux/errno.h>
++#include <linux/mmc/core.h>
++#include <linux/mmc/mmc.h>
++
++/* Ordinary legacy block I/O. The DW host supplies the queue/SG byte limits;
++ * 65535 is its normal maximum block count, rather than a diagnostic page cap.
++ * No CMD23, reliable-write, erase, partition switch or vendor operation.
++ */
++static inline int hi3798mv100_block_rw_request(struct mmc_request *mrq,
++					     bool addressed, u64 sectors)
++{
++	struct mmc_command *cmd;
++	struct mmc_data *data;
++	u32 flags = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_ADTC;
++	u32 read_stop = MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC;
++	u32 write_stop = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
++	bool write;
++
++	if (!mrq || !mrq->cmd || !addressed || !sectors ||
++	    sectors > (1ULL << 32) || mrq->sbc)
++		return -EPERM;
++	cmd = mrq->cmd;
++	data = mrq->data;
++	if (cmd->data != data)
++		return -EPERM;
++	if (cmd->opcode == MMC_STOP_TRANSMISSION && !data && !mrq->stop)
++		return !cmd->arg && (cmd->flags == read_stop ||
++				   cmd->flags == write_stop) ? 0 : -EPERM;
++	if (!data || data->blksz != 512 || !data->blocks ||
++	    data->blocks > 65535 || cmd->flags != flags ||
++	    cmd->arg >= sectors || data->blocks > sectors - cmd->arg)
++		return -EPERM;
++	/* MMC_DATA_DAT_TAG is a software hint from REQ_META. With no CMD23
++	 * capability it changes no command on the wire; retain ordinary writes.
++	 */
++	write = data->flags == MMC_DATA_WRITE ||
++		data->flags == (MMC_DATA_WRITE | MMC_DATA_DAT_TAG);
++	if (!write && data->flags != MMC_DATA_READ)
++		return -EPERM;
++	if (data->blocks == 1)
++		return cmd->opcode == (write ? MMC_WRITE_BLOCK :
++			MMC_READ_SINGLE_BLOCK) && !mrq->stop && !data->stop ?
++			0 : -EPERM;
++	if (cmd->opcode != (write ? MMC_WRITE_MULTIPLE_BLOCK :
++			    MMC_READ_MULTIPLE_BLOCK) || !mrq->stop ||
++	    data->stop != mrq->stop ||
++	    mrq->stop->opcode != MMC_STOP_TRANSMISSION ||
++	    mrq->stop->arg || mrq->stop->data ||
++	    mrq->stop->flags != (write ? write_stop : read_stop))
++		return -EPERM;
++	return 0;
++}
++
++#endif
 --- /dev/null
 +++ b/drivers/mmc/host/hi3798mv100-emmc-install-policy.h
 @@ -0,0 +1,57 @@
@@ -2598,6 +3291,61 @@
 +	    mrq->stop->arg || mrq->stop->flags != stop_flags || mrq->stop->data)
 +		return -EPERM;
 +	return 0;
++}
++
++#endif
+--- /dev/null
++++ b/drivers/mmc/host/hi3798mv100-emmc-rw-policy.h
+@@ -0,0 +1,52 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef HI3798MV100_EMMC_RW_POLICY_H
++#define HI3798MV100_EMMC_RW_POLICY_H
++
++#include "hi3798mv100-emmc-ro-policy.h"
++#include "hi3798mv100-block-rw-policy.h"
++
++/* Production user-area I/O. Keep the installed board's p6/p9 write boundary;
++ * bootloader, environment, calibration, backup, boot/RPMB and security state
++ * are not ordinary system storage. Multi-block writes must stay in one range.
++ */
++static inline int hi3798mv100_emmc_rw_request(struct mmc_request *mrq,
++					    bool user_area, u64 sectors)
++{
++	struct mmc_command *cmd;
++	u32 switch_flags = MMC_RSP_SPI_R1B | MMC_RSP_R1B | MMC_CMD_AC;
++	u32 cache_arg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) |
++		       (EXT_CSD_CACHE_CTRL << 16) | EXT_CSD_CMD_SET_NORMAL;
++	u32 flush_arg = (MMC_SWITCH_MODE_WRITE_BYTE << 24) |
++		       (EXT_CSD_FLUSH_CACHE << 16) | (1 << 8) |
++		       EXT_CSD_CMD_SET_NORMAL;
++	int ret;
++
++	if (!mrq || !mrq->cmd)
++		return -EPERM;
++	cmd = mrq->cmd;
++	/* Cache setup precedes card registration. Only this volatile byte and
++	 * FLUSH_CACHE are writable; no persistent EXT_CSD settings are allowed.
++	 */
++	if (cmd->opcode == MMC_SWITCH && !mrq->data && !cmd->data &&
++	    !mrq->stop && !mrq->sbc &&
++	    (cmd->flags == switch_flags || cmd->flags ==
++	     (MMC_RSP_SPI_R1 | MMC_RSP_R1 | MMC_CMD_AC)) &&
++	    (cmd->arg == cache_arg || cmd->arg == (cache_arg | (1 << 8)) ||
++	     cmd->arg == flush_arg))
++		return 0;
++	ret = hi3798mv100_emmc_ro_request(mrq, user_area, sectors);
++	if (!ret || cmd->opcode == MMC_SWITCH)
++		return ret;
++	ret = hi3798mv100_block_rw_request(mrq, user_area &&
++					 sectors == 15269888, sectors);
++	if (ret || !mrq->data || !(mrq->data->flags & MMC_DATA_WRITE))
++		return ret;
++	if ((cmd->arg >= 28672 && cmd->arg < 69632 &&
++	     mrq->data->blocks <= 69632 - cmd->arg) ||
++	    (cmd->arg >= 1249280 && cmd->arg < 15269888 &&
++	     mrq->data->blocks <= 15269888 - cmd->arg))
++		return 0;
++	return -EPERM;
 +}
 +
 +#endif
@@ -2771,6 +3519,30 @@
 +	    mrq->stop->arg || mrq->stop->flags != stop_flags || mrq->stop->data)
 +		return -EPERM;
 +	return 0;
++}
++
++#endif
+--- /dev/null
++++ b/drivers/mmc/host/hi3798mv100-sd-rw-policy.h
+@@ -0,0 +1,21 @@
++/* SPDX-License-Identifier: GPL-2.0-only */
++#ifndef HI3798MV100_SD_RW_POLICY_H
++#define HI3798MV100_SD_RW_POLICY_H
++
++#include "hi3798mv100-sd-ro-policy.h"
++#include "hi3798mv100-block-rw-policy.h"
++
++/* Production SDHC/SDXC sectors, including normal multi-block reads/writes.
++ * No erase, write-protect, lock, bus/voltage changes or vendor commands.
++ */
++static inline int hi3798mv100_sd_rw_request(struct mmc_request *mrq,
++					 bool sector_addressed, u64 sectors)
++{
++	if (!mrq)
++		return -EPERM;
++	if (!hi3798mv100_sd_ident_request(mrq))
++		return 0;
++	return hi3798mv100_block_rw_request(mrq, sector_addressed, sectors);
 +}
 +
 +#endif

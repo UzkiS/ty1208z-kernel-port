@@ -14,8 +14,11 @@ VERID `0x5342270a`、HCON `0x00e44c81`、32位FIFO，
 
 分区布局见[硬件表](hardware.md)。安装只允许固定p6/p9，不修改
 CA fastboot、持久环境、其他分区、boot0/boot1/RPMB或安全状态。
-底层保持PIO、单线、legacy最高25 MHz、单扇区数据传输，
-块队列提供页大小以满足Linux块层要求，但实际数据准备仍逐扇区。
+底层保持 PIO、单线、legacy 最高 25 MHz；生产队列支持正常多块数据传输，
+擦除、boot/RPMB、分区切换和厂商命令仍被策略拒绝。
+普通文件系统元数据写入的 `MMC_DATA_DAT_TAG` 软件提示已纳入生产策略，
+所有写请求仍完整限制在 p6 或 p9；128 文件创建、改名、硬链接和删除负载已实测，
+见[生产验证](../verification/production-profile-board-20261015.md)。
 
 ## 只读阶段与备份
 
@@ -43,7 +46,7 @@ CA fastboot、持久环境、其他分区、boot0/boot1/RPMB或安全状态。
 
 ## 持久系统
 
-可写候选使用独立身份，普通只读RAM规划器拒绝它。
+生产系统使用可写策略，普通只读 RAM 规划器仍只服务历史诊断 profile。
 已完成单扇区写/读/恢复、紧凑首刷、完整读回、在线扩容和后续文件级升级，
 见[首刷记录](../verification/compact-first-install-board-20261014.md)、
 [升级记录](../verification/native-web-upgrade-board-20261015.md)。
@@ -53,4 +56,4 @@ eMMC不宣告不支持的discard/WRITE_ZEROES，ext4使用普通写。
 在线resize核对 `/dev/root` 指向p9，对挂载点执行扩容ioctl，
 不放开raw mounted写入。重启时保留仍挂载的gendisk，
 待host空闲后屏蔽IRQ并关闭PIO时钟。
-SD是另一控制器，其请求级只读不随eMMC安装而放开。
+SD 是另一控制器，生产配置独立启用普通多块读写；历史只读 profile 不随生产系统改变。

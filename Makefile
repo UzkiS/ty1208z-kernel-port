@@ -9,7 +9,7 @@ help:
 	@echo 'make test-serial - capture and bootloader CLI integration on a Linux PTY'
 	@echo 'make verify     - lint + build + test'
 	@echo 'make references - download pinned SDK references for read-only source audit'
-	@echo 'make references-wifi - verify/download pinned optional RDA driver code (no firmware)'
+	@echo 'make references-wifi - verify/stage the complete bundled RDA driver and firmware tree offline'
 	@echo 'make wifi-usb-audit - compile one RDA USB object with a separate kernel config'
 	@echo 'make wifi-port - link the optional RDA USB module and test production guards'
 	@echo 'make openwrt-wifi-port - compile/package RDA with the native OpenWrt kernel in an isolated tree'
@@ -51,7 +51,8 @@ help:
 .PHONY: openwrt-system
 openwrt-system:
 	python3 tools/build_native_system.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" --resume
-	python3 tools/package_native_system.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" --resume
+	python3 tools/package_native_system.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" \
+		--rda-firmware "$(CURDIR)/firmware/rda5995" --resume
 
 .PHONY: openwrt-web-upgrade
 openwrt-web-upgrade:
@@ -75,6 +76,7 @@ openwrt-first-install:
 lint:
 	python3 tools/check_repository.py
 	python3 tools/fetch_wifi.py --check-lock
+	python3 tools/test_fetch_wifi.py
 	shellcheck tools/*.sh initramfs/init initramfs/diag initramfs/ethernet-diag initramfs/ethernet-dhcp
 	shellcheck initramfs/usb-diag
 	shellcheck initramfs/sd-diag

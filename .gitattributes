@@ -3,5 +3,7 @@
 *.patch text eol=lf
 # Unified-diff context needs a leading space before upstream tabs/blank lines.
 *.patch whitespace=-blank-at-eol,-space-before-tab
+# Preserve the exact locked upstream bytes, including original line endings.
+wifi/vendor/rdaw80211/** -text whitespace=-blank-at-eol,-blank-at-eof,-space-before-tab
 initramfs/init text eol=lf
 initramfs/diag text eol=lf

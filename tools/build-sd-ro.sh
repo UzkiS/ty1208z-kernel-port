@@ -31,6 +31,7 @@ make -C "$linuxsrc" O="$kout" ARCH=arm CROSS_COMPILE="$cross" olddefconfig syncc
 python3 "$project/tools/test_sd_ident.py" --linuxsrc "$linuxsrc"
 python3 "$project/tools/test_sd_ident_driver.py" --linuxsrc "$linuxsrc"
 python3 "$project/tools/test_sd_ro.py" --linuxsrc "$linuxsrc"
+python3 "$project/tools/test_sd_rw.py" --linuxsrc "$linuxsrc"
 python3 "$project/tools/test_sd_restart.py"
 make -C "$linuxsrc" O="$kout" ARCH=arm CROSS_COMPILE="$cross" \
     -j"${JOBS:-16}" zImage hisilicon/hi3798mv100-ty1208z-sd-ro.dtb

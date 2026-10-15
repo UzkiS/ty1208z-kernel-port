@@ -262,6 +262,8 @@ READONLY_HARNESS = r'''
 #define CCC_BLOCK_WRITE 16
 #define EINVAL 22
 struct mmc_card { bool readonly; struct { unsigned cmdclass; } csd; };
+#define mmc_card_mmc(card) ((void)(card), true)
+#define mmc_card_sd(card) ((void)(card), false)
 #define mmc_card_readonly(card) ((card)->readonly)
 struct gendisk { bool readonly; };
 struct device { struct gendisk *disk; };
@@ -324,6 +326,7 @@ def test(linuxsrc):
     names = ('MMC_CAP_NONREMOVABLE', 'MMC_CAP2_NO_SD', 'MMC_CAP2_NO_SDIO')
     caps = '\n'.join(re.search(rf'^#define {name}\s+[^\n]+', host, re.MULTILINE)[0] for name in names)
     policy = HARNESS.replace('/* HOST_CAPS */', caps).replace('/* SLOT */', slot)
+    policy = '#include "hi3798mv100-emmc-rw-policy.h"\n' + policy
     policy = policy.replace('/* VALIDATE */', validate).replace('/* QUEUE */', request)
     core = BLOCK_HARNESS.replace('/* PARTS */', parts).replace('/* PROBE */', probe)
     # OpenWrt inserts its DT-partition helper before alloc_req. Extract only
@@ -358,7 +361,10 @@ def test(linuxsrc):
             command = ['cc', '-std=c11', '-O1', '-g', '-Wall', '-Wextra', '-Werror',
                        '-fsanitize=address,undefined', '-fno-pie', '-no-pie', '-I', str(temp),
                        '-I', str(ROOT / 'overlay/drivers/mmc/host'),
-                       f'-DCONFIG_HI3798MV100_EMMC_READ_ONLY={enabled}']
+                       f'-DCONFIG_HI3798MV100_EMMC_READ_ONLY={enabled}',
+                       '-DCONFIG_HI3798MV100_EMMC_WRITE=0',
+                       '-DCONFIG_HI3798MV100_SD_READ_ONLY=0',
+                       '-DCONFIG_HI3798MV100_SD_WRITE=0']
             if samples:
                 command.append('-DCONFIG_HI3798MV100_EMMC_READ_SAMPLES=1')
             if name.startswith('block-'):

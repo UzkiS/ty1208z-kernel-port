@@ -30,8 +30,10 @@ typedef uint32_t u32;
 #define MMC_CAP_NEEDS_POLL 1
 #define MMC_CAP2_NO_MMC 2
 #define MMC_CAP2_NO_SDIO 4
-static bool ro_mode, native_mode, native_identity;
+static bool ro_mode, native_mode, native_identity, write_mode;
 #define CONFIG_HI3798MV100_SD_READ_ONLY ro_mode
+#define CONFIG_HI3798MV100_SD_WRITE write_mode
+#define PAGE_SIZE 4096
 #define CONFIG_TY1208Z_ROUTER_SD_RO native_mode
 #define CONFIG_TY1208Z_OPENWRT_SYSTEM 0
 #define IS_ENABLED(config) (config)
@@ -170,6 +172,15 @@ int main(void)
     initialize();
     assert(mv100_sd_ident_probe(&p) == -ENODEV && !maps && !reads && !registered);
     puts("SD_NATIVE_OPT_IN_PROBE_PASS: dedicated board requires both native and read-only selections before MMIO");
+    write_mode = ro_mode = true;
+    struct mmc_host mmc = {.max_blk_count = 512, .max_req_size = 512 * 65535,
+                           .max_seg_size = 512 * 65535};
+    struct dw_mci_slot slot = {.mmc = &mmc};
+    assert(!mv100_sd_ident_slot(&slot));
+    assert(mmc.max_blk_count == 512 && mmc.max_req_size == 512 * 65535 &&
+           mmc.max_seg_size == 512 * 65535 && mmc.max_blk_size == 512);
+    assert(mmc.caps == MMC_CAP_NEEDS_POLL && mmc.f_max == 25000000);
+    puts("SD_RW_SLOT_PASS: normal DW multi-block queue limits and legacy PIO capabilities");
 }
 '''
 

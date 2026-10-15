@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-only
-/* Restricted RAM diagnostic, not the production MV100 storage driver. */
+/* Measured legacy PIO SD path, with separate diagnostic/production policies. */
 #include <linux/io.h>
 #include <linux/irq.h>
 #include <linux/mmc/card.h>
@@ -12,6 +12,7 @@
 #include "dw_mmc-pltfm.h"
 #include "hi3798mv100-sd-ident-policy.h"
 #include "hi3798mv100-sd-ro-policy.h"
+#include "hi3798mv100-sd-rw-policy.h"
 
 static int mv100_sd_ident_init(struct dw_mci *host)
 {
@@ -58,9 +59,12 @@ static int mv100_sd_ident_slot(struct dw_mci_slot *slot)
 	mmc->pm_caps = 0;
 	mmc->f_max = 25000000;
 	mmc->max_blk_size = 512;
-	mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ? 8 : 1;
-	mmc->max_req_size = 512 * mmc->max_blk_count;
-	mmc->max_seg_size = mmc->max_req_size;
+	/* Production retains the normal DW queue limits and multi-block I/O. */
+	if (!IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE)) {
+		mmc->max_blk_count = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ? 8 : 1;
+		mmc->max_req_size = 512 * mmc->max_blk_count;
+		mmc->max_seg_size = mmc->max_req_size;
+	}
 	mmc->dsr_req = 0;
 	return 0;
 }
@@ -69,13 +73,17 @@ static int mv100_sd_ident_validate(struct dw_mci *host, struct mmc_request *mrq)
 {
 	int ret = hi3798mv100_sd_ident_request(mrq);
 
-	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY)) {
+	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ||
+	    IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE)) {
 		struct mmc_card *card = host->slot ? host->slot->mmc->card : NULL;
 		bool addressed = card && mmc_card_sd(card) &&
 			mmc_card_is_blockaddr(card) && card->csd.read_blkbits == 9;
 		u64 sectors = addressed ? card->csd.capacity : 0;
 
-		ret = hi3798mv100_sd_ro_request(mrq, addressed, sectors);
+		if (IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE))
+			ret = hi3798mv100_sd_rw_request(mrq, addressed, sectors);
+		else
+			ret = hi3798mv100_sd_ro_request(mrq, addressed, sectors);
 	}
 
 	if (ret)
@@ -100,7 +108,8 @@ static const struct dw_mci_drv_data mv100_sd_ident_data = {
 	.validate_request = mv100_sd_ident_validate,
 	.switch_voltage = mv100_sd_ident_voltage,
 	.force_pio = true,
-	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY),
+	.force_ro = IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) &&
+		    !IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE),
 };
 
 static int mv100_sd_ident_probe(struct platform_device *pdev)
@@ -112,7 +121,8 @@ static int mv100_sd_ident_probe(struct platform_device *pdev)
 	u32 value;
 	int irq;
 
-	if (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ?
+	if ((IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) ||
+	     IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE)) ?
 	    !(of_machine_is_compatible("tianyi,ty1208z-ca-sd-ro-ram") ||
 	      (IS_ENABLED(CONFIG_TY1208Z_ROUTER_SD_RO) &&
 	       of_machine_is_compatible("tianyi,ty1208z-ca-openwrt-sdro-ram")) ||
@@ -179,7 +189,7 @@ static void mv100_sd_ident_shutdown(struct platform_device *pdev)
 
 	/* Remove the host before reset: stop rescans/requests, mask IRQs and
 	 * disable its card clock through the existing DW remove path. No
-	 * CRG/LDO provider exists and request policy rejects card writes.
+	 * CRG/LDO provider exists. Removal waits for outstanding requests.
 	 */
 	dw_mci_pltfm_remove(pdev);
 	if (mci_readl(host, INTMASK) || mci_readl(host, CLKENA) ||
@@ -188,7 +198,10 @@ static void mv100_sd_ident_shutdown(struct platform_device *pdev)
 		dev_err(&pdev->dev, "SD_IDENT_SHUTDOWN_FAILED controller-not-quiesced\n");
 		return;
 	}
-	dev_info(&pdev->dev, "SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\n");
+	if (IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE))
+		dev_info(&pdev->dev, "SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled\n");
+	else
+		dev_info(&pdev->dev, "SD_IDENT_SHUTDOWN_COMPLETE host-removed clock-disabled no-card-writes\n");
 }
 
 static const struct of_device_id mv100_sd_ident_match[] = {
@@ -207,5 +220,5 @@ static struct platform_driver mv100_sd_ident_driver = {
 	},
 };
 module_platform_driver(mv100_sd_ident_driver);
-MODULE_DESCRIPTION("TY1208Z restricted PIO SD identification diagnostic");
+MODULE_DESCRIPTION("TY1208Z legacy PIO SD with bounded request policies");
 MODULE_LICENSE("GPL");

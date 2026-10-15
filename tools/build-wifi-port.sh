@@ -1,5 +1,5 @@
 #!/bin/bash
-# Compile/link only, never load a driver, access hardware or fetch firmware.
+# Compile/link only using bundled inputs; never load a driver or access hardware.
 set -euo pipefail
 project=$(cd -- "$(dirname -- "$0")/.." && pwd)
 taskbase=${1:-"$project/.work"}

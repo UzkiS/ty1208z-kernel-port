@@ -1,17 +1,21 @@
 """Exact additive native-system changes; baseline profiles remain unchanged."""
 TRANSFORMATIONS = {'arch/arm/mach-hisi/Kconfig': [('config TY1208Z_ROUTER_EMMC_RO\n',
                                  'config TY1208Z_OPENWRT_SYSTEM\n'
-                                 '\tbool "TY1208Z native OpenWrt system with measured memory and '
-                                 'read-only storage"\n'
+                                 '\tbool "TY1208Z native OpenWrt production system"\n'
                                  '\tdepends on ARCH_HI3798MV100 && NET && BLOCK && MMC\n'
-                                 '\tdepends on !HIGHMEM && !SMP && !MTD\n'
+                                 '\tdepends on !MTD\n'
                                  '\tdepends on !DEBUG_FS && !WATCHDOG && !PM\n'
                                  '\thelp\n'
-                                 '\t  Integrate the measured 768-MiB memory, Ethernet, SD and eMMC '
-                                 'paths.\n'
-                                 '\t  Both storage controllers retain their existing request-level '
-                                 'write denial.\n'
+                                 '\t  Integrate 1-GiB memory, four-core SMP, Ethernet, '
+                                 'SD and eMMC paths.\n'
+                                 '\t  Production block I/O has independent writable SD/eMMC policies.\n'
                                  '\n'
+                                 'config TY1208Z_EMMC_INSTALL_CANDIDATE\n'
+                                 '\tbool "TY1208Z first-install and persistent-system packaging"\n'
+                                 '\tdepends on TY1208Z_OPENWRT_SYSTEM && HI3798MV100_EMMC_WRITE\n'
+                                 '\thelp\n'
+                                 '\t  Select the installer and disk-root delivery. The production\n'
+                                 '\t  eMMC policy permits multi-block p6/p9 writes and cache flush.\n\n'
                                  'config TY1208Z_ROUTER_EMMC_RO\n')],
  'arch/arm/mm/init.c': [('#if IS_ENABLED(CONFIG_POWER_RESET_TY1208Z_MV100_RAM) || '
                          'IS_ENABLED(CONFIG_TY1208Z_ROUTER_RAM768) || '
@@ -34,7 +38,7 @@ TRANSFORMATIONS = {'arch/arm/mach-hisi/Kconfig': [('config TY1208Z_ROUTER_EMMC_R
                                'TY1208Z_OPENWRT_SYSTEM\n')],
  'drivers/mmc/core/block.c': [('\tdevidx = ida_alloc_max(&mmc_blk_ida, max_devices - 1, '
                                'GFP_KERNEL);',
-                               '\t/* Pin the two integrated read-only disks to the measured DT '
+                               '\t/* Pin the two integrated disks to the measured DT '
                                'host aliases. */\n'
                                '\tif (IS_ENABLED(CONFIG_TY1208Z_OPENWRT_SYSTEM))\n'
                                '\t\tdevidx = ida_alloc_range(&mmc_blk_ida, card->host->index,\n'
@@ -47,7 +51,7 @@ TRANSFORMATIONS = {'arch/arm/mach-hisi/Kconfig': [('config TY1208Z_ROUTER_EMMC_R
                                   '\tbool "TY1208Z integrated SD/eMMC guarded RAM restart"\n'
                                   '\tdepends on TY1208Z_OPENWRT_SYSTEM\n'
                                   '\thelp\n'
-                                  '\t  Arm the measured reset only after BOTH read-only hosts have '
+                                  '\t  Arm the measured reset only after BOTH storage hosts have '
                                   'shut down.\n'
                                   '\n'
                                   'config POWER_RESET_HISI\n')],
@@ -111,11 +115,12 @@ TRANSFORMATIONS = {'arch/arm/mach-hisi/Kconfig': [('config TY1208Z_ROUTER_EMMC_R
 TRANSFORMATIONS['drivers/clk/hisilicon/Kconfig'].append((
     '\tdepends on USB_OHCI_HCD_PLATFORM=y && !BLOCK && !MMC && !MTD\n'
     '\tdepends on !NET && !MODULES && !PM && !SMP && !DEBUG_FS\n',
-    '\tdepends on USB_OHCI_HCD_PLATFORM=y && !MTD && !PM && !SMP && !DEBUG_FS\n'
+    '\tdepends on USB_OHCI_HCD_PLATFORM=y && !MTD && !PM && '
+    '(!SMP || TY1208Z_OPENWRT_SYSTEM) && !DEBUG_FS\n'
     '\tdepends on (!BLOCK && !MMC && !NET && !MODULES) || TY1208Z_OPENWRT_SYSTEM\n'))
 TRANSFORMATIONS['drivers/mmc/host/Kconfig'].append((
     '\tdepends on !SMP && !USB_SUPPORT && !MTD\n',
-    '\tdepends on !SMP && !MTD\n'
+    '\tdepends on (!SMP || TY1208Z_OPENWRT_SYSTEM) && !MTD\n'
     '\tdepends on !USB_SUPPORT || TY1208Z_OPENWRT_SYSTEM\n'))
 
 
@@ -155,14 +160,17 @@ def extend(changes):
         if isinstance(replacements, tuple):
             replacements = [replacements]
         result = []
+        applied = set()
         for old, new in replacements:
             for before, after in TRANSFORMATIONS[name]:
                 if before in new:
                     if new.count(before) != 1:
                         raise ValueError("Native system generator anchor differs: " + name)
                     new = new.replace(before, after)
+                    applied.add(before)
             result.append((old, new))
-        # block.c already has unrelated changes; append the stable disk-ID edit.
-        if name == "drivers/mmc/core/block.c":
-            result.extend(TRANSFORMATIONS[name])
+        # Anchors outside generated insertions must also reach the patch, e.g.
+        # the system restart Kconfig/Makefile entries and stable disk IDs.
+        result.extend((before, after) for before, after in TRANSFORMATIONS[name]
+                      if before not in applied)
         changes[name] = result

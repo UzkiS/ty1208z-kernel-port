@@ -1,0 +1,12 @@
+{
+  "source": "User-supplied TY1208Z CA Android partition backup; included by explicit project-owner release authorization",
+  "module_usb_alias": "1e04:8888",
+  "redistribution": "Project owner authorized publication with the matching release packages; provenance remains user-supplied",
+  "files": {
+    "vendor/firmware/rda5995_usb_code_p2p.bin": {"bytes": 160772, "sha256": "722951f1c0d8620bb39e6fe6b1d3297428b5c1ed3c26c719681b3d5078d60878"},
+    "vendor/firmware/rda5995_usb_code1_p2p.bin": {"bytes": 12524, "sha256": "0e5bb2d7731dc602cd034ea2a686c8773d46a40fe2d9f7e1682d6c277553d6b0"},
+    "vendor/firmware/rda5995_usb_data_p2p.bin": {"bytes": 3120, "sha256": "13135cdeb67d28efbdb5d4112d28d219f6d824294f3ae8bd9927a6180fcbfbf1"},
+    "vendor/firmware/rda5995_usb_code_ap.bin": {"bytes": 130208, "sha256": "e384c93339a000a6ce4ede1058d90b9487a631a914591b89722a97b88eeb3951"},
+    "vendor/firmware/rda5995_usb_data_ap.bin": {"bytes": 1456, "sha256": "d230d154d3ac896a8010ba4b4b082cf3788dcb6e8d9d63bf9c815716640508bd"}
+  }
+}

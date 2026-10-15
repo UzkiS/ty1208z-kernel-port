@@ -6,6 +6,7 @@
 
 ## 安装与当前集成
 
+- [四核、全内存与磁盘管理实机验收（2026-10-15）](production-profile-board-20261015.md)
 - [干净构建 CI 修复与结果（2026-10-15）](ci-closure-20261015.md)
 - [紧凑 RAM 网页首刷实测（2026-10-14）](compact-first-install-board-20261014.md)
 - [原生网页升级与持久根重启实测（2026-10-15）](native-web-upgrade-board-20261015.md)

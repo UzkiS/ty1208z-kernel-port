@@ -49,7 +49,7 @@ def make_package(compiler, apk, version, output):
         "ty1208z-image-check": "upgrade/image-check.c",
         "emmc-p9-control": "persistent/emmc-p9-control.c",
     }.items():
-        subprocess.run([str(compiler), "-static", "-Os", "-Wall", "-Wextra", "-Werror",
+        subprocess.run([str(compiler), "-static", "-s", "-Os", "-Wall", "-Wextra", "-Werror",
                         str(PROJECT / "openwrt/system" / source), "-o", str(root / "sbin" / destination)],
                        check=True, env=dict(os.environ, STAGING_DIR=str(compiler.parent.parent.parent)))
     (root / "etc/ty1208z-upgrade-abi").write_text(version + "\n")

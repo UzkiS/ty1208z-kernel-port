@@ -1,89 +1,70 @@
-# Project instructions
+# 项目协作说明
 
-Scope: this repository only. The unrelated drive-root `AGENTS.md` is excluded.
-Session instructions take precedence.
+本文件只适用于本仓库；盘符根目录中无关的 AGENTS.md 不适用。用户在会话中的明确指示优先。
 
-## Objective and current state
+## 目标与现状
 
-Maintain TY1208Z CA / Hi3798MV100 board support and pinned official OpenWrt.
-The physical system now has eMMC ext4 rw installation, full p9 growth, native
-Chinese LuCI upgrades, persistent Docker data/autostart and ordinary command
-reboot. RDA STA/AP and USB VFAT/NTFS read-only access have measured evidence.
-Read `STATUS.md`, `docs/architecture.md` and `docs/hardware.md` before board changes.
-Older profile reports describe their dated scope, not current missing features.
+维护 TY1208Z 高安版 / Hi3798MV100 的板级支持及固定版本的官方 OpenWrt。
+实机已经完成 eMMC ext4 可写根、p9 扩容、中文 LuCI 升级、Docker 持久化与自启、普通命令重启。
+RDA STA/AP 和 USB VFAT/NTFS 文件读取已有实测证据。板级修改前阅读 STATUS.md、
+docs/architecture.md、docs/hardware.md；历史报告仅代表报告当时的配置。
 
-## User defaults
+用户要求解除生产系统因开发阶段设置的限制：启用四核 SMP、1 GiB 地址范围与 HIGHMEM，
+SD 支持正常读写，SD/eMMC 使用正常多块队列，USB 存储进入默认生产配置。
+历史单核、768 MiB、只读诊断 profile 独立保留供回归；不可用其限制约束生产系统。
+配置已开启、编译通过和实机验收是不同状态，必须如实分别记录。
 
-- Use pinned official OpenWrt sources. Required features are Simplified Chinese,
-  Docker/Dockerman, Passwall with both Xray and sing-box, and unzip.
-- Default root password is empty. Preserve explicitly configured passwords on
-  configuration restoration; never create a random management password.
-- Use accepted graceful command reboot paths when their exact prerequisites
-  hold. Avoid repeated manual power cycles.
-- Prefer a practical single-device workflow and lower token use. Keep backup,
-  boot and recovery checks; reuse passing unchanged memory/application evidence
-  and test only changed integration boundaries. Do not repeat full suites,
-  add variants, or download/reverify CI without a concrete need. Inferred
-  coverage must not be reported as new measured acceptance.
-- Current limits are single-core, low768 memory (about744 MiB usable), slow
-  single-sector PIO, request-level read-only SD and no measured Wi-Fi-uplink
-  bypass-routing composition. Do not expand these requirements on your own.
-- Every enlarged RAM-profile boot requires fresh attached loader inspection and
-  the immediately preceding guarded reboot's complete hash-verified eleven
-  allocations. Preserve low16 MiB and exclude upper256 MiB. Keep the dedicated
-  low init pages reserved. DDR capacity or ddrfree alone does not permit growth.
-- Public usage documentation is Chinese and written for repository readers.
-  Separate current guides from dated evidence. Preserve historical measurements
-  and identify reused component evidence. Do not narrate conversation history.
-- Public content must omit credentials, actual network identities, unique device
-  identifiers and personal local paths. Do not mention this cleanup in Git
-  commit titles or bodies.
+## 用户默认要求
 
-## Authorization and device boundaries
+- 使用固定版本官方 OpenWrt；提供简体中文、Docker/Dockerman、Passwall、Xray、sing-box 和 unzip。
+- root 默认空密码；恢复配置时保留用户设置的密码，不生成随机管理密码。
+- 在前置条件符合已有证据时使用正常命令重启，避免反复要求手动断电。
+- 采用实用的单设备流程，复用未变更且已通过的内存与应用证据，只测试改变的集成边界。
+  没有具体原因不重复全套测试、不增加变体、不反复下载或校验 CI；推断覆盖不能写成新实测。
+- 用户明确表示 SD 数据不重要，允许为完成读写验证而修改；仍须核对目标，避免误操作 eMMC。
+- 将已知可用的高安 fastboot 二进制与原始压缩包保存在 bootloader/，保留精确哈希与来源说明。
+- RDA5995 固件获用户授权随公开完整包发布，保存在 firmware/，附来源及哈希。
+- 完整 SDK 和下载的上游源码已经公开，不提交 Git；保留来源锁、哈希、适配代码与许可证。
+- RDA 是明确例外：完整 63 文件驱动/固件树维护于 wifi/vendor/rdaw80211/，构建默认
+  校验并复制仓库内文件；保留原文件版权/许可证和集中来源锁，不以公开可下载推断许可。
+- 面向用户的文档使用中文，区分当前操作说明和历史证据；不叙述聊天过程。
+- 正式 first-install、sysupgrade、配套 RAM 包和校验文件应有 GitHub Releases 下载入口，
+  不能要求用户寻找会过期的 CI 附件。普通 push 不等于正式发布成功。
+- 公开内容不含凭据、真实网络身份、唯一设备标识、个人本地路径；提交说明不叙述清理过程。
 
-- Offline analysis, edits, builds, tests, local commits and pushing to the
-  configured repository were authorized. Routine work does not need approval.
-- The prior session explicitly authorized measured p6/p9 installation and
-  necessary recovery; those installation/upgrade milestones have passed.
-  This does not authorize unrelated device writes or expanded partition targets.
-- Preserve the known-successful CA fastboot, persistent boot environment,
-  p1-p5/p7-p8, SD, boot0/boot1/RPMB and security state.
-- Never generate or execute OTP/eFuse, key, lock-bit or security-state writes.
-- No guessed load/boot commands. Verify exact bootloader commands, allocation
-  evidence, resource ranges and both device CRCs for RAM loading.
-- Keep original RDA firmware, full firmware packages, backups, credentials,
-  raw UART and private receipts outside public Git.
-- Do not spawn agents unless the user explicitly requests delegation.
+## 设备授权与保护边界
 
-## Architecture and source ownership
+- 已授权离线分析、编辑、构建、测试、本地提交和向配置好的仓库推送；常规工作无需再问。
+- 此前已授权 p6/p9 安装、升级和必要恢复；不得扩大为无关分区或安全状态写入。
+- 保留已知成功的高安 fastboot、持久启动环境、p1-p5/p7-p8、boot0/boot1/RPMB 和安全状态。
+  生产 eMMC 多块写入仍须完整位于 p6 或 p9，不能跨越保护边界。
+- 永不生成或执行 OTP/eFuse、密钥、锁位及安全状态写入。
+- 不猜测加载或启动命令。RAM 启动前核对命令、地址、解压范围及两份设备 CRC。
+- 扩展内存启动前要求新鲜引导检查及紧邻重启的完整、哈希核验的 11 项 allocation。
+  取消整块上方 256 MiB 的排除，但必须精确保留实际引导占用及低 16 MiB / 专用低位 init 页。
+  DDR 容量或 ddrfree 本身不能证明覆盖实际占用是安全的。
+- 完整原机固件、备份、凭据、原始 UART 和私有收据留在公开 Git 之外。
+  上述高安 fastboot 和 RDA5995 是用户明确授权的公开二进制例外。
+- 不主动创建子代理，除非用户明确要求代理协作。
 
-- New Linux files are authoritative in `overlay/`; regenerate
-  `patches/0001-hi3798mv100-diagnostic.patch`. Never edit generated patches alone.
-- Existing upstream changes use explicit checked generators that fail on
-  changed anchors, archive hashes or patch context.
-- Pin source versions, URLs and SHA-256 identities. Do not download and execute
-  upstream scripts. Preserve licenses; fetch SDK reference files with
-  `tools/fetch_references.py` rather than vendoring complete trees or firmware.
-- Wi-Fi sources remain in `wifi/`, native integration in `openwrt/`.
-  Modules must match the exact target build; never copy Hinas4.4 or another
-  OpenWrt target's modules into Linux6.12.
+## 源码归属
 
-## Validation and Git
+- 新 Linux 文件以 overlay/ 为准，修改后重新生成 patches/0001-hi3798mv100-diagnostic.patch，
+  不单独手改生成的补丁。
+- 修改上游文件必须使用检查锚点、哈希和上下文的生成器；不静默接受来源漂移。
+- 固定版本、URL 和 SHA-256；不下载后直接执行上游脚本；保留许可证。
+  使用 tools/fetch_references.py 获取 SDK 参考，不提交完整树。
+- 无线源码在 wifi/，原生集成在 openwrt/；模块匹配精确内核构建。
+  不把 Hinas 4.4 或其他 OpenWrt target 的模块复制到 Linux 6.12。
 
-- UTF-8/LF; Python four spaces; kernel C uses upstream tabs/style.
-- Build outputs stay under ignored `.work/` and `artifacts/`.
-- Runtime changes normally require `make lint`, `make build`, `make test`,
-  selected according to the explicit changed-boundary preference above.
-  Documentation changes need accuracy, links and source hygiene checks, not
-  another kernel build. Run meaningful integration checks, not mirror tests.
-- QEMU virt validates generic boot/userspace, not MV100 controllers, Wi-Fi,
-  physical memory or CA loading. Future wall-clock tests run only in isolated
-  QEMU. Normal board diagnostics do not change wall time.
-- Never label a new offline artifact hardware-accepted merely because unchanged
-  components passed earlier. Record build, emulation, hardware and application
-  status separately, with exact identities and remaining limits.
-- Commit coherent changes. No force-push/history rewriting, credentials,
-  firmware, raw DTBs, upstream tarballs or large binaries.
-- Actions uses pinned revisions, read-only permissions and fresh Linux builds.
-  Check actual outcomes after authorized pushes or targeted dispatches;
-  skipped, configured or queued checks are not passing evidence.
+## 验证与 Git
+
+- UTF-8/LF；Python 四空格；内核 C 使用上游制表符风格。
+- 输出放在忽略的 .work/ 和 artifacts/；不覆盖已有成功产物或未经检查的工作目录。
+- 根据变更边界执行有意义的 lint、编译和测试；文档变更只需准确性、链接与来源检查。
+- QEMU virt 只能验证通用内核、用户空间与模拟网络，不能证明 MV100 控制器、Wi-Fi、
+  物理内存或高安加载成功。未来时间测试只在隔离 QEMU 中运行，板上不修改墙上时钟。
+- 新离线产物不因组件历史通过而成为“硬件通过”；分别记录构建、模拟、实机与应用结果及身份。
+- 提交保持内聚；不强推或改写历史；不提交原始 DTB、上游压缩包、凭据或无关大二进制。
+- Actions 固定 revision、默认只读权限并进行干净 Linux 构建；授权推送或 dispatch 后检查实际结果。
+  跳过、仅配置、排队中的任务不能算通过。

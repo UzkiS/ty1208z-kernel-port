@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
-#include "hi3798mv100-ty1208z-ethernet-net.dts"
+#define TY1208Z_FULL_MEMORY 1
+#include "hi3798mv100-ty1208z-openwrt-smp.dts"
 
 / {
 	model = "TY1208Z CA native OpenWrt system RAM candidate";
@@ -52,7 +53,7 @@
 	};
 };
 
-&{/memory@0} { reg = <0 0x30000000>; };
+&{/memory@0} { reg = <0 0x40000000>; };
 &{/aliases} {
 	mmc0 = "/soc/mmc@f9830000";
 	mmc1 = "/soc/mmc@f9820000";

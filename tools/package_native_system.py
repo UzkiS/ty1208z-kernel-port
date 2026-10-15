@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Package the built native system for bounded RAM boot and network supplementation."""
 from prepare_native_userspace import native_archive, record
-from native_system_patch import TRANSFORMATIONS, ensure, source_text
+from refresh_native_board_patch import identity
 from prepare_openwrt import toolchain_from_native
-from prepare_native_package_supplement import input_provenance, prepare as prepare_packages
+from prepare_native_package_supplement import input_provenance, public_runtime_metadata, prepare as prepare_packages
 import argparse
 import gzip
 import hashlib
@@ -30,7 +30,8 @@ parser.add_argument('--resume', action='store_true')
 parser.add_argument('--persistent-candidate', action='store_true',
                     help='Package the explicit offline installation kernel; still not a flash command')
 parser.add_argument('--rda-firmware', type=Path,
-                    help='Private backup-reference directory with manifest.json and extracted firmware files')
+                    default=Path(__file__).resolve().parents[1] / 'firmware/rda5995',
+                    help='Matching RDA firmware directory with manifest.json; defaults to the bundled firmware')
 args = parser.parse_args()
 project = Path(__file__).resolve().parents[1]
 base = args.taskbase.resolve()
@@ -47,16 +48,12 @@ if output.exists() or work.exists():
     assert args.resume and not (output / 'manifest.json').exists(), 'Inspect an existing completed package rather than overwrite'
 work.mkdir(parents=True, exist_ok=True)
 output.mkdir(parents=True, exist_ok=True)
-original_kernel = next((source / 'build_dir').glob('target-*/linux-hi3798mv100_apps/linux-6.12.112'))
 assert bool(state.get('persistent_candidate')) == args.persistent_candidate
-if args.persistent_candidate:
-    from native_persistent_patch import CHANGES, ensure as ensure_persistent
-    for name in set(TRANSFORMATIONS) | set(CHANGES):
-        expected = ensure_persistent(ensure(source_text(original_kernel, project, name), name), name)
-        assert (kernel / name).read_text() == expected, name
-else:
-    for name in TRANSFORMATIONS:
-        assert (kernel / name).read_text() == ensure(source_text(original_kernel, project, name), name), name
+assert state['board_patch_sha256'] == identity(project / 'patches/0001-hi3798mv100-diagnostic.patch')
+assert identity(build / 'board-support.patch') == state['board_patch_sha256']
+for overlay in (project / 'overlay').rglob('*'):
+    if overlay.is_file():
+        assert (kernel / overlay.relative_to(project / 'overlay')).read_bytes() == overlay.read_bytes(), overlay.name
 assert state['status'] == 'integrated-native-kernel-built-not-booted' and state['exit_code'] == 0
 
 root = work / 'root'
@@ -130,20 +127,27 @@ defaults.parent.mkdir(parents=True, exist_ok=True)
 shutil.copyfile(project / 'openwrt/system/docker-network', defaults)
 defaults.chmod(0o755)
 
-private_firmware = {}
+rda_firmware = {}
 if args.rda_firmware:
     reference = json.loads((args.rda_firmware / 'manifest.json').read_bytes())
     for suffix in ('code_p2p', 'code1_p2p', 'data_p2p', 'code_ap', 'data_ap'):
         name = 'rda5995_usb_' + suffix + '.bin'
         relative = 'vendor/firmware/' + name
         payload = (args.rda_firmware / name).read_bytes()
-        assert record(payload) == reference['files'][relative], 'Private firmware changed: ' + name
+        assert record(payload) == reference['files'][relative], 'RDA firmware changed: ' + name
         destination = root / 'lib/firmware' / name
         destination.parent.mkdir(parents=True, exist_ok=True)
         destination.write_bytes(payload)
-        private_firmware[name] = record(payload)
+        rda_firmware[name] = record(payload)
 
 # Preserve native accounts/configuration/language; mark this reduced bootstrap.
+# Native bootstrap archives can precede the final toolchain's path mapping.
+# Keep its C++ runtime aligned with the toolchain used for the APK transaction.
+runtime = root / 'lib/libstdc++.so.6.0.33'
+if runtime.is_file():
+    shutil.copyfile(toolchain / 'lib/libstdc++.so.6.0.33', runtime)
+    subprocess.run([str(compiler).removesuffix('gcc') + 'strip', '--strip-debug', runtime], check=True)
+public_runtime_metadata(root)
 (root / 'etc/ty1208z-system-bootstrap').write_text('Native RAM bootstrap; load the verified userspace supplement before using Passwall or Docker.\n')
 (root / 'etc/init.d/dockerd').unlink(missing_ok=True)
 cpio = work / 'bootstrap.cpio'
@@ -208,15 +212,15 @@ for p in sorted(output.rglob('*')):
         with p.open('rb') as handle:
             files[p.relative_to(output).as_posix()] = {'bytes': p.stat().st_size, 'sha256': hashlib.file_digest(handle, 'sha256').hexdigest()}
 receipt = {'schema': 1, 'status': 'integrated native RAM candidate; not booted or installable',
-           'board': 'tianyi,ty1208z-ca-openwrt-system-ram', 'memory_end': 0x30000000,
+           'board': 'tianyi,ty1208z-ca-openwrt-system-ram', 'memory_end': 0x40000000,
            'kernel_patch_sha256': hashlib.sha256((project / 'patches/0001-hi3798mv100-diagnostic.patch').read_bytes()).hexdigest(),
            'bootstrap_omits': ['usr/bin/xray'], 'supplement': network_payload.name,
            'modules': len(new_modules), 'supplement_files': delivered,
            'module_layout': 'flat-openwrt-kmodloader',
            'rda_module': state['rda_module'],
-           'private_rda_firmware': private_firmware,
-           'redistribution': 'PRIVATE user-supplied firmware; do not publish' if private_firmware else 'No RDA firmware included',
-           'storage': 'eMMC and SD request-level read-only; no automount',
+           'rda_firmware': rda_firmware,
+           'redistribution': 'Bundled RDA firmware; included in the public release with explicit project-owner authorization',
+           'storage': 'SD and USB ordinary read/write; eMMC multi-block p6/p9 writes and cache flush; no automount',
            'package_database': supplement_manifest['package_database'],
            'installed_required_packages': supplement_manifest['installed_required_packages'],
            'prior_userspace_evidence': 'Unchanged cores/runtime and installed Passwall files; actual new-kernel runtime pending',
@@ -224,7 +228,7 @@ receipt = {'schema': 1, 'status': 'integrated native RAM candidate; not booted o
            'persistent_writes': False, 'files': files}
 if args.persistent_candidate:
     receipt['status'] = 'offline installation-kernel RAM candidate; not hardware accepted or installable'
-    receipt['storage'] = 'SD read-only; eMMC one-sector writes permitted only in p6/p9; no automatic mounts'
+    receipt['storage'] = 'SD and USB ordinary read/write; eMMC multi-block p6/p9 writes and cache flush; no automount'
     receipt['persistent_candidate'] = True
 (output / 'manifest.json').write_text(json.dumps(receipt, indent=2) + '\n')
 print(json.dumps({'status': receipt['status'], 'bootstrap_bytes': compressed,

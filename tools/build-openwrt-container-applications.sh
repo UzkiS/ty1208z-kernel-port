@@ -15,6 +15,8 @@ if [ "$stage" = build ]; then
 fi
 export SOURCE_DATE_EPOCH=1791676800 TZ=UTC LC_ALL=C
 source_tree=$("$python_cmd" "$project/tools/prepare_openwrt_applications.py" --taskbase "$taskbase" --container-applications)
+export PATH="$source_tree/staging_dir/hostpkg/bin:$source_tree/staging_dir/host/bin:$PATH"
+"$python_cmd" "$project/tools/prepare_storage_packages.py" --source "$source_tree" --taskbase "$taskbase"
 make_args=(-C "$source_tree" "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" COMMITCOUNT=1)
 (
     cd "$source_tree"
@@ -23,8 +25,9 @@ make_args=(-C "$source_tree" "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" COMMITCOUNT=
     ./scripts/feeds install -f -p passwall_packages xray-core sing-box
     ./scripts/feeds install -p luci luci luci-ssl luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-app-dockerman luci-i18n-dockerman-zh-cn
     ./scripts/feeds install -f -p passwall luci-app-passwall luci-i18n-passwall-zh-cn
-    ./scripts/feeds install -p packages curl unzip docker dockerd containerd runc tini iperf3 docker-compose ttyd
+    ./scripts/feeds install -p packages curl unzip docker dockerd containerd runc tini iperf3 docker-compose ttyd parted smartmontools dosfstools exfat-mkfs exfat-fsck
 )
+"$python_cmd" "$project/tools/prepare_public_build_paths.py" --source "$source_tree"
 cp "$source_tree/.ty1208z-application.config" "$source_tree/.config"
 make "${make_args[@]}" defconfig
 "$python_cmd" "$project/tools/check_openwrt_applications.py" --source "$source_tree"
@@ -33,6 +36,7 @@ if [ "$stage" = config ]; then exit 0; fi
 make "${make_args[@]}" -j"$jobs" tools/install V=s
 make "${make_args[@]}" -j"$jobs" toolchain/install V=s
 make "${make_args[@]}" -j"$jobs" V=s
+"$python_cmd" "$project/tools/test_storage_policy.py" --source "$source_tree"
 "$python_cmd" "$project/tools/check_openwrt_applications.py" --source "$source_tree" --built
 "$python_cmd" "$project/tools/check_openwrt_containers.py" --source "$source_tree" --built --application-runtime
 "$python_cmd" "$project/tools/test_openwrt_applications_qemu.py" --source "$source_tree" --memory-mib 768 --taskbase "$taskbase"

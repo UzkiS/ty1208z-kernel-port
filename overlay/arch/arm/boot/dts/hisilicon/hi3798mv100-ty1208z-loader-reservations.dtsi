@@ -1,0 +1,15 @@
+/* SPDX-License-Identifier: GPL-2.0-only */
+/* Exact inherited loader allocations. Do not exclude the whole upper 256 MiB.
+ * A changed loader allocation table requires a matching reservation update.
+ */
+/memreserve/ 0x3fbfd000 0x00400000;
+/memreserve/ 0x3f8fc000 0x00300000;
+/memreserve/ 0x3f87b000 0x00080000;
+/memreserve/ 0x3f878000 0x00002000;
+/memreserve/ 0x3f843000 0x00034000;
+/memreserve/ 0x3f742000 0x00100000;
+/memreserve/ 0x3f73e000 0x00003000;
+/memreserve/ 0x3ef54000 0x007e9000;
+/memreserve/ 0x3edbe000 0x00195000;
+/memreserve/ 0x3e5d4000 0x007e9000;
+/memreserve/ 0x3e507000 0x000cc000;

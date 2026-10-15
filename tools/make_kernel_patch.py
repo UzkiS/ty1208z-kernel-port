@@ -19,15 +19,25 @@ with args.archive.open("rb") as source:
     assert hashlib.file_digest(source, "sha256").hexdigest() == lock["linux"]["sha256"]
 
 changes = {
+    "include/linux/cpuhotplug.h": (
+        '\tCPUHP_AP_ARM_GLOBAL_TIMER_STARTING,\n',
+        '\tCPUHP_AP_ARM_GLOBAL_TIMER_STARTING,\n'
+        '\tCPUHP_AP_HI3798MV100_TIMER_STARTING,\n'),
     "arch/arm/mach-hisi/Kconfig": (
         'config ARCH_HI3xxx\n',
         'config ARCH_HI3798MV100\n'
-        '\tbool "Hi3798MV100 single-core diagnostic support"\n'
-        '\tdepends on ARCH_MULTI_V7 && !SMP\n'
+        '\tbool "Hi3798MV100 board support"\n'
+        '\tdepends on ARCH_MULTI_V7\n'
         '\tselect HI3798MV100_TIMER\n'
         '\thelp\n'
-        '\t  Experimental RAM-only diagnostic candidate for TY1208Z CA.\n'
-        '\t  Hardware boot and secure-boot acceptance remain unverified.\n\n'
+        '\t  TY1208Z CA board support, including the measured UP and SMP profiles.\n\n'
+        'config HI3798MV100_SMP\n'
+        '\tbool "TY1208Z Hi3798MV100 four-core SMP"\n'
+        '\tdepends on ARCH_HI3798MV100 && SMP\n'
+        '\tselect HI3798MV100_SMP_TIMER\n'
+        '\thelp\n'
+        '\t  Enable the public HiSilicon CPU1-3 reset/vector sequence and\n'
+        '\t  four local hisp804 timer instances.\n\n'
         'config TY1208Z_ROUTER_RAM768\n'
         '\tbool "TY1208Z measured 768-MiB native router RAM experiment"\n'
         '\tdepends on ARCH_HI3798MV100 && NET && HISI_FEMAC\n'
@@ -56,7 +66,9 @@ changes = {
         'config ARCH_HI3xxx\n'),
     "arch/arm/mach-hisi/Makefile": (
         'obj-y\t+= hisilicon.o\n',
-        'obj-y\t+= hisilicon.o\nobj-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100.o\n'),
+        'obj-y\t+= hisilicon.o\n'
+        'obj-$(CONFIG_ARCH_HI3798MV100) += hi3798mv100.o\n'
+        'obj-$(CONFIG_HI3798MV100_SMP) += hi3798mv100-smp.o\n'),
     "arch/arm/boot/dts/hisilicon/Makefile": (
         '# SPDX-License-Identifier: GPL-2.0\n',
         '# SPDX-License-Identifier: GPL-2.0\n'
@@ -69,7 +81,8 @@ changes = {
         'dtb-$(CONFIG_MMC_DW_HI3798MV100_SD_IDENT) += hi3798mv100-ty1208z-sd-ident.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_SD_READ_ONLY) += hi3798mv100-ty1208z-sd-ro.dtb\n'
         'dtb-$(CONFIG_HI3798MV100_ETHERNET_AUDIT) += hi3798mv100-ty1208z-ethernet-audit.dtb\n'
-        'dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb\n'),
+        'dtb-$(CONFIG_HI3798MV100_ETHERNET_CLOCK_ID) += hi3798mv100-ty1208z-ethernet-clock-id.dtb\n'
+        'dtb-$(CONFIG_HI3798MV100_SMP) += hi3798mv100-ty1208z-smp.dtb\n'),
     "drivers/soc/hisilicon/Kconfig": (
         'config KUNPENG_HCCS\n',
         'config HI3798MV100_SD_AUDIT\n'
@@ -110,10 +123,14 @@ changes = {
         'config HI3798MV100_TIMER\n'
         '\tbool\n\tdepends on ARM && OF\n'
         '\tselect CLKSRC_MMIO\n\tselect TIMER_OF\n\n'
+        'config HI3798MV100_SMP_TIMER\n'
+        '\tbool\n\tdepends on ARM && OF && SMP\n'
+        '\tselect CLKSRC_MMIO\n\tselect TIMER_OF\n\n'
         'config ARM_TIMER_SP804\n'),
     "drivers/clocksource/Makefile": (
         'obj-$(CONFIG_ARM_TIMER_SP804)',
         'obj-$(CONFIG_HI3798MV100_TIMER) += timer-hi3798mv100.o\n'
+        'obj-$(CONFIG_HI3798MV100_SMP_TIMER) += timer-hi3798mv100-smp.o\n'
         'obj-$(CONFIG_ARM_TIMER_SP804)'),
 }
 changes.update({
@@ -299,6 +316,12 @@ changes.update({
         '\thelp\n'
         '\t  Report read-only and reject writes/settings before hardware queue.\n'
         '\t  Allow bounded sector-addressed SD single/multi-block reads.\n\n'
+        'config HI3798MV100_SD_WRITE\n'
+        '\tbool "TY1208Z ordinary SD user-area writes"\n'
+        '\tdepends on MMC_DW_HI3798MV100_SD_IDENT && BLOCK && MMC_BLOCK\n'
+        '\thelp\n'
+        '\t  Enable ordinary block writes while retaining the measured PIO\n'
+        '\t  controller path and rejecting erase, lock and vendor commands.\n\n'
         'config HI3798MV100_EMMC_READ_SAMPLES\n'
         '\tbool "TY1208Z fixed four-sector read-only diagnostic"\n'
         '\tdepends on MMC_DW_HI3798MV100_IDENT && !BLOCK\n'
@@ -309,7 +332,7 @@ changes.update({
         'config MMC_DW_HI3798MV100_IDENT\n'
         '\tbool "TY1208Z restricted eMMC identification diagnostic"\n'
         '\tdepends on MMC_DW && ARCH_HI3798MV100\n'
-        '\tdepends on !BLOCK || HI3798MV100_EMMC_READ_ONLY\n'
+        '\tdepends on !BLOCK || HI3798MV100_EMMC_READ_ONLY || TY1208Z_OPENWRT_SYSTEM\n'
         '\tselect MMC_DW_PLTFM\n'
         '\thelp\n'
         '\t  PIO, 1-bit, legacy identification only. Blocks card settings,\n'
@@ -323,6 +346,13 @@ changes.update({
         '\thelp\n'
         '\t  Dedicated user-area-only RAM experiment, not a production driver.\n'
         '\t  Enforce queue write denial and suppress boot/RPMB devices.\n\n'
+        'config HI3798MV100_EMMC_WRITE\n'
+        '\tbool "TY1208Z ordinary eMMC user-area writes"\n'
+        '\tdepends on ARCH_HI3798MV100 && MMC_DW_HI3798MV100_IDENT && MMC_BLOCK && BLOCK\n'
+        '\tdepends on !TY1208Z_ROUTER_EMMC_RO\n'
+        '\thelp\n'
+        '\t  Enable ordinary user-area block I/O with the measured PIO host.\n'
+        '\t  Boot, RPMB, partition-switch, erase and vendor commands remain denied.\n\n'
         'config MMC_DW_HI3798CV200\n'),
     "drivers/mmc/host/Makefile": (
         'obj-$(CONFIG_MMC_DW_HI3798CV200)',
@@ -332,7 +362,10 @@ changes.update({
     "drivers/mmc/core/block.c": [
         ('\treturn mmc_card_readonly(card) ||\n'
          '\t       !(card->csd.cmdclass & CCC_BLOCK_WRITE);\n',
-         '\treturn IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||\n'
+         '\treturn (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) && mmc_card_mmc(card) &&\n'
+         '\t\t!IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE)) ||\n'
+         '\t       (IS_ENABLED(CONFIG_HI3798MV100_SD_READ_ONLY) && mmc_card_sd(card) &&\n'
+         '\t\t!IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE)) ||\n'
          '\t       mmc_card_readonly(card) ||\n'
          '\t       !(card->csd.cmdclass & CCC_BLOCK_WRITE);\n'),
         ('static int mmc_blk_alloc_parts(struct mmc_card *card, struct mmc_blk_data *md)\n'
@@ -342,11 +375,28 @@ changes.update({
          '{\n'
          '\tint idx, ret;\n\n'
          '\t/* This independent RAM profile exposes only the measured user area. */\n'
-         '\tif (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))\n'
+         '\tif (IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) ||\n'
+         '\t    IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE))\n'
          '\t\treturn 0;\n'),
         ('\tmmc_blk_rpmb_add(card);\n',
-         '\tif (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY))\n'
+         '\tif (!IS_ENABLED(CONFIG_HI3798MV100_EMMC_READ_ONLY) &&\n'
+         '\t    !IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE))\n'
          '\t\tmmc_blk_rpmb_add(card);\n'),
+    ],
+    "drivers/mmc/core/queue.c": [
+        ('\tif (mmc_can_erase(card))\n\t\tmmc_queue_setup_discard(card, &lim);',
+         '\t/* The measured PIO policies reject erase/WRITE_ZEROES; do not\n'
+         '\t * advertise discard for their ordinary writable user areas. */\n'
+         '\tif (mmc_can_erase(card) &&\n'
+         '\t    !(IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE) && mmc_card_mmc(card)) &&\n'
+         '\t    !(IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE) && mmc_card_sd(card)))\n'
+         '\t\tmmc_queue_setup_discard(card, &lim);'),
+        ('\tlim.max_hw_sectors = min(host->max_blk_count, host->max_req_size / 512);',
+         '\tlim.max_hw_sectors = min(host->max_blk_count, host->max_req_size / 512);\n'
+         '\tif (((IS_ENABLED(CONFIG_HI3798MV100_EMMC_WRITE) && mmc_card_mmc(card)) ||\n'
+         '\t     (IS_ENABLED(CONFIG_HI3798MV100_SD_WRITE) && mmc_card_sd(card))) &&\n'
+         '\t    host->max_blk_count == 1)\n'
+         '\t\tlim.max_hw_sectors = max(lim.max_hw_sectors, PAGE_SIZE / 512);'),
     ],
     "drivers/mmc/host/dw_mmc.h": [
         (' * @init: early implementation specific initialization.\n',
@@ -472,8 +522,12 @@ extend(changes)
 
 diffs = []
 with tarfile.open(args.archive) as archive:
+    prefix = f'linux-{lock["linux"]["version"]}/'
+    wanted = {prefix + name for name in changes}
+    originals = {member.name.removeprefix(prefix): archive.extractfile(member).read().decode()
+                 for member in archive if member.name in wanted}
     for path, replacements in changes.items():
-        before = archive.extractfile(f'linux-{lock["linux"]["version"]}/{path}').read().decode()
+        before = originals[path]
         after = before
         if isinstance(replacements, tuple):
             replacements = [replacements]
