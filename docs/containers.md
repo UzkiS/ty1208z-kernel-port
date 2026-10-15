@@ -22,8 +22,9 @@ Dockerman 可以管理部署出的容器，但没有 Compose YAML 编辑、项�
 默认服务绑定 LAN，执行 `/bin/login`，使用系统账号和密码。
 从 `2026.10.15.4` 起，首刷、升级和配套 RAM 包均包含 ttyd 1.7.7、LuCI 插件和中文翻译；
 实机通过 APK 增量安装后，页面和实际终端命令均通过。
-缺少 LuCI 插件的 `.3` 已撤下公开下载，由 `.4` 替代，旧资产没有覆盖。
-见[发布记录](../verification/release-20261015.4.md)和[页面实测](../verification/ttyd-compose-board-20261015.md)。
+当前下载使用 `.5`，同时修复恢复默认按钮；缺少 LuCI 插件的 `.3` 和按钮有误的 `.4`
+均已撤下公开下载，旧资产没有覆盖。
+见[发布记录](../verification/release-20261015.5.md)和[页面实测](../verification/ttyd-compose-board-20261015.md)。
 
 ## 使用边界
 

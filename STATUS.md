@@ -10,7 +10,7 @@
 | 系统来源 | 官方 OpenWrt 25.12 固定 `58efa9917d4cc53fceed173529a286187649e827`，Linux 6.12.112；固定版本构建，不持续追踪 master |
 | 首次安装 | TTL/TFTP 启动专用 RAM 环境，官方中文 LuCI 首刷；1 GiB p9 和 p6 完整读回，eMMC ext4 rw 根启动；[记录](verification/compact-first-install-board-20261014.md) |
 | 容量与持久化 | p9 在线扩至 6846 MiB，文件系统约 6.5 GiB；配置和容器内容跨断电保留；[安装说明](docs/installation-plan.md) |
-| 恢复默认 | LuCI“系统 → 恢复默认设置”、firstboot/factoryreset 支持 ext4 配置重置；清登录授权/密码，保留 MAC、SD、Docker/用户数据，实际重置和后续重启通过；[记录](verification/factory-reset-board-20261015.md) |
+| 恢复默认 | LuCI“系统 → 恢复默认设置”、firstboot/factoryreset 支持 ext4 配置重置；清登录授权/密码，保留 MAC、SD、Docker/用户数据，实际重置和后续重启通过；[后端记录](verification/factory-reset-board-20261015.md)。`.5` 修复按钮灰色并改为 `system/reset`，真实 DOM、实机页面/预检通过；[页面记录](verification/reset-ui-board-20261015.md) |
 | 后续升级与重启 | 官方 LuCI 保留配置升级、stage2 RAM pivot、文件级根更新、p6 读回、默认 eMMC 启动及普通命令重启实测通过；[记录](verification/native-web-upgrade-board-20261015.md) |
 | 中文管理 | 简体中文 LuCI、默认 root 空密码；官方无线表单和中文挂载页已验证；[UI 记录](verification/luci-ui-board-20261014.md) |
 | 代理与工具 | Passwall 26.10.4、Xray 26.10.10、sing-box 1.14.3、unzip 6.0-r9；[双核心记录](verification/passwall-dual-core-20261013.md) |
@@ -36,14 +36,14 @@
 
 ## 当前包与 CI
 
-2026.10.15.4 修复版的 sysupgrade 包 131,850,442 B，SHA-256：
-`26b56aa4d9fcef2b5e8c306a441cff526025fd70c0550c790b7233548f2395b3`。
+2026.10.15.5 修复版的 sysupgrade 包 131,850,442 B，SHA-256：
+`e16b0a9e4031d8e0e8789f23519a9512c8216a72ce98b63a7af821bc3250604c`。
 内核 ABI `6.12.112~0757bd0e5fb295b399d4be7ea0c4decb-r1`。
 完整 Release 包含项目所有者授权公开的 RDA5995 固件。
 
-`2026.10.15` 因重复 radio、`.1` 因随机网口 MAC、`.2` 因缺少 ext4 恢复默认入口、`.3` 因缺少 ttyd LuCI 页撤回公开下载，旧文件身份仅供追溯。
-替代版 [2026.10.15.4](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.4)
-包括首刷包、sysupgrade、RAM 配套包、固件及两份清单；见[发布记录](verification/release-20261015.4.md)。
+`2026.10.15` 因重复 radio、`.1` 因随机网口 MAC、`.2` 因缺少 ext4 恢复默认入口、`.3` 因缺少 ttyd LuCI 页、`.4` 因恢复默认按钮灰色撤回公开下载，旧文件身份仅供追溯。
+替代版 [2026.10.15.5](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.5)
+包括首刷包、sysupgrade、RAM 配套包、固件及两份清单；见[发布记录](verification/release-20261015.5.md)。
 六个资产已正式公开，服务器大小/SHA-256 和匿名清单下载匹配，受影响旧版升级下载链接均为 404。
 本机 MAC 和桥地址已持久化，桥接多次普通重启保持原 DHCP 地址；单个 TY1208Z 开放热点自启，
 主路由 DHCP 和管理路径通过，见[修复记录](verification/stable-mac-bridge-20261015.md)。
