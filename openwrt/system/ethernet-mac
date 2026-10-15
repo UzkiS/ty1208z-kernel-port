@@ -1,0 +1,35 @@
+#!/bin/sh
+# Persist this device's kernel-generated fallback MAC before netifd starts.
+# Never ship a shared address or override an address configured by the user.
+set -eu
+
+[ -r /sys/class/net/eth0/addr_assign_type ] || exit 1
+[ "$(cat /sys/class/net/eth0/addr_assign_type)" = 1 ] || exit 0
+
+device_section=
+for section in $(uci -q show network | sed -n 's/^network\.\([^.=]*\)=\(device\|interface\)$/\1/p'); do
+    type=$(uci -q get "network.$section")
+    if [ "$type" = device ]; then
+        [ "$(uci -q get "network.$section.name" || true)" = eth0 ] || continue
+        [ -n "$device_section" ] || device_section=$section
+    else
+        target=$(uci -q get "network.$section.device" || uci -q get "network.$section.ifname" || true)
+        [ "$target" = eth0 ] || continue
+    fi
+    [ -z "$(uci -q get "network.$section.macaddr" || true)" ] || exit 0
+done
+
+mac=$(cat /sys/class/net/eth0/address)
+# Accept only a nonzero unicast address; a missing/invalid address must retry.
+printf '%s\n' "$mac" | grep -Eq '^[[:xdigit:]][02468aAcCeE](:[[:xdigit:]]{2}){5}$' || exit 1
+[ "$mac" != 00:00:00:00:00:00 ] || exit 1
+
+if [ -z "$device_section" ]; then
+    device_section=ty1208z_eth0
+    # Do not replace an unrelated user section with the same name.
+    [ -z "$(uci -q get "network.$device_section" || true)" ] || exit 1
+    uci set "network.$device_section=device"
+    uci set "network.$device_section.name=eth0"
+fi
+uci set "network.$device_section.macaddr=$mac"
+uci commit network

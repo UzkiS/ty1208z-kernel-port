@@ -27,6 +27,8 @@ ARCH = "arm_cortex-a7_neon-vfpv4"
 EPOCH = "1791676800"
 PROJECT = Path(__file__).resolve().parents[1]
 BOARD_FILES = {
+    "etc/uci-defaults/96-ty1208z-ethernet-mac": "openwrt/system/ethernet-mac",
+    "etc/uci-defaults/98-ty1208z-docker-network": "openwrt/system/docker-network",
     "lib/netifd/wireless/rda.sh": "openwrt/system/wireless/rda.sh",
     "etc/uci-defaults/97-ty1208z-wireless": "openwrt/system/wireless/defaults",
     "usr/libexec/ty1208z-rda-path": "openwrt/system/wireless/rda-path",
@@ -316,6 +318,8 @@ def prepare(base, source, baseline_source, board_root, kernel_build, output):
         raise ValueError("APK transaction does not own every exact-board module")
     public_runtime_metadata(root)
     subprocess.run([sys.executable, PROJECT / "tools/test_rda_radio_path.py", "--root", root], check=True)
+    subprocess.run([sys.executable, PROJECT / "tools/test_ethernet_mac.py", "--root", root], check=True)
+    subprocess.run([sys.executable, PROJECT / "tools/test_wireless_defaults.py", "--root", root], check=True)
     # Archive every actual difference plus all metadata, so software management
     # describes the delivered files. The board module APKs own their exact payloads.
     delivered = {}

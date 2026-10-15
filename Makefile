@@ -80,6 +80,7 @@ lint:
 	shellcheck tools/*.sh initramfs/init initramfs/diag initramfs/ethernet-diag initramfs/ethernet-dhcp
 	shellcheck initramfs/usb-diag
 	shellcheck openwrt/system/wireless/defaults openwrt/system/wireless/rda-path openwrt/system/wireless/hotplug
+	shellcheck openwrt/system/ethernet-mac openwrt/system/docker-network
 	shellcheck initramfs/sd-diag
 	shellcheck initramfs/sd-ro-diag
 	shellcheck initramfs/emmc-ro-diag

@@ -15,7 +15,8 @@ if [ "$stage" = build ]; then
 fi
 export SOURCE_DATE_EPOCH=1791676800 TZ=UTC LC_ALL=C
 source_tree=$("$python_cmd" "$project/tools/prepare_openwrt_applications.py" --taskbase "$taskbase" --container-applications)
-export PATH="$source_tree/staging_dir/hostpkg/bin:$source_tree/staging_dir/host/bin:$PATH"
+# OpenWrt adds staged tools itself. Its prerequisite checks need the original
+# host PATH; finding their own wrappers here can replace them with self-links.
 "$python_cmd" "$project/tools/prepare_storage_packages.py" --source "$source_tree" --taskbase "$taskbase"
 make_args=(-C "$source_tree" "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" COMMITCOUNT=1)
 (

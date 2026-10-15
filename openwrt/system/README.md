@@ -22,7 +22,9 @@ make openwrt-system TASKBASE=/path/to/existing/taskbase
 bootstrap 在已测传输和展开预算内，
 较大用户空间由 SSH supplement 提供。模块直接放在 `/lib/modules/6.12.112/`，
 因为 ubox kmodloader 不递归 `kernel/`。离线 APK 事务登记包与所有模块的归属。
-首次默认配置将 DHCP 接口 `probe` 加入 WAN，并建立 Docker 区域及 Docker → WAN 转发。
+首次默认配置把网口和 AP 放入 `br-uplink`，`probe` 继续作主路由的 DHCP 客户端；
+桥加入 LAN 防火墙区，允许主路由 DHCP 和同网段管理，Docker 转发到该 LAN 区。
+保留已有无线配置的升级不会自动修改无线模式或网络布局，旧路由型配置仍沿用 WAN 区。
 
 `--resume` 只复用已经检查的构建目录；保留已完成产物时使用新的 `--work`/
 `--output`，打包器拒绝覆盖完整交付清单。构建工具不连接物理设备。
@@ -31,12 +33,16 @@ RAM 包本身不作为持久安装包。早期验收见[系统 RAM 报告](../..
 
 ## 无线与管理
 
+`ethernet-mac` 在 netifd 启动前把每台设备自身的随机 fallback MAC 写入 UCI，
+后续启动复用，桥也沿用这个地址；保留用户指定 MAC，不把真实设备地址写入公共镜像。
+它稳定 DHCP 身份；需要永久固定 IP 时仍应在主路由保留租约。
+
 `wireless/rda.sh` 管理单个无线接口的进程、模块和固件切换。
 `wireless/rda-path` 在默认配置和 IEEE80211 hotplug 自动探测前按实际 USB 路径定位板载芯片，
 避免 EHCI/OHCI 总线编号变化产生重复 radio；仅清理同一硬件未修改且关闭的默认重复项。
 角色切换在用户空间完成，避免在 cfg80211 持有 RTNL 时重枚举 USB。
 支持一个 AP 或路由型 STA、2.4 GHz、HT20/legacy、开放或 WPA2-PSK/CCMP、
-固定 AP 信道；无线默认关闭。不支持桥接 STA、mesh、WPA3、TKIP 或多接口。
+固定 AP 信道；首次安装/恢复默认开启无密码热点 `TY1208Z`，与网口桥接。不支持桥接 STA、mesh、WPA3、TKIP 或多接口。
 
 `tools/luci_rda_wireless.py` 对固定官方 LuCI 表单作检查式适配；
 `tools/netifd_wireless_eof.py` 修复 handler discovery 的 EOF 循环。

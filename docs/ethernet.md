@@ -6,6 +6,18 @@ Linux 6.12与原生OpenWrt已通过本板网口实测：
 [物理网口记录](../verification/ethernet-net-20261012.md)、
 [原生网口记录](../verification/openwrt-ethernet-board-20261013.md)。
 
+## DHCP 身份与无线桥接
+
+旧版本 DT 不提供网口地址，内核每次启动都会生成随机 MAC，导致主路由把重启后的盒子当成新设备。
+从 `2026.10.15.2` 起，首次启动在 netifd 前把本机 fallback MAC 保存到 `/etc/config/network`，
+以后由 netifd 复用；用户指定地址优先，每台设备独立保存，公共镜像不含共用 MAC。
+
+默认 `TY1208Z` 开放热点与 eth0 同属 `br-uplink`，桥显式沿用已保存网口 MAC。
+盒子及无线客户端都由主路由分配地址，管理使用盒子的原地址；没有额外的 192 段管理子网。
+桥位于 LAN 防火墙区，Docker 继续拥有独立的容器网段。已有自定义无线配置在升级时保留。
+DHCP 租约策略仍由主路由决定；如需永久固定 IP，请设置主路由的地址保留。
+实测与边界见[修复记录](../verification/stable-mac-bridge-20261015.md)。
+
 ## 资源与来源
 
 | 资源 | 实测值 |

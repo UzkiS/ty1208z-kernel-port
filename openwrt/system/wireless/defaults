@@ -3,6 +3,37 @@
 if uci -q get wireless.radio0 >/dev/null; then
 	exec /usr/libexec/ty1208z-rda-path
 fi
+if uci -q get network.probe >/dev/null; then
+	network=probe
+elif uci -q get network.lan >/dev/null; then
+	network=lan
+else
+	exit 1
+fi
+# A fresh system bridges AP clients to the Ethernet uplink. The main router
+# serves DHCP; preserve any existing customized network configuration.
+if [ "$(uci -q get network.probe.device)" = eth0 ] &&
+	[ "$(uci -q get network.probe.proto)" = dhcp ]; then
+	uci -q get network.ty1208z_uplink >/dev/null && exit 1
+	mac=$(uci -q get network.probe.macaddr || true)
+	if [ -z "$mac" ]; then
+		for section in $(uci -q show network | sed -n 's/^network\.\([^.=]*\)=device$/\1/p'); do
+			[ "$(uci -q get "network.$section.name")" = eth0 ] || continue
+			mac=$(uci -q get "network.$section.macaddr" || true)
+			[ -z "$mac" ] || break
+		done
+	fi
+	[ -n "$mac" ] || mac=$(cat /sys/class/net/eth0/address)
+	uci -q batch <<'EOF' || exit 1
+set network.ty1208z_uplink=device
+set network.ty1208z_uplink.name='br-uplink'
+set network.ty1208z_uplink.type='bridge'
+add_list network.ty1208z_uplink.ports='eth0'
+set network.probe.device='br-uplink'
+EOF
+	uci set "network.ty1208z_uplink.macaddr=$mac" || exit 1
+	uci commit network || exit 1
+fi
 touch /etc/config/wireless || exit 1
 uci -q batch <<'EOF' || exit 1
 set wireless.radio0=wifi-device
@@ -10,13 +41,13 @@ set wireless.radio0.type='rda'
 set wireless.radio0.band='2g'
 set wireless.radio0.channel='6'
 set wireless.radio0.htmode='HT20'
-set wireless.radio0.disabled='1'
+set wireless.radio0.disabled='0'
 set wireless.default_radio0=wifi-iface
 set wireless.default_radio0.device='radio0'
 set wireless.default_radio0.mode='ap'
-set wireless.default_radio0.network='lan'
-set wireless.default_radio0.ssid='OpenWrt'
+set wireless.default_radio0.ssid='TY1208Z'
 set wireless.default_radio0.encryption='none'
-commit wireless
 EOF
+uci set "wireless.default_radio0.network=$network" || exit 1
+uci commit wireless || exit 1
 exec /usr/libexec/ty1208z-rda-path

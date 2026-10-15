@@ -3,7 +3,11 @@
 # Invoked in the target rootfs; this file never changes persistent boot state.
 set -eu
 
-test "$(uci get network.probe.device)" = eth0
+case "$(uci get network.probe.device)" in
+    eth0) uplink_zone=wan;;
+    br-uplink) uplink_zone=lan;;
+    *) exit 1;;
+esac
 uci set network.docker=interface
 uci set network.docker.device=docker0
 uci set network.docker.proto=none
@@ -20,15 +24,15 @@ uci set firewall.docker.output=ACCEPT
 uci set firewall.docker.forward=ACCEPT
 uci set firewall.ty1208z_docker_wan=forwarding
 uci set firewall.ty1208z_docker_wan.src=docker
-uci set firewall.ty1208z_docker_wan.dest=wan
-wan_found=0
+uci set "firewall.ty1208z_docker_wan.dest=$uplink_zone"
+uplink_found=0
 for zone in $(uci show firewall | grep '=zone$' | cut -d. -f2 | cut -d= -f1); do
-    if [ "$(uci get "firewall.$zone.name")" = wan ]; then
-        uci -q del_list "firewall.$zone.network=probe" || true
+    uci -q del_list "firewall.$zone.network=probe" || true
+    if [ "$(uci get "firewall.$zone.name")" = "$uplink_zone" ]; then
         uci add_list "firewall.$zone.network=probe"
-        wan_found=1
+        uplink_found=1
     fi
 done
-test "$wan_found" = 1
+test "$uplink_found" = 1
 uci commit network
 uci commit firewall
