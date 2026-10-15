@@ -15,6 +15,7 @@
 | 中文管理 | 简体中文 LuCI、默认 root 空密码；官方无线表单和中文挂载页已验证；[UI 记录](verification/luci-ui-board-20261014.md) |
 | 代理与工具 | Passwall 26.10.4、Xray 26.10.10、sing-box 1.14.3、unzip 6.0-r9；[双核心记录](verification/passwall-dual-core-20261013.md) |
 | Docker | 29.6.1、Dockerman、Compose；ARMv7 小容器、资源限制、seccomp、DNS/物理网口 HTTP 已实测，持久数据和冷启动自启通过；[容器记录](verification/openwrt-system-board-20261014.md) |
+| 网页终端 / Compose 界面 | 实机增量安装官方 ttyd LuCI 插件和中文翻译，终端/配置页及 WebSocket 登录执行命令通过；源码已纳入默认构建，`.3` 资产尚未包含该插件。Compose v5.1.4 命令可用，Dockerman 无 Compose 项目页；[记录](verification/ttyd-compose-board-20261015.md) |
 | CPU / 内存 | 四核 `0-3` 在线，1 GiB 地址范围与 HIGHMEM；MemTotal 994384 kB，512 MiB 双模式及高于 768 MiB 的真实页测试通过；[记录](verification/production-profile-board-20261015.md) |
 | 有线网络 | 100 Mbps 全双工、DHCP、双向 TCP、网线重连；统计语义和传输边界见[网口记录](verification/openwrt-ethernet-board-20261013.md) |
 | 板载无线 | RDA5995 USB `1e04:8888`；WPA2 STA、AP 客户端、netifd 角色切换通过，默认开启 TY1208Z 开放热点并与网口桥接；最终模块复用早期 AP 客户端证据，见[无线记录](verification/rda-wireless-board-20261014.md) |

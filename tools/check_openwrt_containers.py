@@ -50,7 +50,8 @@ def check(source, built=False, application_runtime=False):
             raise ValueError(f"Container package selection differs from this profile: {package}")
     if application_runtime:
         for package in ("luci-app-dockerman", "luci-i18n-dockerman-zh-cn",
-                        "docker-compose", "ttyd", "ucode-mod-socket"):
+                        "docker-compose", "ttyd", "luci-app-ttyd", "luci-i18n-ttyd-zh-cn",
+                        "ucode-mod-socket"):
             if f"CONFIG_PACKAGE_{package}=y\n" not in config:
                 raise ValueError(f"Missing Docker LuCI dependency: {package}")
     if f"CONFIG_PACKAGE_kmod-nft-nat={'y' if application_runtime else 'm'}\n" not in config:
@@ -76,10 +77,18 @@ def check(source, built=False, application_runtime=False):
         digest = re.search(r"^PKG_HASH:=([0-9a-f]{64})$", text, re.MULTILINE)
         if digest is None:
             raise ValueError(f"Container package source is not hash-pinned: {name}")
-        recipes[name] = {"version": version, "recipe_sha256": sha256(recipe),
+        reviewed = text
+        if name == "containerd":
+            # prepare_public_build_paths removes containerd's absolute GOPATH.
+            # Compare the canonical upstream recipe; the lock still rejects
+            # every change beyond that exact, reversible build-path edit.
+            reviewed = reviewed.replace("MAKE_FLAGS += \\\n\tGO_GCFLAGS= \\\n\tVERSION=",
+                                        "MAKE_FLAGS += \\\n\tVERSION=")
+        recipes[name] = {"version": version, "recipe_sha256": hashlib.sha256(reviewed.encode()).hexdigest(),
                          "archive_sha256": digest.group(1)}
         if recipes[name] != recipe_lock["packages"][name]:
             raise ValueError(f"Container recipe differs from reviewed identity: {name}")
+        recipes[name]["build_recipe_sha256"] = sha256(recipe)
     if not built:
         print("OPENWRT_CONTAINER_APP_CONFIG_PASS QEMU-only no-board-image" if application_runtime else
               "OPENWRT_CONTAINER_CONFIG_PASS compile-only no-rootfs no-device-access")

@@ -24,7 +24,7 @@ make_args=(-C "$source_tree" "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" COMMITCOUNT=
     ./scripts/feeds update -a
     ./scripts/feeds uninstall -a
     ./scripts/feeds install -f -p passwall_packages xray-core sing-box
-    ./scripts/feeds install -p luci luci luci-ssl luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-app-dockerman luci-i18n-dockerman-zh-cn
+    ./scripts/feeds install -p luci luci luci-ssl luci-i18n-base-zh-cn luci-i18n-firewall-zh-cn luci-app-dockerman luci-i18n-dockerman-zh-cn luci-app-ttyd luci-i18n-ttyd-zh-cn
     ./scripts/feeds install -f -p passwall luci-app-passwall luci-i18n-passwall-zh-cn
     ./scripts/feeds install -p packages curl unzip docker dockerd containerd runc tini iperf3 docker-compose ttyd parted smartmontools dosfstools exfat-mkfs exfat-fsck
 )

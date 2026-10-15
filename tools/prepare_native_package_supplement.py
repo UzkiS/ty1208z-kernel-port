@@ -18,7 +18,8 @@ from prepare_native_userspace import native_archive, record
 
 
 REQUIRED = ("docker", "dockerd", "containerd", "runc", "tini", "luci-app-dockerman",
-            "luci-i18n-dockerman-zh-cn", "docker-compose", "ttyd", "ucode-mod-socket",
+            "luci-i18n-dockerman-zh-cn", "docker-compose", "ttyd", "luci-app-ttyd",
+            "luci-i18n-ttyd-zh-cn", "ucode-mod-socket",
             "iw-full", "wpad-mbedtls", "hostapd-common", "wireless-regdb", "wifi-scripts",
             "ucode-mod-nl80211", "ucode-mod-rtnl", "block-mount", "lsblk",
             "luci-app-diskman", "luci-i18n-diskman-zh-cn", "parted", "e2fsprogs",

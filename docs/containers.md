@@ -7,6 +7,24 @@ DNS 和物理网口 HTTP 已实测；容器数据位于 `/opt/docker`，
 见[系统实测](../verification/openwrt-system-board-20261014.md)和
 [持久升级实测](../verification/native-web-upgrade-board-20261015.md)。
 
+## Compose 与网页终端
+
+实机 `docker compose version` 和 `docker-compose version` 均返回 v5.1.4。
+在 `compose.yaml` 所在目录执行 `docker compose up -d` 即可部署；
+Dockerman 可以管理部署出的容器，但没有 Compose YAML 编辑、项目部署或整组更新页面。
+需要这类页面时可另外安装 [Dockge](https://github.com/louislam/dockge) 或
+[Portainer](https://github.com/portainer/portainer)。2026-10-15 查询的
+`louislam/dockge:1` 和 `portainer/portainer-ce:lts` 清单均列出 Linux ARMv7；
+本项目尚未在实机部署或验收这两个管理器。
+
+网页终端使用 `ttyd` 和官方 `luci-app-ttyd`，入口为 LuCI“服务 → 终端”，
+其中包含终端与配置两个页面；也可访问盒子管理地址的 HTTP 7681 端口。
+默认服务绑定 LAN，执行 `/bin/login`，使用系统账号和密码。
+已发布的 `2026.10.15.3` 含 ttyd 1.7.7，但漏选 LuCI 插件；
+当前源码已补齐插件和中文翻译，实机通过 APK 增量安装后，页面和实际终端命令均通过。
+此次未生成新的完整 Release，也未修改 `.3` 已发布资产；
+见[实测记录](../verification/ttyd-compose-board-20261015.md)。
+
 ## 使用边界
 
 CPU 是 32 位 Cortex-A7，应使用 `linux/arm/v7` 镜像；ARM64 镜像不能原生运行。
