@@ -34,21 +34,22 @@
 
 ## 当前包与 CI
 
-2026.10.15 Release 的 sysupgrade 包 131,379,402 B，SHA-256：
-`b0f21dd0865677eba39b2b85e78784f66c9f93a428f4230de57055b433d9bf28`。
+2026.10.15.1 修复版的 sysupgrade 包 131,379,402 B，SHA-256：
+`4b2c89e79ff70700100e1ae7d933b38632a709d792b6c7c764f3b46013bda218`。
 内核 ABI `6.12.112~0757bd0e5fb295b399d4be7ea0c4decb-r1`。
 配套首刷包和精确身份见[生产报告](verification/production-profile-board-20261015.md)。
 含用户提供 RDA5995 固件的完整 Release 包按项目所有者授权公开；固件来源和哈希单独记录。
 
-正式下载包已发布到 [2026.10.15 Release](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15)。
-首刷包、sysupgrade、RAM 配套包、RDA5995 固件及两份清单共六个文件均已上传，
-GitHub 返回的大小和 SHA-256 与本地一致，清单下载核对通过；见[发布记录](verification/release-20261015.md)。
+`2026.10.15` 因默认路径导致重复 radio 已撤回公开下载，旧文件身份仅供追溯。
+替代版 [2026.10.15.1](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.1)
+包括首刷包、sysupgrade、RAM 配套包、RDA5995 固件及两份清单；见[发布记录](verification/release-20261015.1.md)。
 普通 CI 附件只用于开发验证。
 
 诊断 CI 在 `559c2d8` 上[通过](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38642766702)。
 应用、router、eMMC、修复后 SD/router768 和 Docker/Passwall 组合已有成功干净构建；
 实时结果与修复原因集中在 [CI 记录](verification/ci-closure-20261015.md)，不由工作流文件存在推断成功。
-发布提交 `8be787a` 的新诊断及 Docker/Passwall/DiskMan 组合 CI 已显式派发，发布时仍在运行。
+`8be787a` 诊断 CI 的旧只读 eMMC harness 因漏定义新的写入配置宏失败；已补齐并通过本地
+ASan/UBSan，重跑与 Docker/Passwall/DiskMan 组合 CI 状态见上述记录。
 
 安装只替换固定 p6/p9，保留 CA fastboot、持久 boot 环境、其他分区、
 SD、boot0/boot1/RPMB 和安全状态。使用方法见[安装与升级](docs/installation-plan.md)。

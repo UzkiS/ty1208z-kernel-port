@@ -37,6 +37,7 @@ static bool native_mode;
 #define CONFIG_TY1208Z_OPENWRT_SYSTEM 0
 static bool install_mode;
 #define CONFIG_TY1208Z_EMMC_INSTALL_CANDIDATE install_mode
+#define CONFIG_HI3798MV100_EMMC_WRITE install_mode
 #define IS_ENABLED(option) (option)
 struct device { void *of_node; };
 struct platform_device { struct device dev; };

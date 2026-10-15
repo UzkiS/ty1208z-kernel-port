@@ -4,9 +4,10 @@
 页面下载，不需要查找 CI 的短期构建附件。每个正式 Release 附带 `SHA256SUMS.txt`
 和用途说明；校验通过后再使用对应文件。
 
-当前正式版本为 [2026.10.15](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15)。
+当前版本为 [2026.10.15.1](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.1)。
 首刷用户同时下载 `first-install` 和 `install-ram` 两包；已安装用户只需 `sysupgrade`。
-该版本六个文件均已上传并核对 GitHub SHA-256；精确身份见[发布记录](../verification/release-20261015.md)。
+精确身份和上传核对见[发布记录](../verification/release-20261015.1.md)。
+`2026.10.15` 因重复无线 radio 配置已撤回公开下载；已下载用户应改用修复版本。
 
 文件用途固定如下：
 

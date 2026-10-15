@@ -24,8 +24,9 @@ USB 写入及吞吐没有新增验收。time64 已覆盖选定用户空间与应
 
 ## 安装与使用
 
-正式下载：[2026.10.15 Release](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15)。
+正式下载：[2026.10.15.1 Release](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.1)。
 首刷、日常升级、RAM 配套包、无线固件和校验文件在同一页面，RAM 包内附独立中文步骤。
+`2026.10.15` 因重复无线 radio 配置已撤下公开下载，修复版使用新版本号发布。
 
 首次安装采用 TTL 加网线启动专用临时 OpenWrt，再通过官方 LuCI“系统 → 备份与更新”
 上传 first-install 包；已安装的系统使用独立 sysupgrade 包。两种包不能互换。

@@ -11,6 +11,7 @@ import re
 import shutil
 import stat
 import subprocess
+import sys
 import tarfile
 
 from prepare_native_userspace import native_archive, record
@@ -28,6 +29,8 @@ PROJECT = Path(__file__).resolve().parents[1]
 BOARD_FILES = {
     "lib/netifd/wireless/rda.sh": "openwrt/system/wireless/rda.sh",
     "etc/uci-defaults/97-ty1208z-wireless": "openwrt/system/wireless/defaults",
+    "usr/libexec/ty1208z-rda-path": "openwrt/system/wireless/rda-path",
+    "etc/hotplug.d/ieee80211/05-ty1208z-rda-path": "openwrt/system/wireless/hotplug",
 }
 PERSISTENT_BOARD_FILES = {
     "lib/preinit/79-ty1208z-disk-root": "openwrt/system/persistent/79-ty1208z-disk-root",
@@ -312,6 +315,7 @@ def prepare(base, source, baseline_source, board_root, kernel_build, output):
     if actual_modules != expected_modules:
         raise ValueError("APK transaction does not own every exact-board module")
     public_runtime_metadata(root)
+    subprocess.run([sys.executable, PROJECT / "tools/test_rda_radio_path.py", "--root", root], check=True)
     # Archive every actual difference plus all metadata, so software management
     # describes the delivered files. The board module APKs own their exact payloads.
     delivered = {}

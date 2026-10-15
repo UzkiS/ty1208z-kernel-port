@@ -32,6 +32,8 @@ RAM 包本身不作为持久安装包。早期验收见[系统 RAM 报告](../..
 ## 无线与管理
 
 `wireless/rda.sh` 管理单个无线接口的进程、模块和固件切换。
+`wireless/rda-path` 在默认配置和 IEEE80211 hotplug 自动探测前按实际 USB 路径定位板载芯片，
+避免 EHCI/OHCI 总线编号变化产生重复 radio；仅清理同一硬件未修改且关闭的默认重复项。
 角色切换在用户空间完成，避免在 cfg80211 持有 RTNL 时重枚举 USB。
 支持一个 AP 或路由型 STA、2.4 GHz、HT20/legacy、开放或 WPA2-PSK/CCMP、
 固定 AP 信道；无线默认关闭。不支持桥接 STA、mesh、WPA3、TKIP 或多接口。

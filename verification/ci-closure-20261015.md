@@ -51,11 +51,16 @@ router768失联由GitHub check annotation明确记录，发生在toolchain完成
 
 | 检查 | run | 派发后的状态 |
 |---|---|---|
-| 完整诊断及 time64 回归 | [38673515248](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38673515248) | 运行中，尚未取得完成结论 |
+| 完整诊断及 time64 回归 | [38673515248](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38673515248) | 失败：旧只读 eMMC driver harness 缺少新配置宏定义，见下文 |
 | Docker/fw4/Passwall/DiskMan 组合构建与 QEMU | [38673519682](https://github.com/UzkiS/ty1208z-kernel-port/actions/runs/38673519682) | 运行中，尚未取得完成结论 |
 
-以上两项均于 2026-10-15 02:55 UTC 派发。表格记录发布时的状态，后续结果以对应 run 页面为准，
+以上两项均于 2026-10-15 02:55 UTC 派发。表格已更新诊断失败结论，组合构建仍在运行；后续结果以对应 run 页面为准，
 不把旧提交的成功结果算作本提交通过。最终源码本地 `make lint` 已通过；补装固定哈希的
 pyserial 后，`make test-serial` 的七组共 93 项测试全部通过，该目标不操作真实硬件。
 生产内核编译、实际策略 sanitizer、真实升级和变化应用组件的实机结果见
 [生产报告](production-profile-board-20261015.md)，与上述远端干净构建分开记录。
+
+诊断 run 的 `test_emmc_ro_driver.py` 使用自行定义的 `IS_ENABLED`，缺少
+`CONFIG_HI3798MV100_EMMC_WRITE` 后无法编译实际 probe/shutdown 函数。
+已将该宏绑定到 harness 原有的安装模式变量，分别验证原只读 host 移除和持久写入 host 保留分支，
+实际 Linux 源码的 ASan/UBSan 检查通过；内核驱动和二进制不变。修复提交将显式重跑诊断 CI。

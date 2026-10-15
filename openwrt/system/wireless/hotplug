@@ -1,0 +1,4 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Runs before 10-wifi-detect, including after an RDA AP/STA module reload.
+[ "$ACTION" != add ] || /usr/libexec/ty1208z-rda-path

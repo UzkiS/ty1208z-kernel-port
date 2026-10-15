@@ -6,6 +6,12 @@
 [无线实测](../verification/rda-wireless-board-20261014.md)与
 [中文界面检查](../verification/luci-ui-board-20261014.md)。
 
+硬件只有一个板载 radio。`2026.10.15` 曾因写死旧 USB 总线编号，
+使官方自动探测器为同一芯片再生成 `mac80211` 项；该版公开下载已撤回。
+`2026.10.15.1` 按芯片 USB 身份和实际 sysfs 路径配置，在自动探测前刷新路径，
+只迁移同一硬件未修改且关闭的默认重复项，保留用户自定义配置和其他 USB 网卡。
+验证范围见[修复记录](../verification/rda-radio-path-20261015.md)。
+
 ## 支持范围
 
 单个AP或路由型STA，2.4 GHz，HT20/legacy，开放或WPA2-PSK/CCMP；

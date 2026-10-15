@@ -45,7 +45,7 @@ CRC、哈希和空间；官方 stage2 停服务、切 RAM、确认 p9 已释放�
 staging 并保留小型完成记录。失败保留 RAM 串口恢复，不盲目重启。
 
 最新 sysupgrade 包：131,379,402 B；SHA-256
-`b0f21dd0865677eba39b2b85e78784f66c9f93a428f4230de57055b433d9bf28`。
+`4b2c89e79ff70700100e1ae7d933b38632a709d792b6c7c764f3b46013bda218`（2026.10.15.1）。
 内核 4,925,410 B，SHA-256
 `c2b72c4dd56705a93ead0d54a3151d3f1dbe934e0938d1ea5632743c109f135c`，
 ABI `6.12.112~0757bd0e5fb295b399d4be7ea0c4decb-r1`。

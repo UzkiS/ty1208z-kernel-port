@@ -79,6 +79,7 @@ lint:
 	python3 tools/test_fetch_wifi.py
 	shellcheck tools/*.sh initramfs/init initramfs/diag initramfs/ethernet-diag initramfs/ethernet-dhcp
 	shellcheck initramfs/usb-diag
+	shellcheck openwrt/system/wireless/defaults openwrt/system/wireless/rda-path openwrt/system/wireless/hotplug
 	shellcheck initramfs/sd-diag
 	shellcheck initramfs/sd-ro-diag
 	shellcheck initramfs/emmc-ro-diag

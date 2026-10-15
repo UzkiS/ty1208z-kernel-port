@@ -1,11 +1,12 @@
 #!/bin/sh
 # SPDX-License-Identifier: GPL-2.0-only
-uci -q get wireless.radio0 >/dev/null && exit 0
+if uci -q get wireless.radio0 >/dev/null; then
+	exec /usr/libexec/ty1208z-rda-path
+fi
 touch /etc/config/wireless || exit 1
-uci -q batch <<'EOF'
+uci -q batch <<'EOF' || exit 1
 set wireless.radio0=wifi-device
 set wireless.radio0.type='rda'
-set wireless.radio0.path='platform/soc/f9890000.usb/usb1/1-2'
 set wireless.radio0.band='2g'
 set wireless.radio0.channel='6'
 set wireless.radio0.htmode='HT20'
@@ -18,4 +19,4 @@ set wireless.default_radio0.ssid='OpenWrt'
 set wireless.default_radio0.encryption='none'
 commit wireless
 EOF
-exit $?
+exec /usr/libexec/ty1208z-rda-path

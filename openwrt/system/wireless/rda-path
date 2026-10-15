@@ -1,0 +1,71 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-only
+# Match the onboard USB device before OpenWrt's generic PHY detector runs.
+# USB bus and PHY numbers can change when host drivers or the module reload.
+
+path=
+for device in /sys/bus/usb/devices/*; do
+	[ "$(cat "$device/idVendor" 2>/dev/null)" = 1e04 ] || continue
+	[ "$(cat "$device/idProduct" 2>/dev/null)" = 8888 ] || continue
+	resolved="$(readlink -f "$device")"
+	case "$resolved" in
+		/sys/devices/platform/soc/f9890000.usb/usb*/[0-9]*-2)
+			path="${resolved#/sys/devices/}"
+			break;;
+	esac
+done
+[ -n "$path" ] || exit 0
+
+mkdir -p /var/lock || exit 1
+exec 8>/var/lock/ty1208z-rda-path.lock
+flock 8 || exit 1
+changed=0
+configured=0
+for radio in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
+	[ "$(uci -q get "wireless.$radio.type")" = rda ] || continue
+	configured=1
+	[ "$(uci -q get "wireless.$radio.path")" != "$path" ] || continue
+	uci set "wireless.$radio.path=$path" || exit 1
+	changed=1
+done
+# Older images let mac80211 create a second, disabled default for this same
+# physical device. Remove only that unmodified default, retaining custom Wi-Fi
+# settings and any separate USB adapter. Never enable a radio during migration.
+if [ "$configured" = 1 ]; then
+	for radio in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-device$/\1/p'); do
+		[ "$(uci -q get "wireless.$radio.type")" = mac80211 ] || continue
+		[ "$(uci -q get "wireless.$radio.path")" = "$path" ] || continue
+		[ "$(uci -q get "wireless.$radio.band")" = 2g ] || continue
+		[ "$(uci -q get "wireless.$radio.channel")" = 1 ] || continue
+		case "$(uci -q get "wireless.$radio.htmode")" in NOHT|HT20) ;; *) continue;; esac
+		interfaces=
+		for iface in $(uci -q show wireless | sed -n 's/^wireless\.\([^.=]*\)=wifi-iface$/\1/p'); do
+			[ "$(uci -q get "wireless.$iface.device")" != "$radio" ] || interfaces="$interfaces $iface"
+		done
+		[ "$interfaces" = " default_$radio" ] || continue
+		iface="default_$radio"
+		[ "$(uci -q get "wireless.$iface.disabled")" = 1 ] || continue
+		[ "$(uci -q get "wireless.$iface.mode")" = ap ] || continue
+		[ "$(uci -q get "wireless.$iface.network")" = lan ] || continue
+		[ "$(uci -q get "wireless.$iface.ssid")" = OpenWrt ] || continue
+		[ "$(uci -q get "wireless.$iface.encryption")" = none ] || continue
+		[ -z "$(uci -q get "wireless.$iface.key")" ] || continue
+		# Extra options indicate a customized section, even when disabled.
+		options="$(uci -q show "wireless.$radio" | sed -n 's/^[^.]*\.[^.]*\.\([^=]*\)=.*/\1/p')"
+		custom=0
+		for option in $options; do
+			case "$option" in type|path|band|channel|htmode) ;;
+				country|num_global_macaddr) [ -z "$(uci -q get "wireless.$radio.$option")" ] || custom=1;;
+				*) custom=1;;
+			esac
+		done
+		for option in $(uci -q show "wireless.$iface" | sed -n 's/^[^.]*\.[^.]*\.\([^=]*\)=.*/\1/p'); do
+			case "$option" in device|disabled|mode|network|ssid|encryption|key) ;; *) custom=1;; esac
+		done
+		[ "$custom" = 0 ] || continue
+		uci delete "wireless.$iface" || exit 1
+		uci delete "wireless.$radio" || exit 1
+		changed=1
+	done
+fi
+[ "$changed" = 0 ] || uci commit wireless
