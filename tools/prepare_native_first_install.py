@@ -14,6 +14,7 @@ import tarfile
 from native_upgrade import digest
 from prepare_native_package_supplement import public_runtime_metadata
 import native_reset
+import native_network
 
 PROJECT = Path(__file__).resolve().parents[1]
 EPOCH = 1791676800
@@ -182,6 +183,7 @@ def main():
                "installer": {"file": installer.name, "sha256": digest(installer)},
                "reset_package": {"file": reset_apk.relative_to(args.output).as_posix(), "sha256": digest(reset_apk)},
                "reset_sources": native_reset.source_identity(),
+               "network_profile": native_network.profile(root),
                "root_bytes_written": 1073741824, "full_p9_bytes": 7178551296,
                "manifest": manifest, "redistribution": "User-supplied RDA firmware included in the public release with explicit project-owner authorization"}
     (args.output / "manifest.json").write_text(json.dumps(receipt, indent=2) + "\n")

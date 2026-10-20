@@ -46,6 +46,8 @@ help:
 	@echo 'make openwrt-system - compose the measured board kernel and native userspace for RAM delivery'
 	@echo 'make openwrt-web-upgrade - prepare the official sysupgrade image and board upgrade APK offline'
 	@echo 'make openwrt-first-install - prepare compact RAM/web first-install image and addon offline'
+	@echo 'make openwrt-release - build all three network variants from a shared kernel/runtime'
+	@echo 'make openwrt-release-full VERSION=... - build the shared prerequisites and all three firmware profiles'
 	@echo 'make test-web-upgrade - run parser and unsafe-upload regression checks'
 
 .PHONY: openwrt-system
@@ -62,6 +64,19 @@ openwrt-web-upgrade:
 		--output "$(if $(OUTPUT),$(OUTPUT),$(CURDIR)/build/native-web-upgrade)"
 
 .PHONY: test-web-upgrade
+.PHONY: openwrt-release
+.PHONY: openwrt-release-full
+openwrt-release-full:
+	VERSION="$(VERSION)" TASKBASE="$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" \
+		$(if $(OUTPUT),OUTPUT="$(OUTPUT)") bash tools/build-full-release.sh
+
+openwrt-release:
+	@test -n "$(VERSION)" -a -n "$(DISK_ROOT)" -a -n "$(NATIVE_SOURCE)" -a -n "$(BOOTSTRAP)" -a -n "$(OUTPUT)" || \
+		{ echo 'Set VERSION, DISK_ROOT, NATIVE_SOURCE, BOOTSTRAP and a new OUTPUT directory'; exit 1; }
+	python3 tools/build_release_variants.py --taskbase "$(if $(TASKBASE),$(TASKBASE),$(CURDIR)/.work)" \
+		--source "$(NATIVE_SOURCE)" --disk-root "$(DISK_ROOT)" --bootstrap "$(BOOTSTRAP)" \
+		--version "$(VERSION)" --output "$(OUTPUT)"
+
 test-web-upgrade:
 	python3 tools/test_native_upgrade.py --delivery "$(if $(DELIVERY),$(DELIVERY),$(CURDIR)/build/native-web-upgrade)"
 

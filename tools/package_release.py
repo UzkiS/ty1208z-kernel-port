@@ -77,6 +77,57 @@ def archive_tree(tree, output):
                         archive.addfile(member, stream)
 
 
+def validate_deliveries(bootstrap, upgrade_path, first_install):
+    """Validate every variant with the same runtime, kernel and privacy checks."""
+    ram, upgrade, first = [load(path / 'manifest.json') for path in
+                           (bootstrap, upgrade_path, first_install)]
+    abi = upgrade['manifest']['kernel_abi']
+    for key in ('kernel_abi', 'kernel_bytes', 'kernel_sha256', 'board', 'layout'):
+        if first['manifest'][key] != upgrade['manifest'][key]:
+            raise ValueError('First-install/sysupgrade mismatch: ' + key)
+    if not ram['persistent_candidate'] or ram['memory_end'] != 0x40000000:
+        raise ValueError('Release requires the full-memory installation RAM profile')
+    for name, expected in ram['files'].items():
+        checked(bootstrap, name, expected)
+    for name, (_, _, payload) in native_archive(bootstrap, 'rootfs.cpio.gz').items():
+        check_runtime_content(name, payload)
+    with tarfile.open(bootstrap / ram['supplement']) as packed:
+        for member in packed:
+            if member.isfile():
+                check_runtime_content(member.name, packed.extractfile(member).read())
+    for base in (upgrade_path, first_install):
+        for path in (base / 'root').rglob('*'):
+            if path.is_file() and not path.is_symlink():
+                check_runtime_content(path.relative_to(base / 'root').as_posix(), path.read_bytes())
+    ram_kernel = (bootstrap / 'zImage').read_bytes()
+    for base, receipt in ((upgrade_path, upgrade), (first_install, first)):
+        image = checked(base, receipt['image']['file'], receipt['image'])
+        with tarfile.open(image) as packed:
+            kernel = packed.extractfile('kernel').read()
+            if kernel[64:64 + len(ram_kernel)] != ram_kernel:
+                raise ValueError('RAM and disk kernels differ')
+            if hashlib.sha256(kernel).hexdigest() != receipt['manifest']['kernel_sha256']:
+                raise ValueError('Packaged disk kernel checksum differs')
+    ramdb = (upgrade_path / 'root/lib/apk/db/installed').read_text()
+    if 'P:kernel\nV:' + abi + '\n' not in ramdb:
+        raise ValueError('Packaged kernel ABI absent from the installed APK database')
+    module = upgrade_path / 'root/lib/modules/6.12.112/rdawfmac.ko'
+    module_name = 'lib/modules/6.12.112/rdawfmac.ko'
+    module_identity = ram['supplement_files'][module_name]
+    checked(module.parent, module.name, module_identity)
+    if b'/home/' in module.read_bytes() or b'\\Users\\' in module.read_bytes():
+        raise ValueError('Packaged RDA module contains a build host path; use the Kbuild prefix map')
+    checked(first_install / 'root', module_name, module_identity)
+    with tarfile.open(bootstrap / ram['supplement']) as packed:
+        data = packed.extractfile(module_name).read()
+        if hashlib.sha256(data).hexdigest() != module_identity['sha256']:
+            raise ValueError('RAM/disk packaged RDA modules differ')
+        database = packed.extractfile('lib/apk/db/installed').read().decode()
+        if 'P:kernel\nV:' + abi + '\n' not in database:
+            raise ValueError('RAM/disk kernel APK ABIs differ')
+    return ram, upgrade, first, abi, module_identity
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--bootstrap', type=Path, required=True)
@@ -89,52 +140,7 @@ def main():
         raise ValueError('Invalid release version')
     if args.output.exists():
         raise ValueError('Inspect the existing release directory before replacing it')
-    ram, upgrade, first = [load(path / 'manifest.json') for path in
-                           (args.bootstrap, args.upgrade, args.first_install)]
-    abi = upgrade['manifest']['kernel_abi']
-    for key in ('kernel_abi', 'kernel_bytes', 'kernel_sha256', 'board', 'layout'):
-        if first['manifest'][key] != upgrade['manifest'][key]:
-            raise ValueError('First-install/sysupgrade mismatch: ' + key)
-    if not ram['persistent_candidate'] or ram['memory_end'] != 0x40000000:
-        raise ValueError('Release requires the full-memory installation RAM profile')
-    for name, expected in ram['files'].items():
-        checked(args.bootstrap, name, expected)
-    for name, (_, _, payload) in native_archive(args.bootstrap, 'rootfs.cpio.gz').items():
-        check_runtime_content(name, payload)
-    with tarfile.open(args.bootstrap / ram['supplement']) as packed:
-        for member in packed:
-            if member.isfile():
-                check_runtime_content(member.name, packed.extractfile(member).read())
-    for base in (args.upgrade, args.first_install):
-        for path in (base / 'root').rglob('*'):
-            if path.is_file() and not path.is_symlink():
-                check_runtime_content(path.relative_to(base / 'root').as_posix(), path.read_bytes())
-    ram_kernel = (args.bootstrap / 'zImage').read_bytes()
-    for base, receipt in ((args.upgrade, upgrade), (args.first_install, first)):
-        image = checked(base, receipt['image']['file'], receipt['image'])
-        with tarfile.open(image) as packed:
-            kernel = packed.extractfile('kernel').read()
-            if kernel[64:64 + len(ram_kernel)] != ram_kernel:
-                raise ValueError('RAM and disk kernels differ')
-            if hashlib.sha256(kernel).hexdigest() != receipt['manifest']['kernel_sha256']:
-                raise ValueError('Packaged disk kernel checksum differs')
-    ramdb = (args.upgrade / 'root/lib/apk/db/installed').read_text()
-    if 'P:kernel\nV:' + abi + '\n' not in ramdb:
-        raise ValueError('Packaged kernel ABI absent from the installed APK database')
-    module = args.upgrade / 'root/lib/modules/6.12.112/rdawfmac.ko'
-    module_name = 'lib/modules/6.12.112/rdawfmac.ko'
-    module_identity = ram['supplement_files'][module_name]
-    checked(module.parent, module.name, module_identity)
-    if b'/home/' in module.read_bytes() or b'\\Users\\' in module.read_bytes():
-        raise ValueError('Packaged RDA module contains a build host path; use the Kbuild prefix map')
-    checked(args.first_install / 'root', module_name, module_identity)
-    with tarfile.open(args.bootstrap / ram['supplement']) as packed:
-        data = packed.extractfile(module_name).read()
-        if hashlib.sha256(data).hexdigest() != module_identity['sha256']:
-            raise ValueError('RAM/disk packaged RDA modules differ')
-        database = packed.extractfile('lib/apk/db/installed').read().decode()
-        if 'P:kernel\nV:' + abi + '\n' not in database:
-            raise ValueError('RAM/disk kernel APK ABIs differ')
+    ram, upgrade, first, abi, module_identity = validate_deliveries(args.bootstrap, args.upgrade, args.first_install)
     args.output.mkdir(parents=True)
     assets = args.output / 'assets'
     assets.mkdir()

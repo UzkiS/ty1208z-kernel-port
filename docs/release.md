@@ -4,6 +4,9 @@
 页面下载，不需要查找 CI 的短期构建附件。每个正式 Release 附带 `SHA256SUMS.txt`
 和用途说明；校验通过后再使用对应文件。
 
+后续完整固件默认生成 `bridge`、`hybrid`、`nat` 三版；见[网络版本说明](network-variants.md)。
+新打包入口已实现，不表示三版已公开发布或完成实机验收，当前正式下载仍以下列版本为准。
+
 当前正式版本为 [2026.10.15.5](https://github.com/UzkiS/ty1208z-kernel-port/releases/tag/v2026.10.15.5)，修复恢复默认按钮，并包含中文 ttyd 终端及配置页。
 首刷用户同时下载 `first-install` 和 `install-ram` 两包；已安装用户只需 `sysupgrade`。
 精确身份和上传核对见[发布记录](../verification/release-20261015.5.md)。

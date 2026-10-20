@@ -5,6 +5,10 @@
 普通重启已通过实机验证**；新四核、全内存与多块队列的实机状态单独记录，
 见[当前状态](../../STATUS.md)和[安装说明](../../docs/installation-plan.md)。
 
+完整固件使用 `make openwrt-release-full VERSION=...` 默认生成 `bridge`、`hybrid`、`nat`
+三版，共用内核与应用，分别制作首刷/升级包及恢复默认快照；
+详见[网络版本与构建入口](../../docs/network-variants.md)。以下桥接默认说明适用于 `bridge`。
+
 ## RAM 开发系统
 
 先完成固定原生工具链、`openwrt-router-emmcro` 和

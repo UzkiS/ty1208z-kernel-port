@@ -16,7 +16,7 @@ Linux 使用 `sha256sum -c`，Windows 可用 `Get-FileHash -Algorithm SHA256` �
 | `rootfs.cpio.gz` | 与该 RAM 内核精确配套的 bootstrap |
 | `userspace-system.RAM-ONLY.tar.gz` | RAM 系统补充用户空间及匹配模块 |
 | `ty1208z-first-install-*.apk` | 临时系统中的首刷后端 |
-| `first-install-manifest.json` | 首刷包与内核身份 |
+| `first-install-manifest.json` 或 `first-install-manifests/` | 单版或三版首刷包与内核身份 |
 | `manifest.json`、`checks/` | 构建身份、内存布局及来源记录 |
 
 本包内核 ABI：`@KERNEL_ABI@`。first-install 全包复用已验收流程，最新包没有
@@ -122,8 +122,11 @@ uci commit firewall
 ```
 
 打开 `http://板子实际DHCP地址/cgi-bin/luci/`，默认账号 root、空密码。
-“系统 → 备份与更新”上传同一 Release 的 `ty1208z-ca-first-install-*.bin`。
-需要从干净默认配置开始时取消“保留配置”；选择保留时，临时管理规则也会被保留。
+“系统 → 备份与更新”上传同一 Release 的 first-install 包。
+三版下载集合选择 `ty1208z-ca-bridge-first-install-*`、`ty1208z-ca-hybrid-first-install-*`
+或 `ty1208z-ca-nat-first-install-*`；旧单版文件名为 `ty1208z-ca-first-install-*`。
+首次安装要启用所选类型的默认网络时，取消“保留配置”；保留时会沿用临时系统网络，
+临时管理规则也会被保留。纯 NAT 版持久启动后默认从 Wi-Fi 的 `192.168.50.1` 管理。
 校验通过后安装，等待完整写入、读回和自动重启，不断电。
 
 首次持久启动会自动扩容 p9 到完整 6846 MiB。之后只使用 sysupgrade 包。

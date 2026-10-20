@@ -6,6 +6,7 @@
 
 ## 安装与当前集成
 
+- [三种网络固件离线验证（2026-10-20）](network-variants-20261020.md)
 - [固定 MAC 与默认桥接热点（2026-10-15）](stable-mac-bridge-20261015.md)
 - [ext4 恢复默认实机验收（2026-10-15）](factory-reset-board-20261015.md)
 - [ttyd 网页终端与 Compose 状态（2026-10-15）](ttyd-compose-board-20261015.md)

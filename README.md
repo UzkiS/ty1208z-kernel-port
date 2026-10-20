@@ -68,6 +68,10 @@ OpenWrt 集成入口见[构建架构](docs/architecture.md)和[官方来源说�
 `JOBS` 控制并行度。源码版本、下载哈希、补丁和产物清单随构建记录，
 工具只处理本地构建文件，不会因执行构建命令自动操作设备。
 
+后续完整固件使用 `make openwrt-release-full VERSION=...` 默认生成桥接、混合、纯 NAT 三版；
+共用内核/应用和 RAM 首刷环境，分别提供首刷与升级包。[三版说明](docs/network-variants.md)
+列出网络布局、管理地址和切换方式；当前 `.5` 公开包仍为原桥接版。
+
 ## 开发资料
 
 [硬件依据](docs/hardware.md) · [eMMC](docs/emmc.md) · [SD](docs/sd.md) ·

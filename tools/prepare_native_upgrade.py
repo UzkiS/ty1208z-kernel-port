@@ -11,6 +11,7 @@ from native_upgrade import digest, make_image, make_package, source_identity
 from prepare_openwrt import toolchain_from_native
 from prepare_native_package_supplement import public_runtime_metadata
 import native_reset
+import native_network
 
 
 def main():
@@ -20,6 +21,7 @@ def main():
                         help="Existing accepted private delivery, including root and kernel")
     parser.add_argument("--source", type=Path, required=True, help="Native source with host apk/fwtool")
     parser.add_argument("--output", type=Path, required=True)
+    parser.add_argument('--network-profile', choices=native_network.PROFILES, default='bridge')
     args = parser.parse_args()
     assert not args.output.exists(), "Inspect existing delivery; never overwrite it"
     args.output.mkdir(parents=True)
@@ -46,6 +48,9 @@ def main():
                  "etc/config/network", "etc/shadow"):
         assert (root / name).read_bytes() == (old_root / name).read_bytes(), name
     public_runtime_metadata(root)
+    native_network.configure(root, args.network_profile)
+    network_package = native_network.make_package(apk, root, args.output / 'network-package')
+    native_reset.install(apk, root, [network_package])
     candidates = list((args.source / 'bin').rglob('fstools-2026.05.23~16718b6e-r1.apk'))
     assert len(candidates) == 1, 'Pinned native fstools APK missing or ambiguous'
     fstools = native_reset.adapt_fstools(apk, candidates[0], args.output / 'fstools-package')
@@ -63,8 +68,12 @@ def main():
     receipt = {"status": "public offline web upgrade candidate; physical acceptance pending",
                "image": {"file": image.name, "bytes": image.stat().st_size, "sha256": digest(image)},
                "package": {"file": package.relative_to(args.output).as_posix(), "sha256": digest(package)},
-               "manifest": manifest, "sources": {**source_identity(), **native_reset.source_identity()}, "toolchain": toolchain_identity,
+               "manifest": manifest, "sources": {**source_identity(), **native_reset.source_identity(),
+                                                 **native_network.source_identity()}, "toolchain": toolchain_identity,
                "reset_packages": {p.relative_to(args.output).as_posix(): digest(p) for p in (fstools, reset)},
+               "network_profile": args.network_profile,
+               "network_package": {"file": network_package.relative_to(args.output).as_posix(),
+                                   "sha256": digest(network_package)},
                "data_preserved": ["/opt", "/root", "/mnt", "/srv"],
                "hardware_actions": False, "redistribution": "User-supplied RDA firmware included in the public release with explicit project-owner authorization"}
     (args.output / "manifest.json").write_text(json.dumps(receipt, indent=2) + "\n")

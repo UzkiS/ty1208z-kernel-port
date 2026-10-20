@@ -1,6 +1,6 @@
 # 当前状态与验收边界
 
-更新于 2026-10-15。当前交付已完成 TY1208Z CA 实机 eMMC 安装和原生网页升级。
+更新于 2026-10-20。当前交付已完成 TY1208Z CA 实机 eMMC 安装和原生网页升级。
 本页只记录当前集成状态；独立实验的当时结论见[历史验证索引](verification/README.md)。
 
 ## 已完成
@@ -8,6 +8,7 @@
 | 项目 | 当前结果与证据 |
 |---|---|
 | 系统来源 | 官方 OpenWrt 25.12 固定 `58efa9917d4cc53fceed173529a286187649e827`，Linux 6.12.112；固定版本构建，不持续追踪 master |
+| 三种网络固件 | 后续完整构建默认生成 bridge、hybrid、nat 的首刷/升级包；六个本地预览镜像、真实 ARM UCI/fw4 和对应重置快照检查通过。新组合未实机验收，当前公开 `.5` 不变；[记录](verification/network-variants-20261020.md) |
 | 首次安装 | TTL/TFTP 启动专用 RAM 环境，官方中文 LuCI 首刷；1 GiB p9 和 p6 完整读回，eMMC ext4 rw 根启动；[记录](verification/compact-first-install-board-20261014.md) |
 | 容量与持久化 | p9 在线扩至 6846 MiB，文件系统约 6.5 GiB；配置和容器内容跨断电保留；[安装说明](docs/installation-plan.md) |
 | 恢复默认 | LuCI“系统 → 恢复默认设置”、firstboot/factoryreset 支持 ext4 配置重置；清登录授权/密码，保留 MAC、SD、Docker/用户数据，实际重置和后续重启通过；[后端记录](verification/factory-reset-board-20261015.md)。`.5` 修复按钮灰色并改为 `system/reset`，真实 DOM、实机页面/预检通过；[页面记录](verification/reset-ui-board-20261015.md) |
