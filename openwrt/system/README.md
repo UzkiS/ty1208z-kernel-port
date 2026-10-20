@@ -8,6 +8,8 @@
 完整固件使用 `make openwrt-release-full VERSION=...` 默认生成 `bridge`、`hybrid`、`nat`
 三版，共用内核与应用，分别制作首刷/升级包及恢复默认快照；
 详见[网络版本与构建入口](../../docs/network-variants.md)。以下桥接默认说明适用于 `bridge`。
+`2026.10.20` 的三版正式下载与校验身份见[发布记录](../../verification/release-20261020.md)，
+混合版和 NAT 版尚未实机联网验收。
 
 ## RAM 开发系统
 

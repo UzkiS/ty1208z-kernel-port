@@ -6,12 +6,13 @@
 
 ## 安装与当前集成
 
+- [三种网络固件 Release 文件与公开下载（2026-10-20）](release-20261020.md)
 - [三种网络固件离线验证（2026-10-20）](network-variants-20261020.md)
 - [固定 MAC 与默认桥接热点（2026-10-15）](stable-mac-bridge-20261015.md)
 - [ext4 恢复默认实机验收（2026-10-15）](factory-reset-board-20261015.md)
 - [ttyd 网页终端与 Compose 状态（2026-10-15）](ttyd-compose-board-20261015.md)
 - [恢复默认按钮与路由修复（2026-10-15）](reset-ui-board-20261015.md)
-- [当前 .5 版恢复默认修复 Release 文件（2026-10-15）](release-20261015.5.md)
+- [.5 版恢复默认修复 Release 文件（2026-10-15）](release-20261015.5.md)
 - [已撤回 .4 版 ttyd Release 文件身份（2026-10-15）](release-20261015.4.md)
 - [已撤回 .3 版 Release 文件身份（2026-10-15）](release-20261015.3.md)
 - [已撤回 .2 版 Release 文件身份（2026-10-15）](release-20261015.2.md)
